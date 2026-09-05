@@ -1,0 +1,286 @@
+# OMOBIO Selfcare Platform — Monitoring & Alerting Pipeline
+#
+# Continuous monitoring job that:
+#   - Validates Sentry / Grafana / Prometheus are receiving data from prod
+#   - Tests alertmanager routing
+#   - Uploads synthetic monitoring probes
+#   - Performs daily SLO snapshot
+#   - Refreshes error budget burn reports
+#
+# Also builds and deploys the Grafana dashboards + alert rules from
+# observability/ to the production monitoring stack.
+
+name: Monitoring & Alerts
+
+on:
+  schedule:
+    # Every 15 minutes
+    - cron: '*/15 * * * *'
+    # Daily snapshot at 02:30 UTC
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+  id-token: write
+
+env:
+  PROM_URL: ${{ secrets.PROMETHEUS_URL }}
+  GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+  SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+  ALERTMANAGER_URL: ${{ secrets.ALERTMANAGER_URL }}
+  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+jobs:
+  # ======================================================================
+  # Synthetic monitoring — verify prod is up
+  # ======================================================================
+  synthetic:
+    name: Synthetic probes (every 15m)
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '*/15 * * * *'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install k6
+        run: |
+          apt-get update && apt-get install -y curl
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.tar.gz | tar -xz
+          sudo cp k6-v0.50.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: Run synthetic probes
+        env:
+          API_GATEWAY: ${{ secrets.PROD_API_GATEWAY }}
+        run: |
+          k6 run - <<EOF
+          import http from 'k6/http';
+          import { check } from 'k6';
+          export const options = { vus: 1, duration: '30s' };
+          const PROBES = [
+            { url: __ENV.API_GATEWAY + '/actuator/health', name: 'gateway-health' },
+            { url: __ENV.API_GATEWAY + '/api/v1/config/manifest?tenantId=dialog-lk', name: 'config-manifest' },
+            { url: __ENV.API_GATEWAY + '/api/v1/content/faqs?tenantId=dialog-lk', name: 'content-faqs' },
+            { url: __ENV.API_GATEWAY + '/actuator/health', name: 'gateway-health-loop' },
+          ];
+          export default function () {
+            for (const p of PROBES) {
+              const r = http.get(p.url, { headers: { 'X-Tenant-Id': 'dialog-lk' } });
+              check(r, { [\`\${p.name} status 200\`] : (r) => r.status === 200 });
+            }
+          }
+          EOF
+
+      - name: Alert on probe failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🔴 *Synthetic probe failed*\nEnvironment: prod\nRun: ${{ github.run_id }}\nDuration: ${{ github.event.head_commit.id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }}
+
+  # ======================================================================
+  # Daily SLO snapshot
+  # ======================================================================
+  slo-snapshot:
+    name: Daily SLO snapshot
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '30 2 * * *'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Query SLOs from Prometheus
+        env:
+          PROM: ${{ env.PROM_URL }}
+        run: |
+          mkdir -p slo-output
+          SERVICES="api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service"
+          echo "{ \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," > slo-output/snapshot.json
+          echo "  \"slos\": [" >> slo-output/snapshot.json
+          FIRST=1
+          for svc in $SERVICES; do
+            # Availability SLO: 99.9% over 30 days
+            AVAIL=$(curl -sG "$PROM/api/v1/query" \
+              --data-urlencode "query=1 - (sum(rate(http_requests_total{service=\"$svc\",status=~\"5..\"}[30d]))/sum(rate(http_requests_total{service=\"$svc\"}[30d])))" \
+              | jq -r '.data.result[0].value[1] // "0"')
+            # Latency SLO: p99 < 1.5s
+            P99=$(curl -sG "$PROM/api/v1/query" \
+              --data-urlencode "query=histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"$svc\"}[30d])))" \
+              | jq -r '.data.result[0].value[1] // "0"')
+            # Error budget burn
+            BURN=$(curl -sG "$PROM/api/v1/query" \
+              --data-urlencode "query=(1 - 0.999) * 30 * 24 * 60 / (1 - $AVAIL) * 60" \
+              | jq -r '.data.result[0].value[1] // "0"' 2>/dev/null || echo "0")
+            COMMA=""
+            if [ $FIRST -eq 0 ]; then COMMA=","; fi
+            FIRST=0
+            cat >> slo-output/snapshot.json <<EOF
+            $COMMA
+            { "service": "$svc", "availability_30d": $AVAIL, "p99_latency_s": $P99, "error_budget_burn_hours": $BURN }
+            EOF
+          done
+          echo "] }" >> slo-output/snapshot.json
+          cat slo-output/snapshot.json | jq '.' | head -50
+
+      - name: Upload snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: slo-snapshot-${{ github.run_id }}
+          path: slo-output/
+
+      - name: Push to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-west-1
+        run: |
+          aws s3 cp slo-output/snapshot.json \
+            s3://omobio-slo-snapshots/$(date -u +%Y/%m/%d)/snapshot-${{ github.run_id }}.json
+
+      - name: Alert on SLO violation
+        env:
+          PROM: ${{ env.PROM_URL }}
+        run: |
+          VIOLATIONS=$(jq -r '.slos[] | select(.availability_30d < 0.999 or .p99_latency_s > 1.5) | "\(.service): avail=\(.availability_30d) p99=\(.p99_latency_s)s"' slo-output/snapshot.json)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::warning::SLO violations detected:"
+            echo "$VIOLATIONS"
+            echo "VIOLATIONS<<EOF" >> "$GITHUB_ENV"
+            echo "$VIOLATIONS" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          else
+            echo "All SLOs within budget"
+          fi
+
+      - name: Slack notification
+        if: env.VIOLATIONS != ''
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ *SLO violations detected*\n\`\`\`\n${{ env.VIOLATIONS }}\n\`\`\`"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }}
+
+  # ======================================================================
+  # Test alertmanager routing
+  # ======================================================================
+  test-alerts:
+    name: Test alertmanager routing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test critical alert
+        env:
+          AM: ${{ env.ALERTMANAGER_URL }}
+        run: |
+          curl -XPOST "$AM/api/v1/alerts" -H "Content-Type: application/json" -d '[
+            {
+              "labels": { "alertname": "TestAlert", "severity": "critical", "service": "selfcare-platform" },
+              "annotations": { "summary": "Test alert from monitoring pipeline" }
+            }
+          ]'
+
+      - name: Test warning alert
+        env:
+          AM: ${{ env.ALERTMANAGER_URL }}
+        run: |
+          curl -XPOST "$AM/api/v1/alerts" -H "Content-Type: application/json" -d '[
+            {
+              "labels": { "alertname": "TestWarning", "severity": "warning", "service": "selfcare-platform" },
+              "annotations": { "summary": "Test warning from monitoring pipeline" }
+            }
+          ]'
+
+  # ======================================================================
+  # Deploy Grafana dashboards + alert rules
+  # ======================================================================
+  deploy-dashboards:
+    name: Deploy Grafana dashboards + alerts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push dashboards to Grafana
+        env:
+          GRAFANA: ${{ env.GRAFANA_URL }}
+          TOKEN: ${{ secrets.GRAFANA_ADMIN_TOKEN }}
+        run: |
+          for f in selfcare-platform/observability/dashboards/*.json; do
+            echo "Uploading $f"
+            curl -XPOST "$GRAFANA/api/dashboards/db" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"dashboard\": $(cat $f), \"overwrite\": true, \"message\": \"Updated by monitoring-alerts.yml @ ${{ github.sha }}\"}" \
+              || echo "Failed to upload $f"
+          done
+
+      - name: Push alert rules
+        env:
+          PROM: ${{ env.PROM_URL }}
+          TOKEN: ${{ secrets.PROM_ADMIN_TOKEN }}
+        run: |
+          curl -XPOST "$PROM/api/v1/rules/rules" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @selfcare-platform/observability/prometheus-alerts.yaml
+          echo "Alert rules updated"
+
+      - name: Push scrape config
+        env:
+          PROM: ${{ env.PROM_URL }}
+          TOKEN: ${{ secrets.PROM_ADMIN_TOKEN }}
+        run: |
+          curl -XPOST "$PROM/api/v1/admin/config" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @selfcare-platform/observability/prometheus-scrape.yaml
+          echo "Scrape config updated"
+
+  # ======================================================================
+  # Verify Sentry receives events
+  # ======================================================================
+  sentry-check:
+    name: Verify Sentry ingestion
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send test event to Sentry
+        env:
+          SENTRY: ${{ env.SENTRY_DSN }}
+        run: |
+          DSN="$SENTRY"
+          PUBLIC_KEY=$(echo $DSN | sed -E 's|^https?://([^@]+)@.*|\1|' | cut -d: -f1)
+          if [ -z "$PUBLIC_KEY" ]; then
+            echo "::warning::SENTRY_DSN not configured"
+            exit 0
+          fi
+          curl -XPOST "https://sentry.io/api/0/projects/omobio/selfcare-platform/events/" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -d '{
+              "message": "Test event from monitoring pipeline",
+              "level": "info",
+              "platform": "other",
+              "tags": { "source": "monitoring-alerts.yml" }
+            }'

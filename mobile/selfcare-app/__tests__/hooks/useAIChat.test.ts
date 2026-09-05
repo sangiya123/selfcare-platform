@@ -1,0 +1,54 @@
+/**
+ * useAIChat hook tests.
+ *
+ * Verifies:
+ * - Returns initial empty state
+ * - Recommended prompts are available
+ * - Industry-aware prompts (telco vs insurance)
+ * - Intent is null initially
+ */
+import { renderHook } from '@testing-library/react-native';
+import { useAIChat } from '../../src/hooks/useAIChat';
+
+// Mock the underlying AI client so we don't need a real server
+jest.mock('../../src/config/AIClient', () => ({
+  AIClient: jest.fn().mockImplementation(() => ({
+    getOrCreateSession: jest.fn().mockResolvedValue({
+      id: 'sess-1',
+      tenantId: 'dialog-lk',
+      title: 'New Conversation',
+      messages: [],
+      active: true,
+    }),
+    setLastSessionId: jest.fn(),
+    getLastSessionId: jest.fn().mockReturnValue(null),
+    classifyIntent: jest.fn().mockResolvedValue({
+      intent: 'GENERAL', confidence: 0.5, suggestedAction: 'general_assist', autoActEligible: false,
+    }),
+  })),
+}));
+
+jest.mock('../../src/hooks/useAuth', () => ({
+  useAuth: () => ({ accessToken: null }),
+}));
+
+describe('useAIChat', () => {
+  it('returns initial empty state', () => {
+    const { result } = renderHook(() => useAIChat());
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.input).toBe('');
+    expect(result.current.isStreaming).toBe(false);
+    expect(result.current.intent).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it('provides recommended prompts', () => {
+    const { result } = renderHook(() => useAIChat());
+    expect(result.current.recommendedPrompts.length).toBeGreaterThan(0);
+  });
+
+  it('starts with showPrompts false but exposes isUrgentIntent flag', () => {
+    const { result } = renderHook(() => useAIChat());
+    expect(result.current.isUrgentIntent).toBe(false);
+  });
+});

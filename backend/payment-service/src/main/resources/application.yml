@@ -1,0 +1,57 @@
+# OMOBIO Payment Service
+spring:
+  application:
+    name: payment-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:omobio}
+    password: ${DB_PASSWORD:omobio}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:omobio}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+server:
+  port: ${PAYMENT_SERVICE_PORT:8089}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: payment-service
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
+  payment:
+    cross-connection:
+      max-amount: 100000.00
+      step-up-threshold: 10000.00
+    receipt:
+      base-url: ${PAYMENT_RECEIPT_URL:http://localhost:8089}
+
+payment:
+  receipt:
+    base-url: ${PAYMENT_RECEIPT_URL:http://localhost:8089}

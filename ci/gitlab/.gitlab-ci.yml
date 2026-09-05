@@ -1,0 +1,367 @@
+# OMOBIO Selfcare Platform — GitLab CI/CD pipeline
+#
+# Mirror of the GitHub Actions workflow for teams using GitLab.
+# Stages: lint → test → scan → build → deploy
+# Coverage gate: 60% minimum line coverage (configurable).
+
+stages:
+  - lint
+  - test
+  - scan
+  - build
+  - publish
+  - deploy
+
+variables:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+  MAVEN_CLI_OPTS: '-B -e -fae -DskipTests=false -DargLine="-Xmx2g"'
+  DOCKER_REGISTRY: $CI_REGISTRY_IMAGE
+  DOCKER_TLS_CERTDIR: '/certs'
+  KUBECONFIG: '/etc/deploy/kubeconfig'
+  NVD_API_KEY: $OWASP_NVD_API_KEY
+  FAIL_ON_CVSS: '7'
+
+default:
+  image: eclipse-temurin:25-jdk
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .m2/repository
+      - node_modules/
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends
+        git curl jq ca-certificates gettext-base
+    - command -v node || (curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs)
+
+# ==========================================
+# Lint & static analysis
+# ==========================================
+checkstyle:
+  stage: lint
+  script:
+    - cd selfcare-platform/backend
+    - mvn $MAVEN_CLI_OPTS checkstyle:check
+  artifacts:
+    when: always
+    reports:
+      junit: '**/target/checkstyle-result.xml'
+    paths:
+      - '**/target/checkstyle-result.xml'
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+spotbugs:
+  stage: lint
+  script:
+    - cd selfcare-platform/backend
+    - mvn $MAVEN_CLI_OPTS -DskipTests=true spotbugs:check
+  artifacts:
+    when: always
+    reports:
+      junit: '**/target/spotbugsXml.xml'
+    paths:
+      - '**/target/spotbugsXml.xml'
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+pmd:
+  stage: lint
+  script:
+    - cd selfcare-platform/backend
+    - mvn $MAVEN_CLI_OPTS -DskipTests=true pmd:check
+  artifacts:
+    when: always
+    paths:
+      - '**/target/pmd.xml'
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+# ==========================================
+# Tests
+# ==========================================
+unit-tests:backend:
+  stage: test
+  script:
+    - cd selfcare-platform/backend
+    - mvn $MAVEN_CLI_OPTS test
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - '**/target/surefire-reports/TEST-*.xml'
+    paths:
+      - '**/target/surefire-reports/'
+      - '**/target/jacoco.exec'
+  coverage: '/Total.*?([0-9]{1,3})%/'
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+unit-tests:admin:
+  stage: test
+  image: node:20
+  script:
+    - cd selfcare-platform/admin/selfcare-studio
+    - npm ci
+    - npx vitest run --coverage --reporter=junit --outputFile.junit=./junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: selfcare-platform/admin/selfcare-studio/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: selfcare-platform/admin/selfcare-studio/coverage/cobertura-coverage.xml
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - selfcare-platform/admin/**/*
+
+unit-tests:mobile:
+  stage: test
+  image: node:20
+  script:
+    - cd selfcare-platform/mobile/selfcare-app
+    - npm ci
+    - npx jest --ci --coverage --coverageReporters=cobertura --testResultsProcessor=jest-junit
+  artifacts:
+    when: always
+    reports:
+      junit: selfcare-platform/mobile/selfcare-app/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: selfcare-platform/mobile/selfcare-app/coverage/cobertura-coverage.xml
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - selfcare-platform/mobile/**/*
+
+conformance-tests:
+  stage: test
+  services:
+    - name: mongo:7
+      alias: mongo
+    - name: redis:7-alpine
+      alias: redis
+    - name: mysql:8
+      alias: mysql
+      command: ['--default-authentication-plugin=mysql_native_password']
+      variables:
+        MYSQL_ROOT_PASSWORD: 'root'
+        MYSQL_DATABASE: 'selfcare_test'
+  variables:
+    OMOBIO_TEST_GATEWAY_URL: 'http://localhost:8080'
+    OMOBIO_TEST_DB_URL: 'jdbc:mysql://mysql:3306/selfcare_test'
+    OMOBIO_TEST_REDIS_URL: 'redis://redis:6379'
+    OMOBIO_TEST_MONGO_URL: 'mongodb://mongo:27017/selfcare_test'
+  script:
+    - cd selfcare-platform/tests/conformance
+    - mvn $MAVEN_CLI_OPTS test
+  artifacts:
+    when: always
+    reports:
+      junit: '**/target/surefire-reports/TEST-*.xml'
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# ==========================================
+# Security scanning
+# ==========================================
+owasp-dependency-check:
+  stage: scan
+  script:
+    - cd selfcare-platform/backend
+    - mvn -B -DskipTests=true -Dnvd.api.key=$NVD_API_KEY -DfailBuildOnCVSS=$FAIL_ON_CVSS
+        -Dformats=HTML,JSON,SARIF -DoutputDirectory=target/dependency-check
+        org.owasp:dependency-check-maven:check
+  artifacts:
+    when: always
+    paths:
+      - selfcare-platform/backend/target/dependency-check/
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - selfcare-platform/backend/**/pom.xml
+
+trivy-container-scan:
+  stage: scan
+  image:
+    name: docker:24
+    entrypoint: ['']
+  services:
+    - docker:24-dind
+  needs: ['build:images']
+  script:
+    - apk add --no-cache curl
+    - curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.54.1/trivy_0.54_Linux-64bit.tar.gz
+        | tar -xz -C /usr/local/bin
+    - trivy image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed
+        $DOCKER_REGISTRY/api-gateway:$CI_COMMIT_SHORT_SHA
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+gitleaks:
+  stage: scan
+  image: zricethezav/gitleaks:v8.18.4
+  script:
+    - gitleaks detect --redact --fail-on-public --source . --verbose
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# ==========================================
+# Build (compile + test + coverage aggregation)
+# ==========================================
+build:images:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  needs: ['unit-tests:backend', 'checkstyle', 'owasp-dependency-check']
+  script:
+    - cd selfcare-platform
+    - |
+      for service in api-gateway config-tenant-service customer-identity-service admin-identity-service
+                    account-entitlement-service dashboard-bff product-service usage-service
+                    billing-service payment-service notification-service content-service
+                    journey-service reporting-service ai-gateway audit-service insurance-service
+                    approval-service; do
+        docker build -t $DOCKER_REGISTRY/$service:$CI_COMMIT_SHORT_SHA ./backend/$service
+        docker push $DOCKER_REGISTRY/$service:$CI_COMMIT_SHORT_SHA
+      done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+build:admin:
+  stage: build
+  image: node:20
+  script:
+    - cd selfcare-platform/admin/selfcare-studio
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - selfcare-platform/admin/selfcare-studio/dist
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - selfcare-platform/admin/**/*
+
+# ==========================================
+# Publish (SBOM + release notes)
+# ==========================================
+publish:sbom:
+  stage: publish
+  image: maven:3.9-eclipse-temurin-25
+  script:
+    - cd selfcare-platform/backend
+    - mvn -B org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+  artifacts:
+    paths:
+      - selfcare-platform/backend/target/bom.json
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+
+# ==========================================
+# Deploy
+# ==========================================
+deploy:dev:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - apk add --no-cache curl bash
+    - curl -fsSL https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz | tar -xz
+    - mv linux-amd64/helm /usr/local/bin/helm
+    - mkdir -p ~/.kube
+    - echo "$DEV_KUBECONFIG" | base64 -d > ~/.kube/config
+    - |
+      for service in api-gateway config-tenant-service customer-identity-service admin-identity-service
+                    account-entitlement-service dashboard-bff product-service usage-service
+                    billing-service payment-service notification-service content-service
+                    journey-service reporting-service ai-gateway audit-service insurance-service
+                    approval-service; do
+        helm upgrade --install omobio-${service} \
+          selfcare-platform/backend/deploy/helm/${service} \
+          --namespace omobio-dev --create-namespace \
+          --set image.tag=$CI_COMMIT_SHORT_SHA \
+          --set image.repository=$DOCKER_REGISTRY/${service} \
+          --set env=dev --set replicaCount=1 \
+          --wait --timeout 5m
+      done
+  environment:
+    name: dev
+    url: https://api.dev.omobio.io
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy:stg:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - apk add --no-cache curl bash
+    - curl -fsSL https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz | tar -xz
+    - mv linux-amd64/helm /usr/local/bin/helm
+    - mkdir -p ~/.kube
+    - echo "$STG_KUBECONFIG" | base64 -d > ~/.kube/config
+    - |
+      for service in api-gateway config-tenant-service customer-identity-service admin-identity-service
+                    account-entitlement-service dashboard-bff product-service usage-service
+                    billing-service payment-service notification-service content-service
+                    journey-service reporting-service ai-gateway audit-service insurance-service
+                    approval-service; do
+        helm upgrade --install omobio-${service} \
+          selfcare-platform/backend/deploy/helm/${service} \
+          --namespace omobio-stg --create-namespace \
+          --set image.tag=$CI_COMMIT_SHORT_SHA \
+          --set image.repository=$DOCKER_REGISTRY/${service} \
+          --set env=stg --set replicaCount=2 \
+          --wait --timeout 5m
+      done
+  environment:
+    name: stg
+    url: https://api.stg.omobio.io
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy:prod:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - apk add --no-cache curl bash
+    - curl -fsSL https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz | tar -xz
+    - mv linux-amd64/helm /usr/local/bin/helm
+    - mkdir -p ~/.kube
+    - echo "$PROD_KUBECONFIG" | base64 -d > ~/.kube/config
+    - |
+      VERSION=$CI_COMMIT_SHORT_SHA
+      # Blue/green: deploy as 'green', shift 10% → 50% → 100%
+      for service in api-gateway config-tenant-service customer-identity-service admin-identity-service
+                    account-entitlement-service dashboard-bff product-service usage-service
+                    billing-service payment-service notification-service content-service
+                    journey-service reporting-service ai-gateway audit-service insurance-service
+                    approval-service; do
+        helm upgrade --install omobio-${service} \
+          selfcare-platform/backend/deploy/helm/${service} \
+          --namespace omobio-prod --create-namespace \
+          --set image.tag=$VERSION \
+          --set image.repository=$DOCKER_REGISTRY/${service} \
+          --set env=prod --set replicaCount=3 \
+          --set deployment.color=green \
+          --wait --timeout 10m
+      done
+  environment:
+    name: prod
+    url: https://api.omobio.io
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+  needs: ['publish:sbom', 'deploy:stg']

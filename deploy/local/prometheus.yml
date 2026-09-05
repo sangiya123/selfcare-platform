@@ -1,0 +1,53 @@
+# =====================================================================
+# Prometheus — local dev configuration
+# Scrapes OTel collector's prometheus exporter and the services
+# directly for redundancy.
+# =====================================================================
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    env: dev
+    platform: omobio-selfcare
+
+rule_files:
+  - /etc/prometheus/alerts/*.yaml
+
+scrape_configs:
+  # Primary: OTel collector exposed Prometheus endpoint
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+        labels:
+          service: otel-collector
+    scrape_interval: 15s
+
+  # Direct scrape fallback for select services
+  - job_name: 'omobio-services'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - api-gateway:8080
+          - customer-identity-service:8080
+          - dashboard-bff:8080
+          - product-service:8080
+          - usage-service:8080
+        labels:
+          tier: backend
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+storage:
+  tsdb:
+    retention.time: 15d
+    retention.size: 10GB

@@ -1,0 +1,261 @@
+# OMOBIO Selfcare Platform — SonarQube Quality Gate
+#
+# Scans backend (Java/Maven), admin (TypeScript/React), and mobile
+# (TypeScript/React Native) code, then publishes results to SonarQube
+# and the GitHub Security tab.
+#
+# Required secrets:
+#   SONAR_TOKEN            — SonarQube authentication token
+#   SONAR_HOST_URL         — https://sonarcloud.io or self-hosted URL
+#
+# Required vars (optional):
+#   SONAR_ORG              — SonarCloud organization key (if using SonarCloud)
+
+name: SonarQube Quality Gate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 3 * * 0'  # weekly full scan Sunday 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip test execution (use cached coverage if available)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+  NODE_VERSION: '20'
+
+jobs:
+  # ==========================================
+  # Backend: Java + Maven (Maven Central scanner)
+  # ==========================================
+  backend-sonar:
+    name: Backend SonarQube Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: "!inputs.skip_tests || github.event_name != 'workflow_dispatch'"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for blame/SCM
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Build and run tests with coverage
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B -e -fae \
+            -DskipITs=true \
+            -Dtest='!e2e.*' \
+            -DfailIfNoTests=false \
+            -DargLine="-Xmx2g" \
+            org.jacoco:jacoco-maven-plugin:prepare-agent \
+            test \
+            org.jacoco:jacoco-maven-plugin:report \
+            -pl '!tests/conformance'
+
+      - name: Aggregate coverage to SonarQube
+        working-directory: selfcare-platform/backend
+        run: |
+          # SonarQube reads JaCoCo exec/aggregate by service automatically
+          ls -la */target/jacoco.exec 2>/dev/null | head -25 || true
+
+      - name: Run SonarQube Scanner
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: selfcare-platform/backend
+          args: >
+            -Dsonar.projectKey=omobio-selfcare-backend
+            -Dsonar.projectName=OMOBIO Selfcare Platform - Backend
+            -Dsonar.projectVersion=${{ github.sha }}
+            -Dsonar.sources=.
+            -Dsonar.tests=.
+            -Dsonar.exclusions=**/target/**,**/*.jar,**/node_modules/**
+            -Dsonar.test.inclusions=**/src/test/**/*.java
+            -Dsonar.java.binaries=**/target/classes
+            -Dsonar.java.test.binaries=**/target/test-classes
+            -Dsonar.jacoco.reportPaths=**/target/jacoco.exec
+            -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+            -Dsonar.java.source=25
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.scm.provider=git
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
+      - name: Upload Sonar results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: selfcare-platform/backend/.scannerwork/sonar-report.sarif
+          category: sonar-backend
+
+  # ==========================================
+  # Admin Portal: TypeScript/React (Sonar scanner CLI)
+  # ==========================================
+  admin-sonar:
+    name: Admin SonarQube Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: |
+          npx vitest run --coverage --reporter=verbose
+
+      - name: Run SonarQube Scanner (admin)
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: selfcare-platform/admin/selfcare-studio
+          args: >
+            -Dsonar.projectKey=omobio-selfcare-admin
+            -Dsonar.projectName=OMOBIO Selfcare Platform - Admin
+            -Dsonar.projectVersion=${{ github.sha }}
+            -Dsonar.sources=src
+            -Dsonar.tests=src/__tests__
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/**
+            -Dsonar.test.inclusions=src/__tests__/**/*.{ts,tsx}
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.tsconfigPaths=tsconfig.json
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.scm.provider=git
+
+      - name: Upload admin Sonar results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: selfcare-platform/admin/selfcare-studio/.scannerwork/sonar-report.sarif
+          category: sonar-admin
+
+  # ==========================================
+  # Mobile: TypeScript/React Native (Sonar scanner CLI)
+  # ==========================================
+  mobile-sonar:
+    name: Mobile SonarQube Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: |
+          npx jest --ci --coverage --maxWorkers=2
+
+      - name: Run SonarQube Scanner (mobile)
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: selfcare-platform/mobile/selfcare-app
+          args: >
+            -Dsonar.projectKey=omobio-selfcare-mobile
+            -Dsonar.projectName=OMOBIO Selfcare Platform - Mobile
+            -Dsonar.projectVersion=${{ github.sha }}
+            -Dsonar.sources=src
+            -Dsonar.tests=__tests__
+            -Dsonar.exclusions=**/node_modules/**,**/ios/Pods/**,**/android/build/**,**/coverage/**
+            -Dsonar.test.inclusions=__tests__/**/*.{ts,tsx}
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.tsconfigPaths=tsconfig.json
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.scm.provider=git
+
+      - name: Upload mobile Sonar results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: selfcare-platform/mobile/selfcare-app/.scannerwork/sonar-report.sarif
+          category: sonar-mobile
+
+  # ==========================================
+  # Quality gate summary
+  # ==========================================
+  quality-gate:
+    name: Quality Gate Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [backend-sonar, admin-sonar, mobile-sonar]
+    if: always()
+    steps:
+      - name: Check Quality Gate results
+        run: |
+          echo "Backend result: ${{ needs.backend-sonar.result }}"
+          echo "Admin result:   ${{ needs.admin-sonar.result }}"
+          echo "Mobile result:  ${{ needs.mobile-sonar.result }}"
+
+          FAILED=0
+          if [ "${{ needs.backend-sonar.result }}" != "success" ]; then
+            echo "::error::Backend SonarQube scan failed"
+            FAILED=1
+          fi
+          if [ "${{ needs.admin-sonar.result }}" != "success" ]; then
+            echo "::error::Admin SonarQube scan failed"
+            FAILED=1
+          fi
+          if [ "${{ needs.mobile-sonar.result }}" != "success" ]; then
+            echo "::error::Mobile SonarQube scan failed"
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+          echo "All quality gates passed ✅"

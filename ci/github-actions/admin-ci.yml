@@ -1,0 +1,105 @@
+# GitHub Actions workflow for admin portal CI.
+name: Admin CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'selfcare-platform/admin/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'selfcare-platform/admin/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: selfcare-platform/admin/selfcare-studio
+
+jobs:
+  # ==========================================
+  # Lint + Type check
+  # ==========================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+  # ==========================================
+  # Vitest
+  # ==========================================
+  test:
+    name: Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npx vitest run --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: admin-unit
+        continue-on-error: true
+
+  # ==========================================
+  # Build
+  # ==========================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_APP_ENV: production
+          VITE_API_GATEWAY_URL: ${{ secrets.PROD_API_GATEWAY_URL }}
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-build
+          path: dist/
+          retention-days: 7

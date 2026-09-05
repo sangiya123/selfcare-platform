@@ -1,0 +1,74 @@
+# =====================================================================
+# OMOBIO Selfcare Platform — .gitignore
+# =====================================================================
+
+# Active env (per-machine) — never commit
+.env
+.env.local
+.env.ci
+.env.*
+!.env.example
+!ci/.env.ci.example
+
+# Env templates (committed) — keep .env.example/.env.dev/.env.stg/.env.reg/.env.prod OUTSIDE ignore
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/
+vault-token
+
+# Java
+target/
+*.class
+*.jar
+*.war
+*.log
+hs_err_pid*
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+.cache/
+*.tsbuildinfo
+coverage/
+
+# React Native
+.bundle/
+ios/Pods/
+ios/build/
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.ipa
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Helm/Rendered
+backend/deploy/helm/**/charts/*.tgz
+
+# Local docker volumes
+.docker-data/
+.image-context*/
+.ci-images/
+ci/*.log
+**/.cxx/
+**/.tmp-*/
+
+# Test outputs
+test-output/
+test-results/

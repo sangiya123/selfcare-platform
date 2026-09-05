@@ -1,0 +1,71 @@
+# Docker build context must stay under ~5MB to avoid Windows Docker Desktop
+# named-pipe context transfer cancellation (known WSL2 issue)
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.iws
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Node / Frontend (built separately in own CI)
+admin/
+mobile/
+
+# Docs / planning (not needed for build)
+docs/
+"Planning doc"/
+"OMOBIO_Global_Selfcare_ALL_MARKDOWN_DOCUMENTS"/
+templates/
+
+# Observability (not needed for build)
+observability/
+
+# CI configs (not needed for build)
+ci/
+
+# Config schema (not needed for build)
+config-schema/
+
+# Build outputs
+**/target/
+**/build/
+**/*.jar
+**/*.war
+**/*.ear
+**/coverage/
+**/.scannerwork/
+**/.nyc_output/
+
+# Logs / temp
+**/*.log
+**/logs/
+**/*.tmp
+**/*.bak
+**/*.swp
+
+# Lock files
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+npm-debug.log*
+yarn-error.log*
+
+# Maven / Gradle local cache (in case any leaked)
+.m2/
+**/.m2/
+
+# Large config files (not needed for build)
+.env*
+ENVIRONMENT.md
+INDEX.md
+START.txt
+Jenkinsfile
+Makefile
+build.log

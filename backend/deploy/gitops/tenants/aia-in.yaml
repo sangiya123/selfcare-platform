@@ -1,0 +1,81 @@
+# tenant config: aia-in
+# Client: AIA India — INSURANCE INSURER
+# Region: IN
+# Industry: INSURANCE
+# Tenant Type: INSURER
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: aia-in
+  TENANT_OPERATOR: aia
+  TENANT_INDUSTRY: INSURANCE
+  TENANT_TYPE: INSURER
+  TENANT_REGION: IN
+  TENANT_DISPLAY_NAME: "AIA India"
+  TENANT_COUNTRY: India
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@aia.in
+  TENANT_SUPPORT_PHONE: "+91-22-XXXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#D9001B"
+  TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/aia-in/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/aia-in/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: aia.in
+  TENANT_CDN_DOMAIN: "cdn.aia.in"
+  TENANT_INGRESS_HOST: "selfcare.aia.in"
+
+  # Industry-specific provider endpoints
+  INSURANCE_API_URL: "https://api.aia.in/insurance/v1"
+  INSURANCE_API_KEY_REF: "secret-ref:aia-in-insurance-api-key"
+  POLICY_API_URL: "https://api.aia.in/policy/v1"
+  CLAIMS_API_URL: "https://api.aia.in/claims/v1"
+  AGENT_PORTAL_URL: "https://agents.aia.in"
+  KYC_PROVIDER_URL: "https://kyc.aia.in/v1"
+  UIDAI_VERIFICATION_URL: "https://kyc.aia.in/aadhaar"
+  PAN_VERIFICATION_URL: "https://kyc.aia.in/pan"
+
+  # Feature flags
+  POLICY_VIEW_ENABLED: true
+  PREMIUM_CALCULATION_ENABLED: true
+  CLAIM_FILING_ENABLED: true
+  CLAIM_TRACKING_ENABLED: true
+  BENEFICIARY_MANAGEMENT_ENABLED: true
+  RENEWAL_REMINDER_ENABLED: true
+  AI_ASSISTANT_ENABLED: false
+  JOURNEY_ENABLED: true
+  DOCUMENT_UPLOAD_ENABLED: true
+  INVESTMENT_LINKED_POLICIES_ENABLED: true
+  ULIP_ENABLED: true
+  TELEMEDICINE_ENABLED: false
+  OTP_METHODS:
+    - SMS
+    - EMAIL
+    - AADHAAR_OTP
+  SUPPORTED_LANGUAGES:
+    - hi
+    - en
+    - ta
+    - te
+    - bn
+    - mr
+
+  # Compliance (India IRDAI regulations)
+  DATA_RETENTION_DAYS: 1825  # 5 years for Indian insurance
+  GDPR_COMPLIANT: false
+  PDPA_COMPLIANT: false
+  IRDAI_REGULATED: true
+  RBI_COMPLIANT: true
+  INDIA_DATA_LOCALIZATION: true  # Data must stay in India
+  INSURANCE_REGULATOR_NOTIFY_DAYS: 30
+
+  # Resource sizing (IN has highest user load)
+  RESOURCE_QUOTA_CPU_REQUEST: "2000m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "2Gi"
+  RESOURCE_QUOTA_CPU_LIMIT: "8000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "8Gi"

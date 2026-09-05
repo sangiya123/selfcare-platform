@@ -1,0 +1,432 @@
+# OMOBIO Selfcare Platform — PR Verification (Merge Gate)
+#
+# Runs on every PR to main. Aggregates all the per-stage checks and
+# posts a single PR comment. Blocks merge if any check fails.
+#
+# All jobs run in parallel and the gate is enforced via a required
+# GitHub check. Use branch protection rules on main to require this
+# workflow before merge.
+
+name: PR Verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  statuses: write
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+  NODE_VERSION: '20'
+
+jobs:
+  # ==========================================
+  # Required: All checks
+  # ==========================================
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      admin: ${{ steps.filter.outputs.admin }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      docs: ${{ steps.filter.outputs.docs }}
+      config_schema: ${{ steps.filter.outputs.config_schema }}
+      industry_packs: ${{ steps.filter.outputs.industry_packs }}
+      any: ${{ steps.filter.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'selfcare-platform/backend/**'
+            admin:
+              - 'selfcare-platform/admin/**'
+            mobile:
+              - 'selfcare-platform/mobile/**'
+            docs:
+              - 'selfcare-platform/docs/**'
+              - 'selfcare-platform/**/*.md'
+            config_schema:
+              - 'selfcare-platform/config-schema/**'
+            industry_packs:
+              - 'selfcare-platform/industry-packs/**'
+            any:
+              - 'selfcare-platform/**'
+
+  # ==========================================
+  # Backend compile + lint
+  # ==========================================
+  backend-lint:
+    name: Backend lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Checkstyle
+        working-directory: selfcare-platform/backend
+        run: mvn -B checkstyle:check
+
+      - name: SpotBugs (informational)
+        continue-on-error: true
+        working-directory: selfcare-platform/backend
+        run: mvn -B -DskipTests=true spotbugs:check
+
+      - name: PMD (informational)
+        continue-on-error: true
+        working-directory: selfcare-platform/backend
+        run: mvn -B -DskipTests=true pmd:check
+
+  # ==========================================
+  # Backend unit tests + coverage
+  # ==========================================
+  backend-tests:
+    name: Backend unit tests + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run tests with coverage
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B -e -fae \
+            -Pci \
+            -DskipITs=true \
+            -Dtest='!e2e.*' \
+            -DfailIfNoTests=false \
+            -DargLine="-Xmx2g" \
+            test
+
+      - name: Aggregate coverage
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B verify -DskipTests=true -Pci
+          ls -la target/site/jacoco-aggregate/ 2>/dev/null || true
+
+      - name: Check coverage threshold
+        working-directory: selfcare-platform/backend
+        run: |
+          if [ -f target/site/jacoco-aggregate/jacoco.xml ]; then
+            LINE_COVERAGE=$(grep -oP 'type="LINE", covered="\K[0-9]+' target/site/jacoco-aggregate/jacoco.xml | head -1 || echo 0)
+            LINE_MISSED=$(grep -oP 'type="LINE", covered="[0-9]+", missed="\K[0-9]+' target/site/jacoco-aggregate/jacoco.xml | head -1 || echo 0)
+            if [ "$LINE_MISSED" -gt 0 ] && [ "$LINE_COVERAGE" -gt 0 ]; then
+              TOTAL=$((LINE_COVERAGE + LINE_MISSED))
+              RATIO=$(echo "scale=4; $LINE_COVERAGE / $TOTAL" | bc)
+              PCT=$(echo "$RATIO * 100" | bc)
+              echo "Coverage: ${PCT}% (lines: $LINE_COVERAGE / $TOTAL)"
+              if (( $(echo "$RATIO < 0.60" | bc -l) )); then
+                echo "::error::Coverage ${PCT}% is below 60% threshold"
+                exit 1
+              fi
+            else
+              echo "::warning::Could not parse coverage from jacoco.xml"
+            fi
+          else
+            echo "::warning::No aggregated coverage report"
+          fi
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: backend-tests
+          path: 'selfcare-platform/backend/**/target/surefire-reports/*.xml'
+          reporter: java-junit
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            selfcare-platform/backend/target/site/jacoco-aggregate/**
+            selfcare-platform/backend/**/target/site/jacoco/**
+
+  # ==========================================
+  # Admin tests
+  # ==========================================
+  admin-tests:
+    name: Admin tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.admin == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: Vitest
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npx vitest run --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: admin-pr
+        continue-on-error: true
+
+  # ==========================================
+  # Mobile tests
+  # ==========================================
+  mobile-tests:
+    name: Mobile tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: Jest
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx jest --ci --coverage --maxWorkers=2
+
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: mobile-pr
+        continue-on-error: true
+
+  # ==========================================
+  # Conformance (only on main/develop + service changes)
+  # ==========================================
+  conformance:
+    name: Conformance (smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: |
+      (github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'develop') &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.config_schema == 'true' || needs.changes.outputs.industry_packs == 'true')
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+      mysql:
+        image: mysql:8
+        ports: ['3306:3306']
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: selfcare_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run conformance
+        working-directory: selfcare-platform/tests/conformance
+        run: mvn -B test
+        env:
+          OMOBIO_TEST_GATEWAY_URL: http://localhost:8080
+          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
+          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+
+  # ==========================================
+  # License compliance
+  # ==========================================
+  license-check:
+    name: License compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Check for forbidden licenses
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B -DskipTests=true license:download-licenses
+          FORBIDDEN="GPL-3.0 AGPL-3.0 LGPL-3.0 GPL-2.0 AGPL-2.0"
+          LICENSE_FILE="target/generated-resources/licenses.xml"
+          if [ -f "$LICENSE_FILE" ]; then
+            for lic in $FORBIDDEN; do
+              if grep -q "$lic" "$LICENSE_FILE"; then
+                echo "::error::Forbidden license found: $lic"
+                exit 1
+              fi
+            done
+            echo "License check passed"
+          fi
+
+  # ==========================================
+  # Secret scanning
+  # ==========================================
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --redact --fail-on-public
+
+  # ==========================================
+  # PR comment with summary
+  # ==========================================
+  summary:
+    name: PR comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [changes, backend-lint, backend-tests, admin-tests, mobile-tests, conformance, license-check, secrets]
+    if: always()
+    steps:
+      - name: Generate PR comment
+        run: |
+          cat > pr-comment.md << 'EOF'
+          ## 🤖 PR Verification Report
+
+          | Check | Status | Details |
+          |-------|--------|---------|
+          | Backend lint | ${{ needs.backend-lint.result == 'success' && '✅' || '❌' }} | Checkstyle + SpotBugs + PMD |
+          | Backend tests | ${{ needs.backend-tests.result == 'success' && '✅' || '❌' }} | Unit + coverage ≥ 60% |
+          | Admin tests | ${{ needs.admin-tests.result == 'success' && '✅' || needs.admin-tests.result == 'skipped' && '⏭️' || '❌' }} | TypeScript + Vitest |
+          | Mobile tests | ${{ needs.mobile-tests.result == 'success' && '✅' || needs.mobile-tests.result == 'skipped' && '⏭️' || '❌' }} | TypeScript + Jest |
+          | Conformance | ${{ needs.conformance.result == 'success' && '✅' || needs.conformance.result == 'skipped' && '⏭️' || '❌' }} | Tenant isolation + auth + payment |
+          | License | ${{ needs.license-check.result == 'success' && '✅' || '❌' }} | No GPL/AGPL/LGPL |
+          | Secrets | ${{ needs.secrets.result == 'success' && '✅' || '❌' }} | No leaked secrets |
+          EOF
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-verification
+          path: pr-comment.md
+          message: |
+            ### 🤖 PR Verification Report
+
+            See comments below for full results.
+
+      - name: Fail gate on error
+        if: |
+          needs.backend-lint.result == 'failure' ||
+          needs.backend-tests.result == 'failure' ||
+          needs.admin-tests.result == 'failure' ||
+          needs.mobile-tests.result == 'failure' ||
+          needs.conformance.result == 'failure' ||
+          needs.license-check.result == 'failure' ||
+          needs.secrets.result == 'failure'
+        run: |
+          echo "::error::PR verification failed. See summary above."
+          exit 1

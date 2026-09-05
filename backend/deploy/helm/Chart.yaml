@@ -1,0 +1,17 @@
+apiVersion: v2
+name: omobio-microservice
+description: OMOBIO Selfcare Platform — single microservice Helm chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - omobio
+  - selfcare
+  - telecom
+  - platform
+home: https://omobio.example.com
+sources:
+  - https://github.com/omobio/selfcare-platform
+maintainers:
+  - name: OMOBIO Platform Team
+    email: platform@omobio.example.com

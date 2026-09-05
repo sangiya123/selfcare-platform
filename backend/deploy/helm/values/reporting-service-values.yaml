@@ -1,0 +1,66 @@
+# reporting-service-values.yaml — Reporting Service overrides
+# Handles: analytics, report generation, scheduled reports, data exports
+
+replicaCount: 2
+
+image:
+  repository: omobio/reporting-service
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 3Gi
+  requests:
+    cpu: 500m
+    memory: 1.5Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 75
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx2g -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # Report generation thread pool
+  REPORT_EXECUTOR_CORE_POOL_SIZE: "5"
+  REPORT_EXECUTOR_MAX_POOL_SIZE: "20"
+  REPORT_EXECUTOR_QUEUE_CAPACITY: "100"
+  # Report execution timeout (1 hour)
+  REPORT_EXECUTION_TIMEOUT_MINUTES: "60"
+  # Report cache TTL (1 hour)
+  REPORT_CACHE_TTL_MINUTES: "60"
+  # Scheduled report cron (run at midnight)
+  SCHEDULED_REPORTS_CRON: "0 0 0 * * *"
+  # Export format limits
+  EXPORT_MAX_ROWS: "1000000"
+  EXPORT_TIMEOUT_MINUTES: "30"
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8093
+  initialDelaySeconds: 60
+  periodSeconds: 20
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8093
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  failureThreshold: 3
+
+secrets:
+  databasePassword: "secret-ref:db-password"
+  reportingStorageKey: "secret-ref:reporting-storage-key"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true

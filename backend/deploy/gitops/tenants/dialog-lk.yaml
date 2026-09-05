@@ -1,0 +1,69 @@
+# tenant config: dialog-lk
+# Operator: Dialog Axiata (Sri Lanka) — TELCO OPERATOR
+# Region: LK
+# Industry: TELCO
+# Tenant Type: OPERATOR
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: dialog-lk
+  TENANT_OPERATOR: dialog
+  TENANT_INDUSTRY: TELCO
+  TENANT_TYPE: OPERATOR
+  TENANT_REGION: LK
+  TENANT_DISPLAY_NAME: "Dialog Axiata"
+  TENANT_COUNTRY: Sri Lanka
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@dialog.lk
+  TENANT_SUPPORT_PHONE: "+94-77-XXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#E20000"
+  TENANT_BRAND_COLOR_SECONDARY: "#000000"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/dialog/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/dialog/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: dialog.lk
+  TENANT_CDN_DOMAIN: "cdn.dialog.lk"
+  TENANT_INGRESS_HOST: "selfcare.dialog.lk"
+
+  # Industry-specific provider endpoints
+  BSS_API_URL: "https://bss-api.dialog.lk/v1"
+  BSS_API_KEY_REF: "secret-ref:dialog-bss-api-key"
+  SMSC_URL: "http://smsc.dialog.lk:8080"
+  SMSC_USER_REF: "secret-ref:smsc-user"
+  SMSC_PASSWORD_REF: "secret-ref:smsc-password"
+  VAS_API_URL: "https://vas-api.dialog.lk/v1"
+
+  # Feature flags (telco-specific)
+  SHOW_DTV_BUNDLES: false
+  SHOW_FIBRE_BUNDLES: false
+  SHOW_POSTPAID_ONLY: false
+  ROAMING_ENABLED: true
+  DATA_ROLL_OVER_ENABLED: true
+  AI_ASSISTANT_ENABLED: true
+  JOURNEY_ENABLED: true
+  IN_APP_CALL_ENABLED: true
+  OTP_METHODS:
+    - SMS
+    - USSD
+    - EMAIL
+    - WHATSAPP
+  SUPPORTED_LANGUAGES:
+    - si
+    - ta
+    - en
+
+  # Compliance
+  DATA_RETENTION_DAYS: 365
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+
+  # Resource sizing (scales with tenant size)
+  RESOURCE_QUOTA_CPU_REQUEST: "500m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "512Mi"
+  RESOURCE_QUOTA_CPU_LIMIT: "2000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "2Gi"

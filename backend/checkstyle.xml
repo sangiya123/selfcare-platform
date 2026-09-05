@@ -1,0 +1,268 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  OMOBIO Selfcare Platform — Checkstyle configuration.
+
+  Enforced rules:
+  - Java 25 compatibility
+  - 120-char line length (relaxed for chainable calls)
+  - 4-space indent (no tabs)
+  - Two blank lines between top-level classes
+  - Javadoc on public/protected types and methods
+  - No wildcard imports
+  - No magic numbers (use named constants)
+  - Proper exception handling (no empty catch, no generic Exception)
+  - Logging: no printStackTrace, no System.out
+  - No TODOs in committed code
+-->
+
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java, properties, xml"/>
+
+    <!-- Excludes -->
+    <module name="SuppressionFilter">
+        <property name="file" value="${checkstyle.suppressions.file}"/>
+        <property name="optional" value="true"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- File-level checks                              -->
+    <!-- ============================================ -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+    <module name="LineLength">
+        <property name="max" value="140"/>
+        <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
+    </module>
+    <module name="NewlineAtEndOfFile">
+        <property name="lineSeparator" value="lf_cr_crlf"/>
+    </module>
+    <module name="UniqueProperties"/>
+    <module name="OrderedProperties"/>
+    <module name="FileLength">
+        <property name="max" value="2000"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Translation                                    -->
+    <!-- ============================================ -->
+    <module name="Translation"/>
+
+    <!-- ============================================ -->
+    <!-- Size violations                                -->
+    <!-- ============================================ -->
+    <module name="MethodLength">
+        <property name="max" value="200"/>
+    </module>
+    <module name="ParameterNumber">
+        <property name="max" value="10"/>
+    </module>
+    <module name="AnonInnerLength">
+        <property name="max" value="50"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Whitespace                                     -->
+    <!-- ============================================ -->
+    <module name="WhitespaceAfter"/>
+    <module name="WhitespaceAround">
+        <property name="allowEmptyConstructors" value="true"/>
+        <property name="allowEmptyMethods" value="true"/>
+        <property name="allowEmptyTypes" value="true"/>
+        <property name="allowEmptyLoops" value="true"/>
+    </module>
+    <module name="NoWhitespaceBefore">
+        <property name="allowLineBreaks" value="true"/>
+    </module>
+    <module name="GenericWhitespace"/>
+    <module name="MethodParamPad"/>
+    <module name="ParenPad"/>
+    <module name="TypecastParenPad"/>
+    <module name="ModifierOrder"/>
+    <module name="Indentation">
+        <property name="basicOffset" value="4"/>
+        <property name="braceAdjustment" value="0"/>
+        <property name="caseIndent" value="4"/>
+        <property name="throwsIndent" value="4"/>
+        <property name="lineWrappingIndentation" value="4"/>
+    </module>
+    <module name="EmptyLineSeparator">
+        <property name="allowNoEmptyLineBetweenFields" value="true"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Naming                                         -->
+    <!-- ============================================ -->
+    <module name="PackageName">
+        <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+    <module name="TypeName"/>
+    <module name="ConstantName"/>
+    <module name="StaticVariableName"/>
+    <module name="MemberName"/>
+    <module name="LocalVariableName"/>
+    <module name="LocalFinalVariableName"/>
+    <module name="MethodName"/>
+    <module name="ParameterName"/>
+    <module name="LambdaParameterName"/>
+    <module name="CatchParameterName"/>
+    <module name="AbbreviationAsWordInName">
+        <property name="ignoreFinal" value="false"/>
+        <property name="allowedAbbreviationLength" value="3"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Imports                                       -->
+    <!-- ============================================ -->
+    <module name="AvoidStarImport"/>
+    <module name="UnusedImports">
+        <property name="processJavadoc" value="true"/>
+    </module>
+    <module name="RedundantImport"/>
+    <module name="ImportOrder">
+        <property name="groups" value="java,javax,org,com,/^com\.omobio\./"/>
+        <property name="sortStaticImportsAlphabetically" value="true"/>
+        <property name="useContainerOrderingForStatic" value="true"/>
+        <property name="ordered" value="true"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Javadoc                                        -->
+    <!-- ============================================ -->
+    <module name="JavadocMethod">
+        <property name="scope" value="public"/>
+        <property name="allowedAnnotations" value="Override,Test"/>
+        <property name="minLineCount" value="3"/>
+    </module>
+    <module name="JavadocType">
+        <property name="scope" value="public"/>
+        <property name="allowedAnnotations" value="Entity,Table,Document,Controller,RestController,Service,Component,Repository,Configuration"/>
+    </module>
+    <module name="JavadocVariable">
+        <property name="scope" value="public"/>
+    </module>
+    <module name="MissingJavadocType">
+        <property name="scope" value="public"/>
+        <property name="skipAnnotations" value="SpringBootTest,Test,Configuration"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Modifiers                                      -->
+    <!-- ============================================ -->
+    <module name="RedundantModifier"/>
+    <module name="ModifierOrder"/>
+
+    <!-- ============================================ -->
+    <!-- Blocks                                         -->
+    <!-- ============================================ -->
+    <module name="LeftCurly"/>
+    <module name="RightCurly"/>
+    <module name="NeedBraces"/>
+    <module name="EmptyBlock">
+        <property name="option" value="text"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Common coding problems                        -->
+    <!-- ============================================ -->
+    <module name="EmptyStatement"/>
+    <module name="EqualsHashCode"/>
+    <module name="HiddenField">
+        <property name="ignoreSetter" value="true"/>
+        <property name="ignoreGetter" value="true"/>
+        <property name="ignoreConstructorParameter" value="true"/>
+    </module>
+    <module name="IllegalInstantiation"/>
+    <module name="InnerAssignment"/>
+    <module name="MagicNumber">
+        <property name="ignoreNumbers" value="-1, 0, 1, 2, 100, 1000"/>
+        <property name="ignoreHashCodeMethod" value="true"/>
+        <property name="ignoreAnnotation" value="true"/>
+    </module>
+    <module name="MissingSwitchDefault"/>
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <module name="StringLiteralEquality"/>
+    <module name="NestedIfDepth">
+        <property name="max" value="3"/>
+    </module>
+    <module name="NestedTryDepth">
+        <property name="max" value="2"/>
+    </module>
+    <module name="NPathComplexity">
+        <property name="max" value="200"/>
+    </module>
+    <module name="CyclomaticComplexity">
+        <property name="max" value="20"/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- OOP                                            -->
+    <!-- ============================================ -->
+    <module name="VisibilityModifier">
+        <property name="protectedAllowed" value="true"/>
+    </module>
+    <module name="AbstractClassCoupling">
+        <property name="max" value="20"/>
+    </module>
+    <module name="ClassFanOutComplexity">
+        <property name="max" value="30"/>
+    </module>
+    <module name="FinalClass"/>
+    <module name="HideUtilityClassConstructor"/>
+    <module name="InterfaceIsType"/>
+
+    <!-- ============================================ -->
+    <!-- Security-sensitive                             -->
+    <!-- ============================================ -->
+    <module name="ArrayTypeStyle"/>
+    <module name="UpperEll"/>
+    <module name="RegexpSinglelineJava">
+        <property name="format" value="(?i)System\.out\.print"/>
+        <property name="message" value="Do not use System.out.print; use a logger."/>
+    </module>
+    <module name="RegexpSinglelineJava">
+        <property name="format" value="(?i)printStackTrace"/>
+        <property name="message" value="Do not use printStackTrace; use a logger.error."/>
+    </module>
+    <module name="RegexpSinglelineJava">
+        <property name="format" value="TODO|FIXME|XXX"/>
+        <property name="message" value="No TODO/FIXME in committed code."/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Logging conventions                           -->
+    <!-- ============================================ -->
+    <module name="RegexpSinglelineJava">
+        <property name="format" value="private static final Logger log = LoggerFactory.getLogger\(([A-Z][a-zA-Z0-9_]*\.class|[a-zA-Z_]+\.class\.getName\(\))\)"/>
+        <property name="message" value="Use LoggerFactory.getLogger(YourClass.class) for logger."/>
+    </module>
+
+    <!-- ============================================ -->
+    <!-- Regexp patterns for newer Java features       -->
+    <!-- ============================================ -->
+    <module name="SuppressionCommentFilter"/>
+    <module name="SuppressWarningsHolder"/>
+    <module name="CommentsIndentation"/>
+    <module name="DescendantTokenCheck"/>
+
+    <!-- ============================================ -->
+    <!-- Final formatting                               -->
+    <!-- ============================================ -->
+    <module name="OuterTypeFilename"/>
+    <module name="OuterTypeNumber"/>
+    <module name="OneStatementPerLine"/>
+    <module name="OverloadMethodsDeclarationOrder"/>
+    <module name="VariableDeclarationUsageDistance"/>
+    <module name="SeparatorWrap">
+        <property name="option" value="nl"/>
+        <property name="tokens" value="DOT, COMMA, SEMI, ELLIPSIS, ARRAY_DECLARATOR"/>
+    </module>
+
+</module>

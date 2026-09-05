@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/layout-document.schema.json",
+  "title": "LayoutDocument",
+  "description": "Server-driven layout document for OMOBIO Selfcare Platform",
+  "type": "object",
+  "required": [
+    "tenantId",
+    "environment",
+    "experience",
+    "profileKey",
+    "schemaVersion",
+    "configVersion",
+    "sections",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["2.0"],
+      "description": "Config schema version"
+    },
+    "configVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonically increasing version per publish"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Tenant identifier"
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["dev", "qa", "staging", "prod"]
+    },
+    "experience": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Experience name (e.g., home, packages, bills)"
+    },
+    "profileKey": {
+      "type": "string",
+      "description": "Profile for matching: LOB + customer type + segment"
+    },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ios", "android", "huawei", "web"]
+          }
+        },
+        "minAppVersion": { "type": "string" },
+        "maxAppVersion": { "type": "string" }
+      }
+    },
+    "themeRef": {
+      "type": "string",
+      "description": "Reference to theme document (name@version)"
+    },
+    "navigationRef": {
+      "type": "string",
+      "description": "Reference to navigation document"
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Section" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+    }
+  },
+  "$defs": {
+    "Section": {
+      "type": "object",
+      "required": ["id", "component"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Component ID from registry"
+        },
+        "variant": { "type": "string" },
+        "dataSource": { "type": "string" },
+        "props": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "visibleWhen": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string" },
+            "lob": {
+              "type": "string",
+              "enum": ["MOBILE", "BB", "DTV", "FIBRE", "ENTERPRISE"]
+            },
+            "connectionType": {
+              "type": "string",
+              "enum": ["prepaid", "postpaid", "hybrid"]
+            },
+            "segment": { "type": "string" }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Action" }
+        },
+        "states": {
+          "type": "object",
+          "description": "Widget states mapping",
+          "properties": {
+            "loading": { "type": "string" },
+            "timeout": { "type": "string" },
+            "error": { "type": "string" },
+            "unavailable": { "type": "string" }
+          }
+        },
+        "analytics": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "order": {
+          "type": "integer",
+          "default": 99
+        }
+      },
+      "additionalProperties": false
+    },
+    "Action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "event": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "NAVIGATE", "BACK", "START_JOURNEY", "CALL_API", "OPEN_WEB",
+            "OPEN_WEB_SSO", "EXTERNAL_BROWSER", "DEEP_LINK", "CALL_PHONE",
+            "EMAIL", "COPY", "SHARE", "DOWNLOAD", "MODAL", "BOTTOM_SHEET",
+            "LOGIN", "LOGOUT", "PAYMENT", "REFRESH"
+          ]
+        },
+        "route": { "type": "string" },
+        "journeyId": { "type": "string" },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "confirmation": {
+          "type": "string",
+          "enum": ["none", "policy", "explicit"]
+        },
+        "analyticsEvent": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

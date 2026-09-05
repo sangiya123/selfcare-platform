@@ -1,0 +1,94 @@
+{
+  "tenantId": "hutch-lk",
+  "name": "hutch-lk",
+  "displayName": "Hutch Sri Lanka",
+  "operator": "hutch",
+  "country": "LK",
+  "industry": "TELECOM",
+  "defaultEnvironment": "prod",
+  "defaultLocale": "en",
+  "supportedLocales": ["en", "si", "ta"],
+  "defaultCurrency": "LKR",
+  "supportedLobs": ["MOBILE"],
+  "supportedConnectionTypes": ["prepaid", "postpaid"],
+  "operatorPackVersion": "1.0.0",
+  "theme": {
+    "name": "hutch-default",
+    "version": "1.0.0",
+    "tokens": {
+      "colors": {
+        "primary-900": "#7C1D3F",
+        "primary-700": "#A02755",
+        "primary-500": "#D6336C",
+        "primary-300": "#F4A6C0",
+        "accent-500": "#FFC107",
+        "accent-glow": "#FFD54F",
+        "surface": "#FFFFFF",
+        "surface-subtle": "#FFF5F8",
+        "text-primary": "#1A0E14",
+        "text-secondary": "#6B4F58",
+        "success": "#28A745",
+        "warning": "#FFC107",
+        "error": "#DC3545",
+        "info": "#17A2B8"
+      },
+      "typography": {
+        "fontFamily": "Roboto, system-ui, sans-serif",
+        "fontSizes": {
+          "xs": 12, "sm": 14, "base": 16, "lg": 18,
+          "xl": 20, "2xl": 24, "3xl": 30, "4xl": 36
+        }
+      },
+      "spacing": {
+        "0": 0, "1": 4, "2": 8, "3": 12, "4": 16,
+        "5": 20, "6": 24, "8": 32, "10": 40, "12": 48, "16": 64
+      },
+      "borderRadius": {
+        "none": 0, "sm": 4, "md": 8, "lg": 12,
+        "xl": 16, "2xl": 24, "full": 9999
+      }
+    }
+  },
+  "navigation": {
+    "type": "bottom-tabs",
+    "tabs": [
+      { "id": "home", "label": "Home", "icon": "home", "route": "/" },
+      { "id": "packages", "label": "Packages", "icon": "package", "route": "/packages" },
+      { "id": "usage", "label": "Usage", "icon": "activity", "route": "/usage" },
+      { "id": "support", "label": "Support", "icon": "help-circle", "route": "/support" },
+      { "id": "account", "label": "Account", "icon": "user", "route": "/account" }
+    ]
+  },
+  "providerBindings": {
+    "AuthProvider": "com.omobio.providers.hutch.HutchAuthProvider",
+    "ProfileProvider": "com.omobio.providers.hutch.HutchProfileProvider",
+    "BalanceProvider": "com.omobio.providers.hutch.HutchBalanceProvider",
+    "UsageProvider": "com.omobio.providers.hutch.HutchUsageProvider",
+    "BillingProvider": "com.omobio.providers.hutch.HutchBillingProvider",
+    "PaymentProvider": "com.omobio.providers.hutch.HutchPaymentProvider",
+    "RechargeProvider": "com.omobio.providers.hutch.HutchRechargeProvider",
+    "ProductCatalogProvider": "com.omobio.providers.hutch.HutchProductCatalogProvider",
+    "NotificationProvider": "com.omobio.providers.hutch.HutchNotificationProvider"
+  },
+  "endpoints": {
+    "auth": "https://auth.hutch.lk",
+    "billing": "https://billing.hutch.lk",
+    "payments": "https://payments.hutch.lk",
+    "support": "https://support.hutch.lk"
+  },
+  "features": {
+    "cross.connection.payment": {
+      "enabled": true,
+      "maxAmount": 50000.00,
+      "currency": "LKR",
+      "requiresStepUp": true,
+      "allowedActions": ["PAY_BILL", "RECHARGE"]
+    },
+    "authMethods": ["OTP", "BIOMETRIC"]
+  },
+  "entitlement": {
+    "type": "primary-number-linked-list",
+    "note": "ADR-006: Hutch uses the same linked-list model as Dialog"
+  },
+  "status": "ACTIVE"
+}

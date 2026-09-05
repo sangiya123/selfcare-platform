@@ -1,0 +1,43 @@
+# OMOBIO Notification Service
+spring:
+  application:
+    name: notification-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  data:
+    mongodb:
+      host: ${MONGO_HOST:localhost}
+      port: ${MONGO_PORT:27017}
+      database: ${MONGO_DATABASE:omobio_config}
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:omobio}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+server:
+  port: ${NOTIFICATION_SERVICE_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: notification-service
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}

@@ -1,0 +1,65 @@
+# usage-service-values.yaml — Usage Service overrides
+# Handles: usage metering, consumption tracking, event aggregation
+
+replicaCount: 2
+
+image:
+  repository: omobio/usage-service
+
+resources:
+  limits:
+    cpu: 1500m
+    memory: 2Gi
+  requests:
+    cpu: 400m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 70
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx1536m -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # Usage record aggregation window (5 minutes)
+  AGGREGATION_WINDOW_SECONDS: "300"
+  # Metering cache TTL (10 minutes)
+  METERING_CACHE_TTL_MINUTES: "10"
+  # Customer usage summary cache TTL (5 minutes)
+  USAGE_SUMMARY_CACHE_TTL_MINUTES: "5"
+  # Real-time usage metrics cache TTL (30 seconds)
+  REALTIME_METRICS_CACHE_TTL_SECONDS: "30"
+  # Kafka consumer batch size
+  KAFKA_CONSUMER_BATCH_SIZE: "500"
+  KAFKA_CONSUMER_POLL_TIMEOUT_MS: "1000"
+  # Retention period (90 days)
+  USAGE_RETENTION_DAYS: "90"
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8087
+  initialDelaySeconds: 50
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8087
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  failureThreshold: 3
+
+secrets:
+  databasePassword: "secret-ref:db-password"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true

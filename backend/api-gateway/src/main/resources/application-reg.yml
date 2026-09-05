@@ -1,0 +1,28 @@
+# REGIONAL profile overrides
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "https://admin.reg.omobio.io"
+            allowedMethods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity}/.well-known/jwks.json}
+  # WAF enabled in regional environment
+  waf:
+    enabled: true
+    log-only-mode: false
+    block-on-match: true
+  otel:
+    enabled: true
+
+logging:
+  level:
+    com.omobio: INFO

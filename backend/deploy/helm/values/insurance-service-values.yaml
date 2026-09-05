@@ -1,0 +1,60 @@
+# insurance-service-values.yaml — Insurance Service overrides
+# Handles: insurance product management, claims, policy lifecycle
+
+replicaCount: 2
+
+image:
+  repository: omobio/insurance-service
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1.5Gi
+  requests:
+    cpu: 300m
+    memory: 768Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx1g -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # Policy renewal window days
+  POLICY_RENEWAL_WINDOW_DAYS: "30"
+  # Claims processing batch size
+  CLAIMS_BATCH_SIZE: "50"
+  # Policy cache TTL
+  POLICY_CACHE_TTL_MINUTES: "120"
+  # Insurance provider sync interval
+  PROVIDER_SYNC_CRON: "0 0 1 * * *"
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8096
+  initialDelaySeconds: 45
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8096
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  failureThreshold: 3
+
+secrets:
+  databasePassword: "secret-ref:db-password"
+  insuranceProviderApiKey: "secret-ref:insurance-provider-api-key"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true

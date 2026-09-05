@@ -1,0 +1,135 @@
+# GitHub Actions workflow for mobile app CI.
+name: Mobile CI
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*.*.*']
+    paths:
+      - 'selfcare-platform/mobile/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'selfcare-platform/mobile/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: selfcare-platform/mobile/selfcare-app
+
+jobs:
+  # ==========================================
+  # Lint + Type check
+  # ==========================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+  # ==========================================
+  # Unit tests (Jest)
+  # ==========================================
+  unit-tests:
+    name: Unit Tests (Jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Jest
+        run: npx jest --ci --coverage --maxWorkers=2
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: mobile-unit
+        continue-on-error: true
+
+  # ==========================================
+  # E2E (Detox) — Android, on main only
+  # ==========================================
+  e2e-android:
+    name: E2E (Android, Detox)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: Build Android (debug)
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Run Detox E2E
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx detox test --configuration android.ci
+
+  # ==========================================
+  # E2E (Detox) — iOS, on main only
+  # ==========================================
+  e2e-ios:
+    name: E2E (iOS, Detox)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: Install Pods
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: cd ios && pod install
+
+      - name: Run Detox E2E
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx detox test --configuration ios.sim

@@ -1,0 +1,52 @@
+# OMOBIO Approval Service
+# Four-eyes approval workflow for high-risk admin actions
+spring:
+  application:
+    name: approval-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:omobio}
+    password: ${DB_PASSWORD:omobio}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:omobio}
+
+server:
+  port: ${APPROVAL_SERVICE_PORT:8096}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: approval-service
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
+  approval:
+    default-expiry-hours: 72
+    expiry-check-interval-ms: 300000

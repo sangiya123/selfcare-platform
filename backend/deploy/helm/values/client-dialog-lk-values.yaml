@@ -1,0 +1,56 @@
+# client-dialog-lk-values.yaml — Dialog (LK) tenant overrides
+# Industry: TELCO, Tenant type: OPERATOR
+
+tenant:
+  id: dialog-lk
+  operator: dialog
+
+# Tenant-specific theme
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0"
+  OMOBIO_TENANT_ID: "dialog-lk"
+  OMOBIO_TENANT_INDUSTRY: "TELCO"
+  OMOBIO_TENANT_TYPE: "OPERATOR"
+  # Dialog-specific provider endpoint (read from TenantConfigurationService at runtime)
+  DIALOG_BSS_API_URL: "https://bss-api.dialog.lk/v1"
+  DIALOG_BSS_API_KEY_REF: "secret-ref:dialog-bss-api-key"
+  # SMSC for notifications
+  SMSC_URL: "http://smsc.dialog.lk:8080"
+  SMSC_USER_REF: "secret-ref:smsc-user"
+  SMSC_PASSWORD_REF: "secret-ref:smsc-password"
+
+# Dialog branding
+image:
+  repository: omobio/selfcare-platform
+
+# Dialog-specific feature flags
+featureFlags:
+  SHOW_DTV_BUNDLES: false
+  SHOW_FIBRE_BUNDLES: false
+  AI_ASSISTANT_ENABLED: true
+  JOURNEY_ENABLED: true
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: selfcare.dialog.lk
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - selfcare.dialog.lk
+      secretName: dialog-selfcare-tls
+
+service:
+  type: ClusterIP
+  port: 8080
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70

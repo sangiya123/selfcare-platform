@@ -1,0 +1,42 @@
+# payment-service-values.yaml — Payment Service overrides
+# Handles: payments, idempotency, reconciliation, Kafka events
+
+replicaCount: 2
+
+image:
+  repository: omobio/payment-service
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # Payment provider credentials
+  PAYMENT_GATEWAY_BASE_URL: "https://payments.omobio.example.com"
+  # Idempotency key TTL (24h)
+  IDEMPOTENCY_KEY_TTL_HOURS: "24"
+  # Reconciliation schedule (cron)
+  RECONCILIATION_CRON: "0 0 2 * * *"
+
+secrets:
+  databasePassword: "secret-ref:db-password"
+  # payment-gateway-api-key: "secret-ref:payment-api-key"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true

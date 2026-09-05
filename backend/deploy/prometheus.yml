@@ -1,0 +1,34 @@
+# Prometheus scrape config for local development
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'omobio-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:8080'  # api-gateway
+          - 'localhost:8081'  # customer-identity-service
+          - 'localhost:8082'  # admin-identity-service
+          - 'localhost:8083'  # config-tenant-service
+          - 'localhost:8084'  # account-entitlement-service
+          - 'localhost:8085'  # dashboard-bff
+          - 'localhost:8086'  # product-service
+          - 'localhost:8087'  # usage-service
+          - 'localhost:8088'  # billing-service
+          - 'localhost:8089'  # payment-service
+          - 'localhost:8090'  # notification-service
+          - 'localhost:8091'  # content-service
+          - 'localhost:8092'  # journey-service
+          - 'localhost:8093'  # reporting-service
+          - 'localhost:8094'  # ai-gateway
+          - 'localhost:8095'  # audit-service
+          - 'localhost:8096'  # insurance-service
+        labels:
+          env: 'dev'
+          platform: 'omobio'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

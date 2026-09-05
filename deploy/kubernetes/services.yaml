@@ -1,0 +1,1257 @@
+# OMOBIO Kubernetes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ All 19 Microservices
+# Deployments + ClusterIP Services
+# Images must be built first via: ./scripts/build-images.sh
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        tier: omobio
+    spec:
+      containers:
+        - name: api-gateway
+          image: omobio/api-gateway:local-v4
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVER_PORT
+              value: "8080"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            - name: X_DEFAULT_TENANT_ID
+              value: "dialog-lk"
+            - name: SPRING_CLOUD_CONFIG_ENABLED
+              value: "false"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75.0"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: omobio
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080
+  selector:
+    app: api-gateway
+---
+# config-tenant-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-tenant-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: config-tenant-service
+  template:
+    metadata:
+      labels:
+        app: config-tenant-service
+        tier: omobio
+    spec:
+      containers:
+        - name: config-tenant-service
+          image: omobio/config-tenant-service:local-v2
+          args:
+            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-tenant-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: config-tenant-service
+---
+# customer-identity-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-identity-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: customer-identity-service
+  template:
+    metadata:
+      labels:
+        app: customer-identity-service
+        tier: omobio
+    spec:
+      containers:
+        - name: customer-identity-service
+          image: omobio/customer-identity-service:local-v4
+          args:
+            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SERVER_PORT
+              value: "8082"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-identity-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8082
+      targetPort: 8082
+  selector:
+    app: customer-identity-service
+---
+# admin-identity-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-identity-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: admin-identity-service
+  template:
+    metadata:
+      labels:
+        app: admin-identity-service
+        tier: omobio
+    spec:
+      containers:
+        - name: admin-identity-service
+          image: omobio/admin-identity-service:local-v4
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SERVER_PORT
+              value: "8083"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-identity-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: admin-identity-service
+---
+# account-entitlement-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-entitlement-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: account-entitlement-service
+  template:
+    metadata:
+      labels:
+        app: account-entitlement-service
+        tier: omobio
+    spec:
+      containers:
+        - name: account-entitlement-service
+          image: omobio/account-entitlement-service:local-v4
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SERVER_PORT
+              value: "8084"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-entitlement-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8084
+      targetPort: 8084
+  selector:
+    app: account-entitlement-service
+---
+# dashboard-bff
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-bff
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dashboard-bff
+  template:
+    metadata:
+      labels:
+        app: dashboard-bff
+        tier: omobio
+    spec:
+      containers:
+        - name: dashboard-bff
+          image: omobio/dashboard-bff:local-v2
+          args:
+            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SERVER_PORT
+              value: "8085"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-bff
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8085
+      targetPort: 8085
+  selector:
+    app: dashboard-bff
+---
+# product-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+        tier: omobio
+    spec:
+      containers:
+        - name: product-service
+          image: omobio/product-service:local-v2
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SERVER_PORT
+              value: "8086"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8086
+      targetPort: 8086
+  selector:
+    app: product-service
+---
+# usage-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usage-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: usage-service
+  template:
+    metadata:
+      labels:
+        app: usage-service
+        tier: omobio
+    spec:
+      containers:
+        - name: usage-service
+          image: omobio/usage-service:local-v2
+          ports:
+            - containerPort: 8087
+          env:
+            - name: SERVER_PORT
+              value: "8087"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usage-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8087
+      targetPort: 8087
+  selector:
+    app: usage-service
+---
+# billing-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+        tier: omobio
+    spec:
+      containers:
+        - name: billing-service
+          image: omobio/billing-service:local-v2
+          ports:
+            - containerPort: 8088
+          env:
+            - name: SERVER_PORT
+              value: "8088"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8088
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8088
+      targetPort: 8088
+  selector:
+    app: billing-service
+---
+# payment-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        tier: omobio
+    spec:
+      containers:
+        - name: payment-service
+          image: omobio/payment-service:local-v4
+          ports:
+            - containerPort: 8089
+          env:
+            - name: SERVER_PORT
+              value: "8089"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8089
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8089
+      targetPort: 8089
+  selector:
+    app: payment-service
+---
+# notification-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        tier: omobio
+    spec:
+      containers:
+        - name: notification-service
+          image: omobio/notification-service:local-v2
+          ports:
+            - containerPort: 8090
+          env:
+            - name: SERVER_PORT
+              value: "8090"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8090
+      targetPort: 8090
+  selector:
+    app: notification-service
+---
+# content-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: content-service
+  template:
+    metadata:
+      labels:
+        app: content-service
+        tier: omobio
+    spec:
+      containers:
+        - name: content-service
+          image: omobio/content-service:local-v2
+          ports:
+            - containerPort: 8091
+          env:
+            - name: SERVER_PORT
+              value: "8091"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8091
+      targetPort: 8091
+  selector:
+    app: content-service
+---
+# journey-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: journey-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: journey-service
+  template:
+    metadata:
+      labels:
+        app: journey-service
+        tier: omobio
+    spec:
+      containers:
+        - name: journey-service
+          image: omobio/journey-service:local-v2
+          ports:
+            - containerPort: 8092
+          env:
+            - name: SERVER_PORT
+              value: "8092"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8092
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: journey-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8092
+      targetPort: 8092
+  selector:
+    app: journey-service
+---
+# reporting-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reporting-service
+  template:
+    metadata:
+      labels:
+        app: reporting-service
+        tier: omobio
+    spec:
+      containers:
+        - name: reporting-service
+          image: omobio/reporting-service:local-v2
+          ports:
+            - containerPort: 8093
+          env:
+            - name: SERVER_PORT
+              value: "8093"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8093
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reporting-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8093
+      targetPort: 8093
+  selector:
+    app: reporting-service
+---
+# ai-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-gateway
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ai-gateway
+  template:
+    metadata:
+      labels:
+        app: ai-gateway
+        tier: omobio
+    spec:
+      containers:
+        - name: ai-gateway
+          image: omobio/ai-gateway:local-v2
+          ports:
+            - containerPort: 8094
+          env:
+          env:
+            - name: SERVER_PORT
+              value: "8094"
+            - name: OMOBIO_AI_PROVIDER
+              value: "stub"
+            - name: OMOBIO_AI_STUB_ENABLED
+              value: "true"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8094
+      targetPort: 8094
+  selector:
+    app: ai-gateway
+---
+# audit-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: audit-service
+  template:
+    metadata:
+      labels:
+        app: audit-service
+        tier: omobio
+    spec:
+      containers:
+        - name: audit-service
+          image: omobio/audit-service:local-v2
+          ports:
+            - containerPort: 8095
+          env:
+            - name: SERVER_PORT
+              value: "8095"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8095
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8095
+      targetPort: 8095
+  selector:
+    app: audit-service
+---
+# insurance-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insurance-service
+  template:
+    metadata:
+      labels:
+        app: insurance-service
+        tier: omobio
+    spec:
+      containers:
+        - name: insurance-service
+          image: omobio/insurance-service:local-v2
+          args:
+            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+          ports:
+            - containerPort: 8096
+          env:
+            - name: SERVER_PORT
+              value: "8096"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8096
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insurance-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8096
+      targetPort: 8096
+  selector:
+    app: insurance-service
+---
+# approval-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: approval-service
+  namespace: omobio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: approval-service
+  template:
+    metadata:
+      labels:
+        app: approval-service
+        tier: omobio
+    spec:
+      containers:
+        - name: approval-service
+          image: omobio/approval-service:local-v2
+          ports:
+            - containerPort: 8097
+          env:
+            - name: SERVER_PORT
+              value: "8097"
+          envFrom:
+            - configMapRef:
+                name: omobio-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8097
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: approval-service
+  namespace: omobio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8097
+      targetPort: 8097
+  selector:
+    app: approval-service
+---
+# Prometheus monitoring
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: omobio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        tier: observability
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.55.0
+          ports:
+            - containerPort: 9090
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.retention.time=7d"
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+              readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: omobio
+spec:
+  type: NodePort
+  ports:
+    - port: 9090
+      targetPort: 9090
+      nodePort: 30090
+  selector:
+    app: prometheus
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: omobio
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'omobio-platform'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: keep
+            regex: '.*-service|api-gateway'
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: job
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: service
+---
+# Grafana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: omobio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        tier: observability
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.2.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: omobio
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30300
+  selector:
+    app: grafana
+

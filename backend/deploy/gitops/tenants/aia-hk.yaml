@@ -1,0 +1,75 @@
+# tenant config: aia-hk
+# Client: AIA Hong Kong — INSURANCE INSURER
+# Region: HK
+# Industry: INSURANCE
+# Tenant Type: INSURER
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: aia-hk
+  TENANT_OPERATOR: aia
+  TENANT_INDUSTRY: INSURANCE
+  TENANT_TYPE: INSURER
+  TENANT_REGION: HK
+  TENANT_DISPLAY_NAME: "AIA Hong Kong"
+  TENANT_COUNTRY: "Hong Kong SAR"
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@aia.com.hk
+  TENANT_SUPPORT_PHONE: "+852-XXXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#D9001B"
+  TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/aia-hk/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/aia-hk/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: aia.com.hk
+  TENANT_CDN_DOMAIN: "cdn.aia.com.hk"
+  TENANT_INGRESS_HOST: "selfcare.aia.com.hk"
+
+  # Industry-specific provider endpoints
+  INSURANCE_API_URL: "https://api.aia.com.hk/insurance/v1"
+  INSURANCE_API_KEY_REF: "secret-ref:aia-hk-insurance-api-key"
+  POLICY_API_URL: "https://api.aia.com.hk/policy/v1"
+  CLAIMS_API_URL: "https://api.aia.com.hk/claims/v1"
+  AGENT_PORTAL_URL: "https://agents.aia.com.hk"
+  KYC_PROVIDER_URL: "https://kyc.aia.com.hk/v1"
+
+  # Feature flags
+  POLICY_VIEW_ENABLED: true
+  PREMIUM_CALCULATION_ENABLED: true
+  CLAIM_FILING_ENABLED: true
+  CLAIM_TRACKING_ENABLED: true
+  BENEFICIARY_MANAGEMENT_ENABLED: true
+  RENEWAL_REMINDER_ENABLED: true
+  AI_ASSISTANT_ENABLED: true
+  JOURNEY_ENABLED: true
+  DOCUMENT_UPLOAD_ENABLED: true
+  INVESTMENT_LINKED_POLICIES_ENABLED: true
+  TELEMEDICINE_ENABLED: true
+  WEALTH_MANAGEMENT_ENABLED: true
+  MPFA_PORTAL_INTEGRATION: true
+  OTP_METHODS:
+    - SMS
+    - EMAIL
+    - BIOMETRIC
+  SUPPORTED_LANGUAGES:
+    - zh-Hant
+    - en
+
+  # Compliance (HK IA regulations)
+  DATA_RETENTION_DAYS: 2555  # 7 years for HK insurance
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+  HKIA_REGULATED: true
+  PCPD_COMPLIANT: true
+  INSURANCE_REGULATOR_NOTIFY_DAYS: 14
+
+  # Resource sizing (HK has higher load)
+  RESOURCE_QUOTA_CPU_REQUEST: "2000m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "2Gi"
+  RESOURCE_QUOTA_CPU_LIMIT: "8000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "8Gi"

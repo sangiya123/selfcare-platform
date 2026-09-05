@@ -1,0 +1,112 @@
+server:
+  port: 8080
+  reactive:
+    max-memory: 512M
+
+spring:
+  application:
+    name: ai-gateway
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:omobio}
+    password: ${SPRING_DATASOURCE_PASSWORD:omobio_pw}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/selfcare_ai}
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+  threads:
+    virtual:
+      enabled: true
+
+# Resilience4j
+resilience4j:
+  circuitbreaker:
+    instances:
+      ai.gateway.chat:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        sliding-window-size: 10
+  timelimiter:
+    instances:
+      ai.gateway.chat:
+        timeout: 30s
+        cancel-running-future: true
+  retry:
+    instances:
+      ai.gateway.chat:
+        max-attempts: 2
+        wait-duration: 500ms
+
+# OMOBIO AI configuration
+omobio:
+  ai:
+    # Default LLM provider
+    default-provider: ${AI_DEFAULT_PROVIDER:anthropic}
+
+    # Provider-specific config
+    providers:
+      anthropic:
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${ANTHROPIC_MODEL:claude-sonnet-4-5}
+        max-tokens: 4096
+        timeout-seconds: 60
+      openai:
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_MODEL:gpt-4o-mini}
+        max-tokens: 4096
+        timeout-seconds: 60
+      google-ai:
+        api-key: ${GOOGLE_AI_API_KEY:}
+        model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}
+        max-tokens: 4096
+        timeout-seconds: 60
+
+    # Embedding service
+    embedding:
+      enabled: ${EMBEDDING_ENABLED:false}
+      openai-api-key: ${OPENAI_API_KEY:}
+      model: text-embedding-3-small
+      base-url: ${EMBEDDING_BASE_URL:}
+
+    # Content moderation
+    moderation:
+      enabled: ${MODERATION_ENABLED:true}
+      openai-api-key: ${OPENAI_API_KEY:}
+
+# Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+
+otel:
+  service:
+    name: ${spring.application.name}
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+
+logging:
+  level:
+    root: INFO
+    com.omobio: DEBUG
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level [%X{tenantId:-},%X{correlationId:-}] %logger{36} - %msg%n"

@@ -1,0 +1,25 @@
+# Baseline Screenshots Directory
+#
+# Placeholder for baseline screenshots organized by tenant:
+#
+#   dialog-lk/        - Dialog (Sri Lanka) telco client
+#   hutch-lk/         - Hutch (Sri Lanka) telco client
+#   aia-lk/           - AIA (Sri Lanka) insurance client
+#   aia-th/           - AIA (Thailand) insurance client
+#   themes/            - Generic theme variants
+#
+# Screens are organized in subdirectories by screen/feature:
+#
+#   dialog-lk/
+#     auth/           - Login, OTP, biometric
+#     dashboard/       - Main dashboard screens
+#     payments/        - Bill payment, recharge
+#     connections/     - Multi-line management
+#     profile/         - Settings, sign out
+#
+# Each screenshot should be named:
+#   {screen-id}-{variant}-{theme}.png
+#
+# e.g., dashboard-balance-prepaid-light.png
+#       login-otp-dark.png
+#       policy-life-aia-lk-light.png

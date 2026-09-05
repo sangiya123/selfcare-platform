@@ -1,0 +1,16 @@
+# DEV profile overrides
+omobio:
+  security:
+    cors:
+      allowed-origins: http://localhost:3000,http://localhost:8081,http://localhost:19006
+
+otel:
+  enabled: false
+
+logging:
+  level:
+    com.omobio: DEBUG
+    org.springframework.web: DEBUG
+
+spring.jpa.show-sql: true
+spring.jpa.properties.hibernate.format_sql: true

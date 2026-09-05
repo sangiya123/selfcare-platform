@@ -1,0 +1,87 @@
+# Helm values for approval-service
+# OMOBIO Selfcare Platform — four-eyes approval workflow service
+
+replicaCount: 2
+
+image:
+  repository: omobio/approval-service
+  pullPolicy: IfNotPresent
+  tag: "1.0.0-SNAPSHOT"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "approval-service"
+
+service:
+  type: ClusterIP
+  port: 8096
+  targetPort: 8096
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "prod"
+  - name: DB_HOST
+    value: "mysql.selfcare.svc.cluster.local"
+  - name: DB_PORT
+    value: "3306"
+  - name: DB_NAME
+    value: "omobio_selfcare"
+  - name: DB_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: approval-service-secrets
+        key: db-username
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: approval-service-secrets
+        key: db-password
+  - name: REDIS_HOST
+    value: "redis.selfcare.svc.cluster.local"
+  - name: REDIS_PORT
+    value: "6379"
+  - name: REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: approval-service-secrets
+        key: redis-password
+  - name: APPROVAL_SERVICE_PORT
+    value: "8096"
+  - name: OTEL_ENABLED
+    value: "true"
+  - name: OTEL_ENDPOINT
+    value: "http://otel-collector.observability.svc.cluster.local:4317"
+
+probes:
+  liveness:
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    enabled: true
+    path: /actuator/health/readiness
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+serviceAccount:
+  create: true
+  name: "approval-service"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

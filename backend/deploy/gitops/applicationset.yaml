@@ -1,0 +1,263 @@
+# applicationset.yaml — ArgoCD ApplicationSet for OMOBIO Selfcare Platform
+# Generates per-tenant per-environment ArgoCD Applications using Matrix Generator
+# Build once, promote immutable — artifact version controlled via targetRevision
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: omobio-selfcare-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: omobio-selfcare-platform
+    app.kubernetes.io/component: gitops
+    app.kubernetes.io/part-of: omobio-platform
+  annotations:
+    argocd.argoproj.io/sync-options: "Validate=false"
+spec:
+  generators:
+    # Matrix generator: cross-product of tenants × environments
+    # Each combination produces one ArgoCD Application
+    matrix:
+      generators:
+        # Generator 1: List all tenant configurations from tenants/ directory
+        - git:
+            repoURL: https://github.com/omobio/selfcare-platform
+            revision: main
+            directories:
+              - path: backend/deploy/gitops/tenants/*.yaml
+            fileGlob: "backend/deploy/gitops/tenants/*.yaml"
+          template:
+            metadata:
+              labels:
+                omobio.gitops.type: tenant
+            spec:
+              env:
+                - name: TENANT_ID
+                  value: "{{ path[0].baseName }}"
+                - name: TENANT_FILE
+                  value: "{{ path }}/{{ base }}"  # e.g., backend/deploy/gitops/tenants/dialog-lk.yaml
+
+        # Generator 2: List all environment configurations from environments/ directory
+        - git:
+            repoURL: https://github.com/omobio/selfcare-platform
+            revision: main
+            directories:
+              - path: backend/deploy/gitops/environments/*.yaml
+            fileGlob: "backend/deploy/gitops/environments/*.yaml"
+          template:
+            metadata:
+              labels:
+                omobio.gitops.type: environment
+            spec:
+              env:
+                - name: ENV_NAME
+                  value: "{{ path[0].baseName }}"
+                - name: ENV_FILE
+                  value: "{{ path }}/{{ base }}"
+                - name: SYNC_ENABLED
+                  value: "{{ env.SYNC_ENABLED }}"
+                - name: IMAGE_TAG_MUTABLE
+                  value: "{{ env.IMAGE_TAG_MUTABLE }}"
+
+  # Template for the generated ArgoCD Application
+  template:
+    metadata:
+      name: "omobio-{{ TENANT_ID }}-{{ ENV_NAME }}"
+      namespace: argocd
+      labels:
+        omobio.platform: selfcare
+        omobio.tenant: "{{ TENANT_ID }}"
+        omobio.environment: "{{ ENV_NAME }}"
+        omobio.gitops.generated: "true"
+        omobio.industry: "{{ env.TENANT_INDUSTRY }}"
+        omobio.operator: "{{ env.TENANT_OPERATOR }}"
+        omobio.tenant-type: "{{ env.TENANT_TYPE }}"
+        omobio.region: "{{ env.TENANT_REGION }}"
+      annotations:
+        omobio.gitops.promotion: "{{ env.PROMOTION_STRATEGY }}"
+        omobio.gitops.image-strategy: "{{ env.IMAGE_TAG_MUTABLE }}"
+        omobio.gitops.sync-window: "{{ env.SYNC_WINDOW }}"
+        argocd.argoproj.io/sync-options: "Prune=true,SelfHeal=true"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io/foreground
+    spec:
+      # Project scope — references argocd-project.yaml
+      project: omobio-platform
+
+      # Source: Helm chart with tenant-specific values
+      source:
+        repoURL: https://github.com/omobio/selfcare-platform
+        # targetRevision controls promotion: use branch/tag/commit SHA
+        # dev: main (mutable — latest), prod: pinned tag (immutable)
+        targetRevision: "{{ env.DEFAULT_TARGET_REVISION }}"
+        path: backend/deploy/helm
+        helm:
+          # Value files: base + tenant override
+          valueFiles:
+            - values.yaml
+            - "values/client-{{ TENANT_ID }}-values.yaml"
+          # Parameters from tenant + environment config
+          parameters:
+            - name: tenant.id
+              value: "{{ TENANT_ID }}"
+            - name: tenant.operator
+              value: "{{ env.TENANT_OPERATOR }}"
+            - name: tenant.industry
+              value: "{{ env.TENANT_INDUSTRY }}"
+            - name: tenant.type
+              value: "{{ env.TENANT_TYPE }}"
+            - name: tenant.region
+              value: "{{ env.TENANT_REGION }}"
+            - name: environment.name
+              value: "{{ ENV_NAME }}"
+            - name: environment.clusterUrl
+              value: "{{ env.CLUSTER_URL }}"
+            - name: environment.syncWindow
+              value: "{{ env.SYNC_WINDOW }}"
+            - name: image.tag
+              value: "{{ env.DEFAULT_IMAGE_TAG }}"
+            - name: image.pullPolicy
+              value: "{{ env.IMAGE_PULL_POLICY }}"
+            - name: autoscaling.minReplicas
+              value: "{{ env.MIN_REPLICAS }}"
+            - name: autoscaling.maxReplicas
+              value: "{{ env.MAX_REPLICAS }}"
+            - name: ingress.enabled
+              value: "{{ env.INGRESS_ENABLED }}"
+            - name: ingress.className
+              value: "{{ env.INGRESS_CLASS }}"
+            - name: ingress.host
+              value: "{{ env.INGRESS_HOST }}"
+            - name: resources.limits.cpu
+              value: "{{ env.RESOURCE_LIMITS_CPU }}"
+            - name: resources.limits.memory
+              value: "{{ env.RESOURCE_LIMITS_MEMORY }}"
+            - name: resources.requests.cpu
+              value: "{{ env.RESOURCE_REQUESTS_CPU }}"
+            - name: resources.requests.memory
+              value: "{{ env.RESOURCE_REQUESTS_MEMORY }}"
+            - name: healthCheck.enabled
+              value: "{{ env.HEALTH_CHECK_ENABLED }}"
+            - name: healthCheck.path
+              value: "{{ env.HEALTH_CHECK_PATH }}"
+            - name: healthCheck.initialDelaySeconds
+              value: "{{ env.HEALTH_CHECK_INITIAL_DELAY }}"
+            - name: prometheus.enabled
+              value: "{{ env.PROMETHEUS_ENABLED }}"
+          # Pass environment variables as file for complex configs
+          valueFiles:
+            - values.yaml
+            - "values/client-{{ TENANT_ID }}-values.yaml"
+            # Environment-specific overrides loaded via ConfigMap generator
+
+      # Destination: Kubernetes cluster + namespace
+      destination:
+        server: "{{ env.CLUSTER_URL }}"
+        namespace: "omobio-{{ TENANT_ID }}-{{ ENV_NAME }}"
+
+      # Sync policy: automated for dev/stg/reg, manual for prod
+      syncPolicy:
+        automated:
+          # Auto-sync only when SYNC_ENABLED=true (not prod by default)
+          enabled: "{{ env.AUTO_SYNC_ENABLED }}"
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+        ignoreDifferences:
+          # Ignore fields managed by admission webhooks (e.g., Istio sidecar injection)
+          - group: apps
+            kind: Deployment
+            jsonPointers:
+              - /spec/replicas
+          - group: ""
+            kind: ServiceAccount
+            jsonPointers:
+              - /secrets
+              - /imagePullSecrets
+
+      # Ignore differences for specific managed fields
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+
+  # Strategy for applying updates
+  strategy:
+    # Rolling update strategy for progressive delivery
+    type: RollingRecreate
+
+  # Preserve application on ApplicationSet deletion
+  preserveResourcesOnDeletion: false
+
+---
+# Alternative: SCM Provider Generator for Git-based promotion workflow
+# Uncomment to use branch/tag-based promotion instead of matrix
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: omobio-selfcare-platform-scm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: omobio-selfcare-platform-scm
+    app.kubernetes.io/component: gitops
+    app.kubernetes.io/part-of: omobio-platform
+spec:
+  # SCM Provider Generator: scan repos for tags matching promotion pattern
+  generators:
+    - scmProvider:
+        cloneProtocol: https
+        github:
+          # Organization or user owning the repository
+          organization: omobio
+          # Scan for repos matching this pattern
+          repoFilter:
+            - repository: selfcare-platform
+        # Scan branches/tags
+        branchMatch: "*"
+        tagMatch: "v*"  # Only release tags
+  template:
+    metadata:
+      name: "omobio-{{ repo }}-{{ branch }}"
+      namespace: argocd
+      labels:
+        omobio.platform: selfcare
+        omobio.repo: "{{ repo }}"
+        omobio.branch: "{{ branch }}"
+        omobio.gitops.generated: "true"
+        omobio.gitops.type: scm-branch
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io/foreground
+    spec:
+      project: omobio-platform
+      source:
+        repoURL: "{{ url }}"
+        targetRevision: "{{ branch }}"
+        path: backend/deploy/helm
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "omobio-{{ repo }}-{{ branch }}"
+      syncPolicy:
+        automated:
+          enabled: false  # Manual for SCM-based promotion
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

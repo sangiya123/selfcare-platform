@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.omobio</groupId>
+        <artifactId>omobio-selfcare-platform</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../..</relativePath>
+    </parent>
+
+    <groupId>com.omobio.industry</groupId>
+    <artifactId>telco-industry-pack</artifactId>
+    <packaging>pom</packaging>
+
+    <name>OMOBIO Telco Industry Pack</name>
+    <description>
+        Telco-vertical provider implementations (Dialog, Hutch, Airtel, future operators).
+        Each telecom operator is a client/tenant using this industry pack.
+        All provider config comes from MongoDB — NOT from env files.
+    </description>
+
+    <modules>
+        <module>dialog/providers</module>
+        <module>hutch/providers</module>
+        <module>airtel/providers</module>
+    </modules>
+</project>

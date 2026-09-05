@@ -1,0 +1,53 @@
+# OMOBIO Dashboard BFF
+spring:
+  application:
+    name: dashboard-bff
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:omobio}
+    mongodb:
+      host: ${MONGO_HOST:localhost}
+      port: ${MONGO_PORT:27017}
+      database: ${MONGO_DATABASE:omobio_config}
+  webflux:
+    base-path: /
+
+server:
+  port: ${DASHBOARD_BFF_PORT:8085}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: dashboard-bff
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
+  dashboard:
+    overall-deadline-ms: 500
+    default-widget-timeout-ms: 300
+    layout:
+      default-ttl-seconds: 300
+    client:
+      timeout-ms: 500
+      retry-attempts: 0
+  tenant:
+    industry: ${TENANT_INDUSTRY:TELCO}

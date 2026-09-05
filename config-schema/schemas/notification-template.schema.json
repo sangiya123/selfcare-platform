@@ -1,0 +1,257 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/notification-template.schema.json",
+  "title": "NotificationTemplate",
+  "description": "Notification template definition for the OMOBIO Selfcare Platform. Supports multi-channel delivery (PUSH, SMS, EMAIL, IN_APP) with full i18n and mustache-style {{placeholders}}.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "templateId",
+    "channel",
+    "name",
+    "subject",
+    "body",
+    "i18n",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "templateId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.]{2,63}$",
+      "description": "Stable template identifier (e.g. 'recharge.success', 'bill.reminder.3days')"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Human-readable template name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["PUSH", "SMS", "EMAIL", "IN_APP"],
+      "description": "Primary delivery channel for this template"
+    },
+    "subject": {
+      "type": "object",
+      "description": "Template subject (used by EMAIL; echoed as PUSH title for other channels)",
+      "required": ["default"],
+      "properties": {
+        "default": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Default subject text with optional {{placeholders}}"
+        },
+        "short": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Shortened subject for constrained displays (e.g. push notification on Apple Watch)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body": {
+      "type": "object",
+      "required": ["default"],
+      "properties": {
+        "default": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Default body text with mustache {{placeholders}} (e.g. 'Your recharge of LKR {{amount}} was successful. New balance: LKR {{balance}}')"
+        },
+        "short": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Short body for SMS or constrained push UI"
+        }
+      },
+      "additionalProperties": false
+    },
+    "i18n": {
+      "type": "object",
+      "description": "Locale-specific overrides. Each key is an ISO 639-1 language code (en, si, ta, etc.)",
+      "additionalProperties": { "$ref": "#/$defs/LocalizedContent" }
+    },
+    "action": {
+      "type": "object",
+      "description": "Optional CTA / deep-link action attached to the notification",
+      "properties": {
+        "label": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Button / CTA label (e.g. 'View Bill', 'Recharge Now')"
+        },
+        "route": { "type": "string", "description": "In-app canonical route to navigate to on tap" },
+        "deepLink": { "type": "string", "description": "Custom deep-link URI to open the target screen" },
+        "webUrl": { "type": "string", "format": "uri", "description": "Web fallback URL when the app is unavailable" },
+        "actionType": {
+          "type": "string",
+          "enum": ["NAVIGATE", "OPEN_WEB", "OPEN_WEB_SSO", "START_JOURNEY", "DISMISS"]
+        },
+        "journeyId": { "type": "string", "description": "Journey to start when actionType is START_JOURNEY" }
+      },
+      "additionalProperties": false
+    },
+    "image": {
+      "type": "object",
+      "description": "Optional image asset for rich notifications",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "alt": { "type": "string", "maxLength": 256 },
+        "aspectRatio": {
+          "type": "string",
+          "enum": ["1:1", "16:9", "4:3", "ANY"]
+        },
+        "i18n": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string", "format": "uri" },
+              "alt": { "type": "string", "maxLength": 256 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "frequencyCap": {
+      "type": "object",
+      "description": "Limits how often a user can receive this notification",
+      "properties": {
+        "maxPerDay": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum deliveries per user per calendar day"
+        },
+        "maxPerWeek": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "quietHoursStart": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$",
+          "description": "Local time when notifications are suppressed (HH:MM, 24-hour)"
+        },
+        "quietHoursEnd": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "Asia/Colombo",
+          "description": "IANA timezone for quiet-hours calculation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["LOW", "NORMAL", "HIGH", "URGENT"],
+      "default": "NORMAL"
+    },
+    "retention": {
+      "type": "object",
+      "description": "In-app notification retention settings",
+      "properties": {
+        "ttlSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 2592000,
+          "description": "Seconds before in-app notification expires and is auto-deleted"
+        },
+        "archiveAfterSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "Seconds before read notification moves to archive"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expiry": {
+      "type": "object",
+      "properties": {
+        "startUtc": { "type": "string", "format": "date-time" },
+        "endUtc": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "targeting": {
+      "type": "object",
+      "description": "Optional targeting constraints",
+      "properties": {
+        "lob": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["MOBILE", "BB", "DTV", "FIBRE", "ENTERPRISE"]
+          }
+        },
+        "connectionType": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["prepaid", "postpaid", "hybrid"] }
+        },
+        "segment": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+    },
+    "owner": { "type": "string", "maxLength": 128 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 64 }
+    },
+    "analytics": {
+      "type": "object",
+      "properties": {
+        "deliveredEvent": { "type": "string" },
+        "openedEvent": { "type": "string" },
+        "clickedEvent": { "type": "string" },
+        "failedEvent": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "LocalizedContent": {
+      "type": "object",
+      "description": "Locale-specific overrides for subject and body",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "subjectShort": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "bodyShort": {
+          "type": "string",
+          "maxLength": 160
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

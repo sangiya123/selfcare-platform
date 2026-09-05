@@ -1,0 +1,153 @@
+#
+# OpenTelemetry Collector configuration for the OMOBIO Selfcare Platform.
+#
+# Collects:
+#   - Traces from all backend services (Java) via OTLP gRPC
+#   - Metrics from all backend services via OTLP gRPC
+#   - Logs from services (in addition to ELK)
+#
+# Exports:
+#   - Traces to Jaeger (UI) and to Tempo (storage)
+#   - Metrics to Prometheus
+#   - Logs to Loki
+#
+# Pipeline:
+#   receivers → processors → exporters
+#
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 16
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'omobio-backend'
+          metrics_path: '/actuator/prometheus'
+          scrape_interval: 30s
+          static_configs:
+            - targets:
+              - 'api-gateway:8080'
+              - 'config-tenant-service:8080'
+              - 'customer-identity-service:8080'
+              - 'admin-identity-service:8080'
+              - 'account-entitlement-service:8080'
+              - 'dashboard-bff:8080'
+              - 'product-service:8080'
+              - 'usage-service:8080'
+              - 'billing-service:8080'
+              - 'payment-service:8080'
+              - 'notification-service:8080'
+              - 'content-service:8080'
+              - 'journey-service:8080'
+              - 'reporting-service:8080'
+              - 'ai-gateway:8080'
+              - 'audit-service:8080'
+              - 'insurance-service:8080'
+
+processors:
+  # Add service.instance.id for unique trace identification
+  resourcedetection:
+    detectors: [env, system, k8s]
+    timeout: 5s
+    override: false
+
+  # Add tenant_id and correlation_id to all spans/metrics
+  attributes/tenant:
+    actions:
+      - key: tenant_id
+        from_attribute: X-Tenant-Id
+      - key: correlation_id
+        from_attribute: X-Correlation-Id
+
+  # Batch for efficiency
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+  # Memory limiter
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Filter out health-check traffic
+  filter/health:
+    metrics:
+      exclude:
+        match_type: regexp
+        metric_names:
+          - 'http_server_requests_seconds_count.*"/actuator/.*"'
+          - 'http_server_requests_seconds_count.*"/health.*"'
+
+exporters:
+  # Traces to Jaeger
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Traces to Tempo
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+
+  # Metrics to Prometheus
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: omobio
+    const_labels:
+      env: ${env:dev}
+
+  # Logs to Loki
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+
+  # Debug
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes/tenant, batch]
+      exporters: [jaeger, otlp/tempo]
+
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resourcedetection, attributes/tenant, batch, filter/health]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes/tenant, batch]
+      exporters: [loki]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

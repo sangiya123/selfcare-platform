@@ -1,0 +1,68 @@
+# tenant config: airtel-lk
+# Operator: Airtel Lanka — TELCO OPERATOR
+# Region: LK
+# Industry: TELCO
+# Tenant Type: OPERATOR
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: airtel-lk
+  TENANT_OPERATOR: airtel
+  TENANT_INDUSTRY: TELCO
+  TENANT_TYPE: OPERATOR
+  TENANT_REGION: LK
+  TENANT_DISPLAY_NAME: "Airtel Lanka"
+  TENANT_COUNTRY: Sri Lanka
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@airtel.lk
+  TENANT_SUPPORT_PHONE: "+94-71-XXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#ED1C24"
+  TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/airtel/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/airtel/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: airtel.lk
+  TENANT_CDN_DOMAIN: "cdn.airtel.lk"
+  TENANT_INGRESS_HOST: "selfcare.airtel.lk"
+
+  # Industry-specific provider endpoints
+  BSS_API_URL: "https://bss-api.airtel.lk/v1"
+  BSS_API_KEY_REF: "secret-ref:airtel-bss-api-key"
+  SMSC_URL: "http://smsc.airtel.lk:8080"
+  SMSC_USER_REF: "secret-ref:airtel-smsc-user"
+  SMSC_PASSWORD_REF: "secret-ref:airtel-smsc-password"
+  VAS_API_URL: "https://vas-api.airtel.lk/v1"
+
+  # Feature flags (telco-specific)
+  SHOW_DTV_BUNDLES: false
+  SHOW_FIBRE_BUNDLES: false
+  SHOW_POSTPAID_ONLY: false
+  ROAMING_ENABLED: true
+  DATA_ROLL_OVER_ENABLED: true
+  AI_ASSISTANT_ENABLED: false
+  JOURNEY_ENABLED: false
+  IN_APP_CALL_ENABLED: false
+  OTP_METHODS:
+    - SMS
+    - USSD
+    - EMAIL
+  SUPPORTED_LANGUAGES:
+    - si
+    - ta
+    - en
+
+  # Compliance
+  DATA_RETENTION_DAYS: 365
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+
+  # Resource sizing
+  RESOURCE_QUOTA_CPU_REQUEST: "500m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "512Mi"
+  RESOURCE_QUOTA_CPU_LIMIT: "2000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "2Gi"

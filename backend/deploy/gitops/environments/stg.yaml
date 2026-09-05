@@ -1,0 +1,89 @@
+# environment config: stg
+# Staging environment — pre-production validation
+# Cluster: stg-cluster (shared EKS/AKS for staging)
+# Image tag strategy: MUTABLE (release candidate)
+# Sync window: Business hours
+# Required approvals: 1 (Developer)
+
+env:
+  # Environment identity
+  ENV_NAME: stg
+  ENV_DISPLAY_NAME: Staging
+  ENV_TIER: 3
+  ENV_PURPOSE: "Pre-production validation, integration tests, UAT"
+
+  # Cluster
+  CLUSTER_URL: https://stg-cluster.omobio.example.com
+  CLUSTER_NAME: stg-cluster
+  CLUSTER_REGION: ap-southeast-1
+  CLUSTER_ENVIRONMENT: stg
+
+  # Image strategy
+  IMAGE_TAG_MUTABLE: "true"  # Image tag is mutable
+  DEFAULT_IMAGE_TAG: "rc-latest"  # Release candidate
+  DEFAULT_TARGET_REVISION: "main"  # Track main branch
+  IMAGE_PULL_POLICY: Always
+  IMAGE_REGISTRY: ghcr.io/omobio
+  IMAGE_REPOSITORY: omobio/selfcare-platform
+
+  # Auto-sync
+  AUTO_SYNC_ENABLED: "true"  # Auto-sync enabled
+
+  # Sync window
+  SYNC_WINDOW: "business-hours"
+  SYNC_WINDOW_DESCRIPTION: "Mon-Fri 08:00-18:00 SGT"
+  SYNC_WINDOW_CRON: "0 8-18 * * MON-FRI"
+
+  # Approvals
+  REQUIRED_APPROVALS: "1"
+  APPROVAL_ROLES: '["developer"]'
+  APPROVAL_DESCRIPTION: "At least 1 developer approval required"
+
+  # Resource limits
+  RESOURCE_LIMITS_CPU: "1000m"
+  RESOURCE_LIMITS_MEMORY: "1Gi"
+  RESOURCE_REQUESTS_CPU: "200m"
+  RESOURCE_REQUESTS_MEMORY: "256Mi"
+
+  # Replicas
+  MIN_REPLICAS: "2"
+  MAX_REPLICAS: "5"
+
+  # Ingress
+  INGRESS_ENABLED: "true"
+  INGRESS_CLASS: nginx
+  CERT_MANAGER_ISSUER: "letsencrypt-staging"
+
+  # Health checks
+  HEALTH_CHECK_ENABLED: "true"
+  HEALTH_CHECK_PATH: "/actuator/health"
+  HEALTH_CHECK_INITIAL_DELAY: "45"
+
+  # Observability
+  PROMETHEUS_ENABLED: "true"
+  LOG_LEVEL: INFO
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "0.5"  # 50% sampling in stg
+
+  # Security
+  TLS_ENABLED: "true"
+  RBAC_ENFORCED: "true"
+
+  # Cleanup
+  CLEANUP_ON_DELETE: "false"
+  RETENTION_DAYS: "30"
+
+  # Data
+  DATABASE_TIER: "db.t3.small"
+  DATABASE_BACKUP_ENABLED: "true"
+  DATABASE_BACKUP_RETENTION_DAYS: "7"
+  REDIS_TIER: "cache.t3.small"
+
+  # Feature flags
+  EXPERIMENTAL_FEATURES_ENABLED: "true"
+  DEBUG_MODE_ENABLED: "false"
+
+  # Promotion strategy
+  PROMOTION_STRATEGY: "manual-after-tests"
+  PROMOTION_NEXT_ENV: "reg"
+  PROMOTION_GATE: "integration-tests-passed"

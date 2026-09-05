@@ -1,0 +1,18 @@
+{{- if .Values.enabled | default true }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "omobio.fullname" . }}-env
+  namespace: {{ include "omobio.namespace" . }}
+  labels:
+    {{- include "omobio.labels" . | nindent 4 }}
+data:
+  SPRING_PROFILES_ACTIVE: "{{ .Values.env.SPRING_PROFILES_ACTIVE | default "prod" }}"
+  JAVA_TOOL_OPTIONS: "{{ .Values.env.JAVA_TOOL_OPTIONS | default "-Xmx768m -XX:MaxRAMPercentage=75.0" }}"
+  OTEL_SERVICE_NAME: "{{ include "omobio.name" . }}"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "{{ .Values.env.OTEL_EXPORTER_OTLP_ENDPOINT | default "http://otel-collector:4317" }}"
+  OTEL_RESOURCE_ATTRIBUTES: "service.version={{ include "omobio.imageTag" . }},deployment.environment={{ .Values.env.SPRING_PROFILES_ACTIVE | default "prod" }}"
+  {{- if .Values.env.EXTRA_CONFIG }}
+  {{- toYaml .Values.env.EXTRA_CONFIG | nindent 2 }}
+  {{- end }}
+{{- end }}

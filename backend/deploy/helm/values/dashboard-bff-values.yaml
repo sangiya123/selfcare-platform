@@ -1,0 +1,62 @@
+# dashboard-bff-values.yaml — Dashboard BFF overrides
+# Orchestrates widget fan-out with per-widget resilience (ADR-008)
+
+replicaCount: 2
+
+image:
+  repository: omobio/dashboard-bff
+
+resources:
+  limits:
+    cpu: 1500m
+    memory: 1.2Gi
+  requests:
+    cpu: 400m
+    memory: 640Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 60
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx900m -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # ADR-008: overall dashboard deadline (ms)
+  DASHBOARD_DEADLINE_MS: "2000"
+  # Per-widget defaults
+  WIDGET_DEFAULT_TIMEOUT_MS: "500"
+  WIDGET_MAX_TIMEOUT_MS: "3000"
+  # Circuit breaker
+  CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD: "0.5"
+  CIRCUIT_BREAKER_WAIT_DURATION_MS: "30000"
+  # Concurrency
+  WIDGET_MAX_CONCURRENT: "20"
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  failureThreshold: 3
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+  metricsPath: /actuator/prometheus
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

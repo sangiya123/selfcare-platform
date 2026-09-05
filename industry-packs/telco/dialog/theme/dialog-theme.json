@@ -1,0 +1,168 @@
+{
+  "tenantId": "dialog-lk",
+  "name": "dialog-lk",
+  "displayName": "Dialog Sri Lanka",
+  "operator": "dialog",
+  "country": "LK",
+  "industry": "TELECOM",
+  "defaultEnvironment": "prod",
+  "defaultLocale": "en",
+  "supportedLocales": ["en", "si", "ta"],
+  "defaultCurrency": "LKR",
+  "supportedLobs": ["MOBILE", "BB", "DTV", "FIBRE", "ENTERPRISE"],
+  "supportedConnectionTypes": ["prepaid", "postpaid", "hybrid"],
+  "industryPackVersion": "1.0.0",
+  "operatorPackVersion": "1.0.0",
+  "features": {
+    "usage.enabled": true,
+    "bill.enabled": true,
+    "recharge.enabled": true,
+    "payment.enabled": true,
+    "packages.enabled": true,
+    "roaming.enabled": true,
+    "idd.enabled": true,
+    "vas.enabled": true,
+    "notifications.enabled": true,
+    "ai.assistant.enabled": true,
+    "cross.connection.payment.enabled": true,
+    "selfcare.studio.preview.enabled": true
+  },
+  "theme": {
+    "name": "dialog-default",
+    "version": "1.0.0",
+    "tokens": {
+      "colors": {
+        "primary-900": "#1B0B45",
+        "primary-700": "#3D126E",
+        "primary-500": "#6D28D9",
+        "primary-300": "#A78BFA",
+        "accent-500": "#C026D3",
+        "accent-glow": "#E879F9",
+        "surface": "#FFFFFF",
+        "surface-subtle": "#F7F5FB",
+        "text-primary": "#17141F",
+        "text-secondary": "#6B6475",
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444",
+        "info": "#3B82F6"
+      },
+      "typography": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSizes": {
+          "xs": 12,
+          "sm": 14,
+          "base": 16,
+          "lg": 18,
+          "xl": 20,
+          "2xl": 24,
+          "3xl": 30,
+          "4xl": 36
+        },
+        "fontWeights": {
+          "normal": 400,
+          "medium": 500,
+          "semibold": 600,
+          "bold": 700
+        }
+      },
+      "spacing": {
+        "0": 0,
+        "1": 4,
+        "2": 8,
+        "3": 12,
+        "4": 16,
+        "5": 20,
+        "6": 24,
+        "8": 32,
+        "10": 40,
+        "12": 48,
+        "16": 64
+      },
+      "borderRadius": {
+        "none": 0,
+        "sm": 4,
+        "md": 8,
+        "lg": 12,
+        "xl": 16,
+        "2xl": 24,
+        "full": 9999
+      },
+      "elevation": {
+        "none": "none",
+        "sm": "0 1px 2px rgba(0,0,0,0.05)",
+        "md": "0 4px 6px rgba(0,0,0,0.07)",
+        "lg": "0 10px 15px rgba(0,0,0,0.10)",
+        "xl": "0 20px 25px rgba(0,0,0,0.10)"
+      },
+      "iconSizes": {
+        "xs": 12,
+        "sm": 16,
+        "md": 20,
+        "lg": 24,
+        "xl": 32,
+        "2xl": 40
+      }
+    }
+  },
+  "navigation": {
+    "type": "bottom-tabs",
+    "tabs": [
+      { "id": "home", "label": "Home", "icon": "home", "route": "/" },
+      { "id": "products", "label": "Shop", "icon": "shopping-bag", "route": "/products" },
+      { "id": "usage", "label": "Activity", "icon": "activity", "route": "/usage" },
+      { "id": "support", "label": "Support", "icon": "help-circle", "route": "/support" },
+      { "id": "account", "label": "Account", "icon": "user", "route": "/account" }
+    ]
+  },
+  "assets": {
+    "logo": "https://cdn.dialog.lk/assets/logo.svg",
+    "icon": "https://cdn.dialog.lk/assets/icon.png",
+    "favicon": "https://cdn.dialog.lk/assets/favicon.ico"
+  },
+  "providerBindings": {
+    "AuthProvider": "com.omobio.providers.dialog.DialogAuthProvider",
+    "ProfileProvider": "com.omobio.providers.dialog.DialogProfileProvider",
+    "ConnectionProvider": "com.omobio.providers.dialog.DialogConnectionProvider",
+    "BalanceProvider": "com.omobio.providers.dialog.DialogBalanceProvider",
+    "UsageProvider": "com.omobio.providers.dialog.DialogUsageProvider",
+    "BillingProvider": "com.omobio.providers.dialog.DialogBillingProvider",
+    "PaymentProvider": "com.omobio.providers.dialog.DialogPaymentProvider",
+    "RechargeProvider": "com.omobio.providers.dialog.DialogRechargeProvider",
+    "ProductCatalogProvider": "com.omobio.providers.dialog.DialogProductCatalogProvider",
+    "EligibilityProvider": "com.omobio.providers.dialog.DialogEligibilityProvider",
+    "PricingProvider": "com.omobio.providers.dialog.DialogPricingProvider",
+    "NotificationProvider": "com.omobio.providers.dialog.DialogNotificationProvider",
+    "SupportProvider": "com.omobio.providers.dialog.DialogSupportProvider",
+    "LoyaltyProvider": "com.omobio.providers.dialog.DialogLoyaltyProvider"
+  },
+  "endpoints": {
+    "auth": "https://auth.dialog.lk",
+    "mife": "https://mife.dialog.lk",
+    "billing": "https://billing.dialog.lk",
+    "payments": "https://payments.dialog.lk",
+    "support": "https://support.dialog.lk"
+  },
+  "features": {
+    "cross.connection.payment": {
+      "enabled": true,
+      "maxAmount": 100000.00,
+      "currency": "LKR",
+      "requiresStepUp": false,
+      "allowedActions": ["PAY_BILL", "RECHARGE", "TRANSFER_BALANCE"]
+    },
+    "authMethods": ["OTP", "BIOMETRIC"],
+    "sessionTimeout": {
+      "access": 3600,
+      "refresh": 604800,
+      "inactivity": 1800
+    }
+  },
+  "entitlement": {
+    "type": "primary-number-linked-list",
+    "note": "ADR-006: A requested connection is authorized when it is in the currently logged-in primary mobile number's linked connection list, not based on NIC ownership"
+  },
+  "createdAt": "2026-09-03T00:00:00Z",
+  "updatedAt": "2026-09-03T00:00:00Z",
+  "status": "ACTIVE"
+}

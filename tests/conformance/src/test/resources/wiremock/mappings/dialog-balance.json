@@ -1,0 +1,228 @@
+{
+  "mappings": [
+    {
+      "name": "Dialog Balance Provider - Success",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/balance",
+        "queryParameters": {
+          "connectionId": {
+            "matches": "CONN-.*"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "connectionId": "{{request.query.connectionId}}",
+          "amount": 1250.75,
+          "currency": "LKR",
+          "balanceType": "MAIN",
+          "asOf": "{{now}}",
+          "lastRecharge": {
+            "amount": 1000.00,
+            "date": "2026-08-25T10:30:00Z"
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Provider": "DialogBSS"
+        }
+      }
+    },
+    {
+      "name": "Dialog Balance Provider - Connection Not Found",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/balance",
+        "queryParameters": {
+          "connectionId": {
+            "matches": "CONN-INVALID-.*"
+          }
+        }
+      },
+      "response": {
+        "status": 404,
+        "jsonBody": {
+          "error": "Connection not found",
+          "code": "CONN_NOT_FOUND"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Dialog Bills Provider - List Bills",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/bills"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "bills": [
+            {
+              "billId": "BILL-001",
+              "connectionId": "CONN-001",
+              "issueDate": "2026-08-01",
+              "dueDate": "2026-08-31",
+              "totalAmount": 5500.00,
+              "currency": "LKR",
+              "status": "OVERDUE",
+              "items": [
+                {
+                  "description": "Monthly subscription",
+                  "amount": 4500.00
+                },
+                {
+                  "description": "International calls",
+                  "amount": 1000.00
+                }
+              ]
+            },
+            {
+              "billId": "BILL-002",
+              "connectionId": "CONN-001",
+              "issueDate": "2026-08-15",
+              "dueDate": "2026-09-15",
+              "totalAmount": 3200.00,
+              "currency": "LKR",
+              "status": "OUTSTANDING"
+            }
+          ],
+          "total": 8700.00
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Dialog Data Usage Provider",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/usage/data"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "connectionId": "CONN-001",
+          "totalMB": 5120,
+          "usedMB": 3200,
+          "remainingMB": 1920,
+          "resetDate": "2026-09-15",
+          "rolloverMB": 0
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Dialog Voice Usage Provider",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/usage/voice"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "connectionId": "CONN-001",
+          "totalMinutes": 1000,
+          "usedMinutes": 425,
+          "remainingMinutes": 575
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Dialog Products Provider",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/products"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "products": [
+            {
+              "productId": "PROD-DATA-10GB",
+              "name": "Data Pack 10GB",
+              "category": "DATA",
+              "price": 500.00,
+              "currency": "LKR",
+              "validityDays": 30,
+              "dataVolumeMB": 10240,
+              "status": "ACTIVE"
+            },
+            {
+              "productId": "PROD-DATA-5GB",
+              "name": "Data Pack 5GB",
+              "category": "DATA",
+              "price": 250.00,
+              "currency": "LKR",
+              "validityDays": 7,
+              "dataVolumeMB": 5120,
+              "status": "ACTIVE"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Dialog Plans Provider",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/products/plans"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "plans": [
+            {
+              "planId": "PLAN-PREMIUM",
+              "name": "Premium Plan",
+              "monthlyPrice": 2500.00,
+              "currency": "LKR",
+              "features": ["10GB data", "Unlimited calls", "100 SMS"]
+            },
+            {
+              "planId": "PLAN-BASIC",
+              "name": "Basic Plan",
+              "monthlyPrice": 1000.00,
+              "currency": "LKR",
+              "features": ["2GB data", "200 minutes", "50 SMS"]
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "Provider Health Check",
+      "request": {
+        "method": "GET",
+        "urlPath": "/health"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "status": "UP",
+          "service": "DialogBSS",
+          "version": "1.0.0"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

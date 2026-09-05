@@ -1,0 +1,130 @@
+# environment config: prod
+# Production environment — fully immutable, strict gates
+# Cluster: prod-cluster (per region: lk, sg, th, my, hk, in)
+# Image tag strategy: IMMUTABLE (pinned to specific release tag)
+# Sync window: Maintenance windows only (Sun + Wed 02:00-04:00 UTC)
+# Required approvals: 3 (Developer + QA + Ops)
+
+env:
+  # Environment identity
+  ENV_NAME: prod
+  ENV_DISPLAY_NAME: Production
+  ENV_TIER: 1
+  ENV_PURPOSE: "Live customer-facing production deployment"
+
+  # Cluster (per-region in real deployment; this is the template)
+  CLUSTER_URL: https://prod-lk.omobio.example.com
+  CLUSTER_NAME: prod-cluster
+  CLUSTER_REGION: ap-southeast-1
+  CLUSTER_ENVIRONMENT: prod
+  CLUSTER_HIGH_AVAILABILITY: "true"
+  CLUSTER_MULTI_ZONE: "true"
+
+  # Image strategy
+  IMAGE_TAG_MUTABLE: "false"  # IMMUTABLE — cannot change once deployed
+  DEFAULT_IMAGE_TAG: ""  # Must be set explicitly per release
+  DEFAULT_TARGET_REVISION: "tags/v*"  # Only release tags
+  IMAGE_PULL_POLICY: IfNotPresent
+  IMAGE_REGISTRY: ghcr.io/omobio
+  IMAGE_REPOSITORY: omobio/selfcare-platform
+  IMAGE_DIGEST_REQUIRED: "true"  # Must use digest, not tag
+
+  # Auto-sync — DISABLED for prod
+  AUTO_SYNC_ENABLED: "false"  # Manual sync only
+
+  # Sync window — strict maintenance windows
+  SYNC_WINDOW: "maintenance-only"
+  SYNC_WINDOW_DESCRIPTION: "Sunday & Wednesday 02:00-04:00 UTC only"
+  SYNC_WINDOW_CRON_PRIMARY: "0 2-4 * * SUN"
+  SYNC_WINDOW_CRON_SECONDARY: "0 2-4 * * WED"
+  EMERGENCY_DEPLOYMENT: "incident-ticket-required"
+
+  # Approvals — strict 3-eye principle
+  REQUIRED_APPROVALS: "3"
+  APPROVAL_ROLES: '["developer", "qa-engineer", "ops-engineer"]'
+  APPROVAL_DESCRIPTION: "Developer + QA + Ops approval required (3-eye principle)"
+  APPROVAL_TIMEOUT_HOURS: "24"  # Approvals expire after 24h
+
+  # Resource limits (high for prod)
+  RESOURCE_LIMITS_CPU: "4000m"
+  RESOURCE_LIMITS_MEMORY: "4Gi"
+  RESOURCE_REQUESTS_CPU: "1000m"
+  RESOURCE_REQUESTS_MEMORY: "1Gi"
+
+  # Replicas (HA)
+  MIN_REPLICAS: "3"
+  MAX_REPLICAS: "50"
+  POD_DISRUPTION_BUDGET_MIN_AVAILABLE: "2"
+
+  # Ingress
+  INGRESS_ENABLED: "true"
+  INGRESS_CLASS: nginx
+  CERT_MANAGER_ISSUER: "letsencrypt-prod"
+  WAF_ENABLED: "true"
+  RATE_LIMITING_ENABLED: "true"
+
+  # Health checks
+  HEALTH_CHECK_ENABLED: "true"
+  HEALTH_CHECK_PATH: "/actuator/health"
+  HEALTH_CHECK_INITIAL_DELAY: "30"
+  READINESS_PROBE_TIMEOUT: "5"
+  LIVENESS_PROBE_TIMEOUT: "10"
+  STARTUP_PROBE_ENABLED: "true"
+  STARTUP_PROBE_FAILURE_THRESHOLD: "30"
+
+  # Observability
+  PROMETHEUS_ENABLED: "true"
+  LOG_LEVEL: WARN
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "0.1"  # 10% sampling
+  ALERTING_ENABLED: "true"
+  SLO_MONITORING_ENABLED: "true"
+  ERROR_BUDGET_ENFORCED: "true"
+
+  # Security (strictest)
+  TLS_ENABLED: "true"
+  TLS_MIN_VERSION: "1.3"
+  RBAC_ENFORCED: "true"
+  POD_SECURITY_POLICY: "restricted"
+  NETWORK_POLICY_ENABLED: "true"
+  OPA_GATEKEEPER_ENABLED: "true"
+  FALCO_RUNTIME_SECURITY_ENABLED: "true"
+  SECRETS_ENCRYPTED_AT_REST: "true"
+  IMAGE_SIGNING_REQUIRED: "true"
+  ADMISSION_CONTROLLER_ENFORCED: "true"
+
+  # Cleanup
+  CLEANUP_ON_DELETE: "false"
+  RETENTION_DAYS: "730"  # 2 years for audit/compliance
+
+  # Data (production-grade)
+  DATABASE_TIER: "db.r5.xlarge"
+  DATABASE_MULTI_AZ: "true"
+  DATABASE_ENCRYPTED_AT_REST: "true"
+  DATABASE_BACKUP_ENABLED: "true"
+  DATABASE_BACKUP_RETENTION_DAYS: "90"
+  DATABASE_POINT_IN_TIME_RECOVERY: "true"
+  REDIS_TIER: "cache.r5.xlarge"
+  REDIS_CLUSTER_MODE: "true"
+  REDIS_ENCRYPTED_AT_REST: "true"
+
+  # Feature flags
+  EXPERIMENTAL_FEATURES_ENABLED: "false"
+  DEBUG_MODE_ENABLED: "false"
+  KILL_SWITCH_ENABLED: "true"  # Can disable features without redeploy
+
+  # Promotion strategy
+  PROMOTION_STRATEGY: "immutable"
+  PROMOTION_NEXT_ENV: ""  # No promotion from prod
+  PROMOTION_GATE: "release-manager-approval"
+  REGRESSION_TESTS_REQUIRED: "true"
+  PERFORMANCE_TESTS_REQUIRED: "true"
+  SECURITY_SCAN_REQUIRED: "true"
+  CHANGE_ADVISORY_BOARD_REQUIRED: "true"
+  ROLLBACK_PLAN_REQUIRED: "true"
+  COMMUNICATION_REQUIRED: "true"
+
+  # Rollback
+  ROLLBACK_AUTOMATED: "true"
+  ROLLBACK_HEALTH_CHECK_GRACE_PERIOD: "300"  # 5 min
+  ROLLBACK_ON_FAILURE: "true"

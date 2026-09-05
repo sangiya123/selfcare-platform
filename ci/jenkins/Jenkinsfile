@@ -1,0 +1,482 @@
+// OMOBIO Selfcare Platform — Jenkins pipeline
+//
+// Mirrors the GitHub Actions workflow for teams using Jenkins.
+// Stages: lint → test → scan → build → publish → deploy
+// Manual gates: reg, prod
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
+        ansiColor('xterm')
+    }
+
+    environment {
+        JAVA_VERSION = '25'
+        MAVEN_OPTS = '-Xmx2g -XX:+UseG1GC'
+        DOCKER_REGISTRY = credentials('docker-registry-url')
+        NVD_API_KEY = credentials('owasp-nvd-api-key')
+        SONAR_TOKEN = credentials('sonar-token')
+    }
+
+    parameters {
+        choice(
+            name: 'DEPLOY_ENV',
+            choices: ['none', 'dev', 'stg', 'reg', 'prod'],
+            description: 'Deployment environment'
+        )
+        booleanParam(
+            name: 'RUN_SECURITY_SCAN',
+            defaultValue: true,
+            description: 'Run OWASP + Trivy + SonarQube scans'
+        )
+        booleanParam(
+            name: 'RUN_PERFORMANCE',
+            defaultValue: false,
+            description: 'Run k6 performance tests'
+        )
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+        githubPush()
+    }
+
+    stages {
+        // ==========================================
+        // Initialize
+        // ==========================================
+        stage('Initialize') {
+            steps {
+                sh '''
+                    echo "Build #${BUILD_NUMBER} on ${NODE_NAME}"
+                    echo "Branch: ${GIT_BRANCH}"
+                    echo "Commit: ${GIT_COMMIT}"
+                    java -version
+                    mvn -version
+                    docker --version
+                '''
+            }
+        }
+
+        // ==========================================
+        // Lint + static analysis
+        // ==========================================
+        stage('Lint & Static Analysis') {
+            parallel {
+                stage('Checkstyle') {
+                    steps {
+                        dir('selfcare-platform/backend') {
+                            sh 'mvn -B -e -fae checkstyle:check'
+                        }
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true,
+                                testResults: '**/target/checkstyle-result.xml'
+                        }
+                    }
+                }
+                stage('SpotBugs') {
+                    steps {
+                        dir('selfcare-platform/backend') {
+                            sh 'mvn -B -e -fae -DskipTests=true spotbugs:check'
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts allowEmptyArchive: true,
+                                artifacts: '**/target/spotbugsXml.xml',
+                                fingerprint: true
+                        }
+                    }
+                }
+                stage('PMD') {
+                    steps {
+                        dir('selfcare-platform/backend') {
+                            sh 'mvn -B -e -fae -DskipTests=true pmd:check'
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts allowEmptyArchive: true,
+                                artifacts: '**/target/pmd.xml',
+                                fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // Unit tests per service
+        // ==========================================
+        stage('Unit Tests') {
+            matrix {
+                axes {
+                    axis {
+                        name 'SERVICE'
+                        values 'api-gateway', 'platform-common', 'config-tenant-service',
+                               'customer-identity-service', 'admin-identity-service',
+                               'account-entitlement-service', 'dashboard-bff', 'product-service',
+                               'usage-service', 'billing-service', 'payment-service',
+                               'notification-service', 'content-service', 'journey-service',
+                               'reporting-service', 'ai-gateway', 'audit-service',
+                               'insurance-service', 'approval-service'
+                    }
+                }
+                stages {
+                    stage("test-${SERVICE}") {
+                        steps {
+                            dir('selfcare-platform/backend') {
+                                sh "mvn -B -e -fae -pl ${SERVICE} -am test"
+                            }
+                        }
+                        post {
+                            always {
+                                junit testResults:
+                                    "selfcare-platform/backend/${SERVICE}/target/surefire-reports/TEST-*.xml",
+                                    allowEmptyResults: true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // Admin + Mobile tests
+        // ==========================================
+        stage('Admin & Mobile') {
+            parallel {
+                stage('Admin tests') {
+                    steps {
+                        dir('selfcare-platform/admin/selfcare-studio') {
+                            sh '''
+                                npm ci
+                                npx vitest run --coverage
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit testResults:
+                                'selfcare-platform/admin/selfcare-studio/junit.xml',
+                                allowEmptyResults: true
+                        }
+                    }
+                }
+                stage('Mobile tests') {
+                    steps {
+                        dir('selfcare-platform/mobile/selfcare-app') {
+                            sh '''
+                                npm ci
+                                npx jest --ci --coverage
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit testResults:
+                                'selfcare-platform/mobile/selfcare-app/junit.xml',
+                                allowEmptyResults: true
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // Conformance tests (integration)
+        // ==========================================
+        stage('Conformance Tests') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                sh '''
+                    docker run -d --name=mongo -p 27017:27017 mongo:7 || true
+                    docker run -d --name=redis -p 6379:6379 redis:7-alpine || true
+                    docker run -d --name=mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root
+                        -e MYSQL_DATABASE=selfcare_test mysql:8 || true
+                    sleep 30
+                '''
+                dir('selfcare-platform/tests/conformance') {
+                    sh '''
+                        OMOBIO_TEST_GATEWAY_URL=http://localhost:8080 \
+                        OMOBIO_TEST_DB_URL=jdbc:mysql://localhost:3306/selfcare_test \
+                        OMOBIO_TEST_REDIS_URL=redis://localhost:6379 \
+                        OMOBIO_TEST_MONGO_URL=mongodb://localhost:27017/selfcare_test \
+                        mvn -B test
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit testResults:
+                        '**/target/surefire-reports/TEST-*.xml',
+                        allowEmptyResults: true
+                    sh 'docker rm -f mongo redis mysql || true'
+                }
+            }
+        }
+
+        // ==========================================
+        // Security scanning
+        // ==========================================
+        stage('Security Scans') {
+            when {
+                expression { return params.RUN_SECURITY_SCAN }
+            }
+            parallel {
+                stage('OWASP dependency-check') {
+                    steps {
+                        dir('selfcare-platform/backend') {
+                            sh '''
+                                mvn -B -DskipTests=true \
+                                    -Dnvd.api.key=${NVD_API_KEY} \
+                                    -DfailBuildOnCVSS=7 \
+                                    -Dformats=HTML,JSON,SARIF \
+                                    -DoutputDirectory=target/dependency-check \
+                                    org.owasp:dependency-check-maven:check
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts allowEmptyArchive: true,
+                                artifacts: 'selfcare-platform/backend/target/dependency-check/**',
+                                fingerprint: true
+                        }
+                    }
+                }
+                stage('Gitleaks') {
+                    steps {
+                        sh '''
+                            docker run --rm -v $(pwd):/repo \
+                                zricethezav/gitleaks:v8.18.4 \
+                                detect --redact --fail-on-public --source /repo --verbose
+                        '''
+                    }
+                }
+                stage('SonarQube') {
+                    steps {
+                        dir('selfcare-platform/backend') {
+                            sh '''
+                                mvn -B -e -fae -DskipTests=true \
+                                    -Dsonar.host.url=${SONAR_HOST_URL} \
+                                    -Dsonar.login=${SONAR_TOKEN} \
+                                    sonar:sonar
+                            '''
+                        }
+                    }
+                }
+                stage('Trivy image scan') {
+                    when {
+                        anyOf {
+                            branch 'main'
+                            buildingTag()
+                        }
+                    }
+                    steps {
+                        sh '''
+                            docker run --rm \
+                                aquasecurity/trivy:0.54.1 image \
+                                --severity HIGH,CRITICAL \
+                                --exit-code 1 \
+                                --ignore-unfixed \
+                                --format json \
+                                --output trivy-report.json \
+                                ${DOCKER_REGISTRY}/api-gateway:${GIT_COMMIT}
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts allowEmptyArchive: true,
+                                artifacts: 'trivy-report.json',
+                                fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // Build Docker images
+        // ==========================================
+        stage('Build Images') {
+            when {
+                anyOf {
+                    branch 'main'
+                    buildingTag()
+                }
+            }
+            matrix {
+                axes {
+                    axis {
+                        name 'SERVICE'
+                        values 'api-gateway', 'config-tenant-service',
+                               'customer-identity-service', 'admin-identity-service',
+                               'account-entitlement-service', 'dashboard-bff',
+                               'product-service', 'usage-service', 'billing-service',
+                               'payment-service', 'notification-service',
+                               'content-service', 'journey-service', 'reporting-service',
+                               'ai-gateway', 'audit-service', 'insurance-service',
+                               'approval-service'
+                    }
+                }
+                stages {
+                    stage("build-${SERVICE}") {
+                        steps {
+                            sh """
+                                docker build -t ${DOCKER_REGISTRY}/${SERVICE}:${GIT_COMMIT} \
+                                    selfcare-platform/backend/${SERVICE}
+                                docker push ${DOCKER_REGISTRY}/${SERVICE}:${GIT_COMMIT}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // Publish SBOM
+        // ==========================================
+        stage('Publish SBOM') {
+            when {
+                buildingTag()
+            }
+            steps {
+                dir('selfcare-platform/backend') {
+                    sh '''
+                        mvn -B org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+                    '''
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: '**/target/bom.json', fingerprint: true
+                }
+            }
+        }
+
+        // ==========================================
+        // Performance tests (optional)
+        // ==========================================
+        stage('Performance Tests') {
+            when {
+                expression { return params.RUN_PERFORMANCE }
+            }
+            steps {
+                sh '''
+                    docker run --rm -v $(pwd):/scripts \
+                        -e API_GATEWAY=${STG_API_GATEWAY} \
+                        -e TENANT_ID=dialog-lk \
+                        grafana/k6:0.50.0 run /scripts/tests/performance/01_dashboard_load.js
+                '''
+            }
+        }
+
+        // ==========================================
+        // Deploy
+        // ==========================================
+        stage('Deploy') {
+            when {
+                anyOf {
+                    branch 'main'
+                    buildingTag()
+                    expression { return params.DEPLOY_ENV != 'none' }
+                }
+            }
+            matrix {
+                axes {
+                    axis {
+                        name 'ENV'
+                        values 'dev', 'stg', 'reg', 'prod'
+                    }
+                }
+                stages {
+                    stage("deploy-${ENV}") {
+                        when {
+                            anyOf {
+                                allOf {
+                                    expression { return params.DEPLOY_ENV == ENV }
+                                    expression { return params.DEPLOY_ENV != 'none' }
+                                }
+                                allOf {
+                                    not { buildingTag() }
+                                    branch 'main'
+                                    expression { return ENV == 'dev' || ENV == 'stg' }
+                                }
+                                allOf {
+                                    buildingTag()
+                                    expression { return ENV == 'reg' || ENV == 'prod' }
+                                }
+                            }
+                        }
+                        input {
+                            message "Deploy to ${ENV}?"
+                            ok "Deploy"
+                            parameters {
+                                choice(name: 'CONFIRM', choices: ['yes','no'], description: 'Confirm deployment')
+                            }
+                        }
+                        steps {
+                            sh """
+                                # Set kubeconfig per env
+                                case ${ENV} in
+                                    dev) echo "\$DEV_KUBECONFIG" | base64 -d > ~/.kube/config ;;
+                                    stg) echo "\$STG_KUBECONFIG" | base64 -d > ~/.kube/config ;;
+                                    reg) echo "\$REG_KUBECONFIG" | base64 -d > ~/.kube/config ;;
+                                    prod) echo "\$PROD_KUBECONFIG" | base64 -d > ~/.kube/config ;;
+                                esac
+
+                                # Deploy via Helm
+                                for service in api-gateway config-tenant-service customer-identity-service
+                                              admin-identity-service account-entitlement-service dashboard-bff
+                                              product-service usage-service billing-service payment-service
+                                              notification-service content-service journey-service reporting-service
+                                              ai-gateway audit-service insurance-service approval-service; do
+                                    helm upgrade --install omobio-\${service} \
+                                        selfcare-platform/backend/deploy/helm/\${service} \
+                                        --namespace omobio-${ENV} --create-namespace \
+                                        --set image.tag=\${GIT_COMMIT} \
+                                        --set image.repository=${DOCKER_REGISTRY}/\${service} \
+                                        --set env=${ENV} \
+                                        --set replicaCount=2 \
+                                        --wait --timeout 5m
+                                done
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Workspace cleanup
+            cleanWs()
+        }
+        success {
+            echo 'Build succeeded!'
+            // Send Slack notification
+            // slackSend(channel: '#platform-builds',
+            //          message: ":white_check_mark: ${env.JOB_NAME} #${env.BUILD_NUMBER} succeeded")
+        }
+        failure {
+            echo 'Build failed!'
+            // Send Slack notification
+            // slackSend(channel: '#platform-builds',
+            //          message: ":x: ${env.JOB_NAME} #${env.BUILD_NUMBER} failed")
+        }
+    }
+}

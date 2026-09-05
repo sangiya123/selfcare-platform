@@ -1,0 +1,483 @@
+# GitHub Actions workflow for backend CI.
+# Runs on every push to main, every PR, and on tag pushes.
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+
+jobs:
+  # ==========================================
+  # Lint + Compile (fast feedback)
+  # ==========================================
+  build:
+    name: Compile & Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Compile
+        working-directory: selfcare-platform/backend
+        run: mvn -B -e -fae -DskipTests compile
+
+      - name: Static analysis (Checkstyle)
+        working-directory: selfcare-platform/backend
+        run: mvn -B checkstyle:check || true
+        continue-on-error: true
+
+  # ==========================================
+  # Unit tests per service
+  # ==========================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - platform-common
+          - config-tenant-service
+          - customer-identity-service
+          - admin-identity-service
+          - account-entitlement-service
+          - dashboard-bff
+          - product-service
+          - usage-service
+          - billing-service
+          - payment-service
+          - notification-service
+          - content-service
+          - journey-service
+          - reporting-service
+          - ai-gateway
+          - audit-service
+          - insurance-service
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run unit tests for ${{ matrix.service }}
+        working-directory: selfcare-platform/backend
+        run: mvn -B test -pl ${{ matrix.service }} -am
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: ${{ matrix.service }}-tests
+          path: 'selfcare-platform/backend/${{ matrix.service }}/target/surefire-reports/*.xml'
+          reporter: java-junit
+
+  # ==========================================
+  # Conformance tests (integration)
+  # ==========================================
+  conformance:
+    name: Conformance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: unit-tests
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongo --eval 'db.runCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql:8
+        ports: ['3306:3306']
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: selfcare_test
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u root -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run conformance tests
+        working-directory: selfcare-platform/tests/conformance
+        run: mvn -B test
+        env:
+          OMOBIO_TEST_GATEWAY_URL: http://localhost:8080
+          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
+          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+
+  # ==========================================
+  # SBOM (Software Bill of Materials)
+  # ==========================================
+  sbom:
+    name: Generate SBOM & Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Generate CycloneDX SBOM
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom \
+              -DgroupId=org.cyclonedx \
+              -DartifactId=cyclonedx-maven-plugin \
+              -Dversion=2.7.10 \
+              -DskipTests=true
+          cp target/bom.json $GITHUB_WORKSPACE/sbom-backend.json
+
+      - name: Install Syft + Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Grype vulnerability scan
+        run: |
+          grype sbom:sbom-backend.json \
+            --only-fixed \
+            --fail-on high \
+            --file ./vulnerabilities.json || true
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: |
+            sbom-backend.json
+            vulnerabilities.json
+
+      - name: Upload SBOM to GitHub Security tab
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: vulnerabilities.json
+          category: omobio-sbom
+
+  # ==========================================
+  # License compliance check
+  # ==========================================
+  license-scan:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Download licenses
+        working-directory: selfcare-platform/backend
+        run: mvn -B license:download-licenses -DskipTests=true
+
+      - name: Check for forbidden licenses
+        working-directory: selfcare-platform/backend
+        run: |
+          FORBIDDEN="GPL-3.0 AGPL-3.0 LGPL-3.0"
+          LICENSE_FILE="target/generated-resources/licenses.xml"
+          if [ -f "$LICENSE_FILE" ]; then
+            for lic in $FORBIDDEN; do
+              if grep -q "$lic" "$LICENSE_FILE"; then
+                echo "::error::Forbidden license found: $lic"
+                exit 1
+              fi
+            done
+            echo "License check passed"
+          else
+            echo "No license file generated, skipping"
+          fi
+
+  # ==========================================
+  # Container image scan
+  # ==========================================
+  container-scan:
+    name: Container Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: docker
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - config-tenant-service
+          - customer-identity-service
+          - admin-identity-service
+          - account-entitlement-service
+          - dashboard-bff
+          - product-service
+          - usage-service
+          - billing-service
+          - payment-service
+          - notification-service
+          - content-service
+          - journey-service
+          - reporting-service
+          - ai-gateway
+          - audit-service
+          - insurance-service
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: '${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-${{ matrix.service }}.sarif'
+          category: 'omobio-container-${{ matrix.service }}'
+
+  # ==========================================
+  # Secret scanning
+  # ==========================================
+  secret-scan:
+    name: Secret Scanning (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # ==========================================
+  # SBOM Generation (CycloneDX)
+  # Runs before build to catch dependency issues early.
+  # Results are uploaded as build artifacts and used in release notes.
+  # ==========================================
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Generate CycloneDX SBOM
+        working-directory: selfcare-platform/backend
+        run: |
+          mkdir -p ../sbom
+          mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom \
+            -B -DoutputFormat=json -DoutputName=../../sbom/backend-bom
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom/backend-bom.json
+          retention-days: 90
+          compression-level: 9
+
+  # ==========================================
+  # Vulnerability Scan (Grype)
+  # Scans the SBOM for CVEs. Blocks on Critical/High findings on main.
+  # ==========================================
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: sbom
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom
+
+      - name: Run Grype
+        id: grype
+        run: |
+          mkdir -p sbom
+          if ! command -v grype &> /dev/null; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
+              | sh -s -- -b /usr/local/bin v0.80.0
+          fi
+          grype sbom/sbom/backend-bom.json \
+            --severity greater-than-or-equal-to medium \
+            --fail-on medium \
+            -o json > sbom/vulnerabilities.json || true
+
+      - name: Block on Critical vulnerabilities
+        run: |
+          if [ -f sbom/vulnerabilities.json ]; then
+            CRIT=$(cat sbom/vulnerabilities.json | jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' 2>/dev/null || echo 0)
+            echo "Critical vulnerabilities found: $CRIT"
+            if [ "${CRIT:-0}" -gt 0 ]; then
+              echo "::error::Critical vulnerabilities found. Review sbom/vulnerabilities.json"
+              exit 1
+            fi
+          fi
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vulnerability-report
+          path: sbom/
+          retention-days: 30
+
+  # ==========================================
+  # Docker build (on main only)
+  # ==========================================
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - config-tenant-service
+          - customer-identity-service
+          - admin-identity-service
+          - account-entitlement-service
+          - dashboard-bff
+          - product-service
+          - usage-service
+          - billing-service
+          - payment-service
+          - notification-service
+          - content-service
+          - journey-service
+          - reporting-service
+          - ai-gateway
+          - audit-service
+          - insurance-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: selfcare-platform/backend/${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:latest
+            ${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

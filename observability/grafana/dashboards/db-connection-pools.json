@@ -1,0 +1,503 @@
+{
+  "title": "OMOBIO DB Connection Pools",
+  "uid": "omobio-db-connection-pools",
+  "schemaVersion": 39,
+  "version": 1,
+  "description": "HikariCP pool usage, connection acquire time, active connections, leaked connections, and slow query monitoring. Runbook: https://runbooks.omobio.local/db-pool",
+  "tags": ["omobio", "database", "hikari", "connection-pool", "slow-query"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deployments",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "expr": "changes(deployment_started_total{job=~\".+selfcare.+\"}[1m]) > 0",
+        "tagKeys": "service,version,environment",
+        "titleFormat": "Deploy: {{service}}"
+      },
+      {
+        "name": "Pool Exhaustion",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(255, 96, 96, 1)",
+        "expr": "changes(hikaricp_connection_timeout_total[5m]) > 0",
+        "titleFormat": "Hikari pool timeout"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0
+      },
+      {
+        "name": "pool",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(hikaricp_connections_active, pool)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Connection Pool"
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(hikaricp_connections_active, service)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Service"
+      },
+      {
+        "name": "db",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(hikaricp_connections_active, db_system)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "DB System"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Pools at Risk",
+      "description": "Count of pools where active connections exceed 80% of max. Runbook: https://runbooks.omobio.local/db-pool-exhaustion",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "count(hikaricp_connections_active{pool=~\"$pool\",service=~\"$service\"} / hikaricp_connections_max{pool=~\"$pool\",service=~\"$service\"} > 0.8)",
+          "legendFormat": "at risk"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Connection Timeouts (1h)",
+      "description": "Hikari connection acquire timeouts in the last hour. Indicates pool exhaustion.",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(hikaricp_connection_timeout_total{pool=~\"$pool\",service=~\"$service\"}[1h]))",
+          "legendFormat": "timeouts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Active Connections",
+      "description": "Sum of active connections across all tracked HikariCP pools.",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(hikaricp_connections_active{pool=~\"$pool\",service=~\"$service\"})",
+          "legendFormat": "active"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Leaked Connections (1h)",
+      "description": "Connections detected as leaked (not returned to pool within timeout).",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(hikaricp_connections_leaked_total{pool=~\"$pool\",service=~\"$service\"}[1h]))",
+          "legendFormat": "leaks"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "P95 Acquire Time",
+      "description": "95th percentile time to acquire a connection from the pool.",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, pool) (rate(hikaricp_connections_acquire_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p95 {{pool}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Slow Queries (5m)",
+      "description": "SQL queries with execution time exceeding the slow-query threshold.",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(slow_query_total{service=~\"$service\"}[5m]))",
+          "legendFormat": "slow queries"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Hikari Pool Usage by Service (active / max)",
+      "description": "Active connections as a fraction of max pool size per service. Runbook: https://runbooks.omobio.local/db-pool-tuning",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{pool=~\"$pool\",service=~\"$service\"} / hikaricp_connections_max{pool=~\"$pool\",service=~\"$service\"}",
+          "legendFormat": "{{service}} / {{pool}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Connection Acquire Time (p50 / p95 / p99)",
+      "description": "Time to acquire a connection from each pool.",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, pool) (rate(hikaricp_connections_acquire_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p50 {{pool}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, pool) (rate(hikaricp_connections_acquire_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p95 {{pool}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, pool) (rate(hikaricp_connections_acquire_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p99 {{pool}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Active Connections Over Time",
+      "description": "Active connections per pool over time.",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{pool=~\"$pool\",service=~\"$service\"}",
+          "legendFormat": "{{pool}} ({{service}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Idle Connections by Pool",
+      "description": "Idle connections available for immediate use. Zero idle may cause brief delays.",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "hikaricp_connections_idle{pool=~\"$pool\",service=~\"$service\"}",
+          "legendFormat": "{{pool}} ({{service}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "min"] },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Leaked Connections Over Time",
+      "description": "Cumulative leaked connections per pool. Any increase requires investigation.",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "increase(hikaricp_connections_leaked_total{pool=~\"$pool\",service=~\"$service\"}[5m])",
+          "legendFormat": "{{pool}} ({{service}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Connection Timeout Rate",
+      "description": "Rate of Hikari connection-acquire timeouts. Sustained > 0 requires immediate attention.",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (pool, service) (rate(hikaricp_connection_timeout_total{pool=~\"$pool\",service=~\"$service\"}[5m]))",
+          "legendFormat": "{{pool}} ({{service}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Slow Queries by Service",
+      "description": "Slow query rate per service. Threshold configured in slow_query_threshold_seconds.",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(slow_query_total{service=~\"$service\"}[5m]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Wait Time Percentiles by Pool",
+      "description": "Time threads spend waiting for a connection, per pool.",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, pool) (rate(hikaricp_connections_wait_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p50 {{pool}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, pool) (rate(hikaricp_connections_wait_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p95 {{pool}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, pool) (rate(hikaricp_connections_wait_seconds_bucket{pool=~\"$pool\",service=~\"$service\"}[5m])))",
+          "legendFormat": "p99 {{pool}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ]
+}

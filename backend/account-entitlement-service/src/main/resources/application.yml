@@ -1,0 +1,58 @@
+# OMOBIO Account & Entitlement Service
+spring:
+  application:
+    name: account-entitlement-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:omobio}
+    password: ${DB_PASSWORD:omobio}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:omobio}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:account-entitlement-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: manual
+
+server:
+  port: ${ACCOUNT_SERVICE_PORT:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+omobio:
+  kafka:
+    topics:
+      account-profile-updated: ${KAFKA_TOPIC_PROFILE_UPDATED:account.profile.updated}
+      account-connection-changed: ${KAFKA_TOPIC_CONNECTION_CHANGED:account.connection.changed}
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: account-entitlement-service
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}

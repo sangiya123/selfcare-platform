@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/client-integration.schema.json",
+  "title": "ClientIntegration",
+  "description": "Configuration of an external integration (payment gateway, KYC vendor, OTP provider, etc.) for the OMOBIO Selfcare Platform. Includes credentials, timeouts, retry, circuit-breaker, and mock-mode toggles.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "tenantId",
+    "providerKey",
+    "type",
+    "config",
+    "mock",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "providerKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,63}$",
+      "description": "Stable provider key (e.g. 'payhere', 'onesignal', 'gen-otp')"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "PAYMENT",
+        "OTP",
+        "KYC",
+        "PUSH",
+        "SMS",
+        "EMAIL",
+        "NOTARY",
+        "BILLING",
+        "CRM",
+        "ANALYTICS",
+        "WEBHOOK",
+        "CUSTOM"
+      ],
+      "description": "Category of integration"
+    },
+    "displayName": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "config": {
+      "type": "object",
+      "description": "Provider-specific connection configuration",
+      "required": ["baseUrl"],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "description": "Base URL for the provider API (https required)"
+        },
+        "pathPrefix": {
+          "type": "string",
+          "pattern": "^/[a-zA-Z0-9/_-]*$",
+          "description": "Optional path prefix prepended to all requests"
+        },
+        "credentials": {
+          "type": "object",
+          "description": "Inline credentials (mutually exclusive with secretRef; never store raw secrets in dev/qa)",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 512
+            },
+            "apiSecret": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 1024
+            },
+            "merchantId": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "bearerToken": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "secretRef": {
+          "type": "string",
+          "description": "Reference to a secret in the secret manager (e.g. 'vault://kv/tenants/dialog/payhere'); preferred over inline credentials"
+        },
+        "headers": {
+          "type": "object",
+          "description": "Custom static headers injected into every request",
+          "additionalProperties": { "type": "string" }
+        },
+        "queryParams": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "tls": {
+          "type": "object",
+          "description": "TLS configuration overrides",
+          "properties": {
+            "verifyPeer": { "type": "boolean", "default": true },
+            "clientCertRef": { "type": "string" },
+            "clientKeyRef": { "type": "string" },
+            "caBundleRef": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "timeout": {
+      "type": "object",
+      "description": "Per-request and overall call timeouts",
+      "properties": {
+        "connectMs": { "type": "integer", "minimum": 100, "maximum": 60000, "default": 5000 },
+        "readMs": { "type": "integer", "minimum": 100, "maximum": 120000, "default": 30000 },
+        "writeMs": { "type": "integer", "minimum": 100, "maximum": 60000, "default": 10000 },
+        "totalMs": { "type": "integer", "minimum": 100, "maximum": 300000, "default": 60000 }
+      },
+      "additionalProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "description": "Retry policy for transient failures",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 },
+        "initialDelayMs": { "type": "integer", "minimum": 50, "maximum": 60000, "default": 200 },
+        "maxDelayMs": { "type": "integer", "minimum": 100, "maximum": 300000, "default": 10000 },
+        "backoffStrategy": {
+          "type": "string",
+          "enum": ["FIXED", "LINEAR", "EXPONENTIAL", "JITTERED_EXPONENTIAL"],
+          "default": "JITTERED_EXPONENTIAL"
+        },
+        "retryableStatusCodes": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 100, "maximum": 599 },
+          "default": [408, 425, 429, 500, 502, 503, 504]
+        },
+        "retryOnNetworkError": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "circuitBreaker": {
+      "type": "object",
+      "description": "Circuit-breaker policy to prevent cascading failures",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "failureThreshold": { "type": "integer", "minimum": 1, "maximum": 100, "default": 5 },
+        "successThreshold": { "type": "integer", "minimum": 1, "maximum": 100, "default": 2 },
+        "openDurationMs": { "type": "integer", "minimum": 1000, "maximum": 600000, "default": 30000 },
+        "halfOpenMaxConcurrent": { "type": "integer", "minimum": 1, "maximum": 50, "default": 3 }
+      },
+      "additionalProperties": false
+    },
+    "rateLimit": {
+      "type": "object",
+      "properties": {
+        "requestsPerSecond": { "type": "number", "minimum": 0.1, "maximum": 10000 },
+        "burst": { "type": "integer", "minimum": 1, "maximum": 100000 }
+      },
+      "additionalProperties": false
+    },
+    "mock": {
+      "type": "object",
+      "description": "Mock mode toggle and canned-response configuration (for non-prod environments)",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "scenario": {
+          "type": "string",
+          "description": "Name of the canned-response scenario to load (e.g. 'happy-path', 'timeout', 'declined')"
+        },
+        "latencyMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Artificial latency added in mock mode"
+        },
+        "errorRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability (0-1) of returning a mock error"
+        },
+        "fixtures": {
+          "type": "object",
+          "description": "Inline fixture payloads keyed by scenario",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "webhooks": {
+      "type": "array",
+      "description": "Inbound webhook endpoints the provider may call back to",
+      "items": { "$ref": "#/$defs/Webhook" }
+    },
+    "environments": {
+      "type": "array",
+      "description": "Environments this integration applies to",
+      "items": { "type": "string", "enum": ["dev", "qa", "staging", "prod"] }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "ACTIVE", "PAUSED", "DEPRECATED", "INCIDENT"]
+    },
+    "owner": { "type": "string", "maxLength": 128 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 64 }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "Webhook": {
+      "type": "object",
+      "required": ["name", "path"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/[a-zA-Z0-9/_-]*$",
+          "description": "Path mounted by the platform to receive webhooks"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH"],
+          "default": "POST"
+        },
+        "signatureHeader": {
+          "type": "string",
+          "description": "HTTP header name carrying the provider's request signature"
+        },
+        "signatureSecretRef": {
+          "type": "string",
+          "description": "Secret used to validate the request signature"
+        },
+        "events": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Event names this webhook subscribes to"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

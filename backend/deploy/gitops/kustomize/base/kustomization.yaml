@@ -1,0 +1,248 @@
+# kustomize base — OMOBIO Selfcare Platform
+# Base resources applied to all tenants and environments
+# Each tenant/environment overlay patches these with their specific values
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: omobio-selfcare-base
+  annotations:
+    omobio.platform/kustomize: "base"
+    omobio.platform/version: "1.0.0"
+
+# Namespace — created by overlays per tenant+env
+# Each overlay sets namespace: omobio-{tenant}-{env}
+namespace: omobio-base
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: omobio-selfcare
+  app.kubernetes.io/part-of: omobio-platform
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/component: backend
+
+# Common annotations
+commonAnnotations:
+  omobio.platform/kustomize-managed: "true"
+  omobio.platform/gitops-source: "selfcare-platform"
+
+# Resources — base set applied to all overlays
+# Each overlay includes these via ../../base
+resources:
+  # API Gateway
+  - ../../../../backend/api-gateway/deploy/k8s/api-gateway-deployment.yaml
+  - ../../../../backend/api-gateway/deploy/k8s/api-gateway-service.yaml
+  # Config Tenant Service
+  - ../../../../backend/config-tenant-service/deploy/k8s/config-tenant-service-deployment.yaml
+  - ../../../../backend/config-tenant-service/deploy/k8s/config-tenant-service-service.yaml
+  # Customer Identity Service
+  - ../../../../backend/customer-identity-service/deploy/k8s/customer-identity-deployment.yaml
+  - ../../../../backend/customer-identity-service/deploy/k8s/customer-identity-service.yaml
+  # Dashboard BFF
+  - ../../../../backend/dashboard-bff/deploy/k8s/dashboard-bff-deployment.yaml
+  - ../../../../backend/dashboard-bff/deploy/k8s/dashboard-bff-service.yaml
+  # Account Entitlement Service
+  - ../../../../backend/account-entitlement-service/deploy/k8s/account-entitlement-deployment.yaml
+  - ../../../../backend/account-entitlement-service/deploy/k8s/account-entitlement-service.yaml
+  # Product Service
+  - ../../../../backend/product-service/deploy/k8s/product-service-deployment.yaml
+  - ../../../../backend/product-service/deploy/k8s/product-service-service.yaml
+  # Usage Service
+  - ../../../../backend/usage-service/deploy/k8s/usage-service-deployment.yaml
+  - ../../../../backend/usage-service/deploy/k8s/usage-service-service.yaml
+  # Billing Service
+  - ../../../../backend/billing-service/deploy/k8s/billing-service-deployment.yaml
+  - ../../../../backend/billing-service/deploy/k8s/billing-service-service.yaml
+  # Payment Service
+  - ../../../../backend/payment-service/deploy/k8s/payment-service-deployment.yaml
+  - ../../../../backend/payment-service/deploy/k8s/payment-service-service.yaml
+  # Notification Service
+  - ../../../../backend/notification-service/deploy/k8s/notification-service-deployment.yaml
+  - ../../../../backend/notification-service/deploy/k8s/notification-service-service.yaml
+  # Content Service
+  - ../../../../backend/content-service/deploy/k8s/content-service-deployment.yaml
+  - ../../../../backend/content-service/deploy/k8s/content-service-service.yaml
+  # Journey Service
+  - ../../../../backend/journey-service/deploy/k8s/journey-service-deployment.yaml
+  - ../../../../backend/journey-service/deploy/k8s/journey-service-service.yaml
+  # Reporting Service
+  - ../../../../backend/reporting-service/deploy/k8s/reporting-service-deployment.yaml
+  - ../../../../backend/reporting-service/deploy/k8s/reporting-service-service.yaml
+  # AI Gateway
+  - ../../../../backend/ai-gateway/deploy/k8s/ai-gateway-deployment.yaml
+  - ../../../../backend/ai-gateway/deploy/k8s/ai-gateway-service.yaml
+  # Audit Service
+  - ../../../../backend/audit-service/deploy/k8s/audit-service-deployment.yaml
+  - ../../../../backend/audit-service/deploy/k8s/audit-service-service.yaml
+  # Insurance Service (only loaded for insurance tenants via overlay)
+  # - ../../../../backend/insurance-service/deploy/k8s/insurance-service-deployment.yaml
+  # - ../../../../backend/insurance-service/deploy/k8s/insurance-service-service.yaml
+  # Common resources
+  - serviceaccount.yaml
+  - configmap-base.yaml
+
+# Images — base images
+# Overlays patch these to pin to specific tags
+images:
+  - name: omobio/api-gateway
+    newName: omobio/api-gateway
+    newTag: latest
+  - name: omobio/config-tenant-service
+    newName: omobio/config-tenant-service
+    newTag: latest
+  - name: omobio/customer-identity-service
+    newName: omobio/customer-identity-service
+    newTag: latest
+  - name: omobio/dashboard-bff
+    newName: omobio/dashboard-bff
+    newTag: latest
+  - name: omobio/account-entitlement-service
+    newName: omobio/account-entitlement-service
+    newTag: latest
+  - name: omobio/product-service
+    newName: omobio/product-service
+    newTag: latest
+  - name: omobio/usage-service
+    newName: omobio/usage-service
+    newTag: latest
+  - name: omobio/billing-service
+    newName: omobio/billing-service
+    newTag: latest
+  - name: omobio/payment-service
+    newName: omobio/payment-service
+    newTag: latest
+  - name: omobio/notification-service
+    newName: omobio/notification-service
+    newTag: latest
+  - name: omobio/content-service
+    newName: omobio/content-service
+    newTag: latest
+  - name: omobio/journey-service
+    newName: omobio/journey-service
+    newTag: latest
+  - name: omobio/reporting-service
+    newName: omobio/reporting-service
+    newTag: latest
+  - name: omobio/ai-gateway
+    newName: omobio/ai-gateway
+    newTag: latest
+  - name: omobio/audit-service
+    newName: omobio/audit-service
+    newTag: latest
+
+# ConfigMapGenerator — base config
+configMapGenerator:
+  - name: omobio-base-config
+    literals:
+      - OMOBIO_PLATFORM_VERSION=1.0.0
+      - OMOBIO_GITOPS_MODE=true
+      - SPRING_PROFILES_ACTIVE=base
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_PATTERN_CONSOLE="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=when_authorized
+      - MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED=true
+      - SERVER_SHUTDOWN=graceful
+    options:
+      disableNameSuffixHash: true
+      labels:
+        omobio.config: base
+
+# Secret generator — placeholder, real secrets from external secrets
+secretGenerator:
+  - name: omobio-base-secrets
+    literals:
+      - DB_PASSWORD=__REPLACE_WITH_EXTERNAL_SECRET__
+      - REDIS_PASSWORD=__REPLACE_WITH_EXTERNAL_SECRET__
+      - JWT_SIGNING_KEY=__REPLACE_WITH_EXTERNAL_SECRET__
+    options:
+      disableNameSuffixHash: true
+
+# Patches — strategic merge patches applied to all resources
+patches:
+  # Add common environment variables to all deployments
+  - target:
+      kind: Deployment
+      group: apps
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+      - op: add
+        path: /spec/template/spec/terminationGracePeriodSeconds
+        value: 60
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      - op: add
+        path: /spec/template/spec/containers/0/livenessProbe
+        value:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe
+        value:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+# Components — reusable kustomize components
+components:
+  # Metrics sidecar for Prometheus
+  - ../components/metrics-sidecar
+  # Common service mesh (Istio) config
+  - ../components/service-mesh
+
+# Generators — Helm chart inflation (alternative to resources)
+# helmCharts:
+#   - name: omobio-microservice
+#     repo: https://omobio.github.io/helm-charts
+#     version: 1.0.0
+#     releaseName: omobio
+#     namespace: omobio-base
+#     valuesFile: values.yaml
+
+# Vars — kustomize variables for substitution
+vars:
+  - name: PLATFORM_VERSION
+    objref:
+      kind: ConfigMap
+      name: omobio-base-config
+      apiVersion: v1
+    fieldref:
+      fieldpath: data.OMOBIO_PLATFORM_VERSION
+
+# Configurations — kustomize build configurations
+configurations:
+  - kustomize.config.k8s.io/aggregate

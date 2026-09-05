@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/component-registry.schema.json",
+  "title": "ComponentRegistry",
+  "description": "Master registry of all widget components available to the OMOBIO Selfcare Platform client renderers. Aggregates component metadata, platform compatibility, minimum client renderer version requirements, and approval status.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "name",
+    "version",
+    "minClientRendererVersion",
+    "components",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Registry name (e.g. 'selfcare-core', 'selfcare-premium')"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Registry manifest version"
+    },
+    "minClientRendererVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Minimum client renderer version required to consume this registry (semver)"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Tenant the registry belongs to; absent means global"
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["dev", "qa", "staging", "prod"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/RegistryEntry" }
+    },
+    "categories": {
+      "type": "array",
+      "description": "Component categories present in this registry (denormalized for fast lookup)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "DISPLAY", "INPUT", "CONTAINER", "NAVIGATION",
+          "FEEDBACK", "CHART", "PAYMENT", "AUTH", "UTILITY", "COMPOSITE"
+        ]
+      }
+    },
+    "platforms": {
+      "type": "array",
+      "description": "Union of all platforms supported by the components in this registry",
+      "items": {
+        "type": "string",
+        "enum": ["ios", "android", "huawei", "web"]
+      }
+    },
+    "approval": {
+      "type": "object",
+      "description": "Approval metadata for the registry manifest itself",
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["PENDING", "IN_REVIEW", "APPROVED", "REJECTED"]
+        },
+        "approver": { "type": "string" },
+        "approvedAtUtc": { "type": "string", "format": "date-time" },
+        "comments": { "type": "string", "maxLength": 1024 }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "External / third-party component dependencies",
+      "items": { "$ref": "#/$defs/Dependency" }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "owner": { "type": "string" },
+        "description": { "type": "string" },
+        "releaseNotes": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "RegistryEntry": {
+      "type": "object",
+      "description": "A component entry within the registry",
+      "required": [
+        "componentId",
+        "name",
+        "version",
+        "platforms",
+        "approvalStatus",
+        "status"
+      ],
+      "properties": {
+        "componentId": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.-]{2,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "DISPLAY", "INPUT", "CONTAINER", "NAVIGATION",
+            "FEEDBACK", "CHART", "PAYMENT", "AUTH", "UTILITY", "COMPOSITE"
+          ]
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["ios", "android", "huawei", "web"]
+          }
+        },
+        "minRendererVersions": {
+          "type": "object",
+          "description": "Per-platform minimum client renderer versions",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          }
+        },
+        "assetBundle": {
+          "type": "object",
+          "description": "Optional asset bundle for the component",
+          "properties": {
+            "url": { "type": "string", "format": "uri" },
+            "checksum": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$",
+              "description": "SHA-256 checksum of the asset bundle"
+            },
+            "sizeBytes": { "type": "integer", "minimum": 0 },
+            "compression": { "type": "string", "enum": ["none", "gzip", "brotli"] }
+          },
+          "additionalProperties": false
+        },
+        "schemaRef": {
+          "type": "string",
+          "description": "URI reference to the props schema (e.g. 'https://omobio.example.com/schemas/widget-component.schema.json#/properties/propsSchema')"
+        },
+        "securityClassification": {
+          "type": "string",
+          "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "PII", "PCI"]
+        },
+        "approvalStatus": {
+          "type": "string",
+          "enum": ["PENDING", "IN_REVIEW", "APPROVED", "REJECTED", "REVERTED"],
+          "description": "Review/approval state of this component entry"
+        },
+        "approvedBy": { "type": "string" },
+        "approvedAtUtc": { "type": "string", "format": "date-time" },
+        "approvalComments": { "type": "string", "maxLength": 1024 },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "DEPRECATED", "RETIRED"]
+        },
+        "experimental": {
+          "type": "boolean",
+          "default": false,
+          "description": "True if the component is experimental and may change without notice"
+        },
+        "deprecatedAtUtc": { "type": "string", "format": "date-time" },
+        "sunsetAtUtc": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date after which the component will be removed from the registry"
+        },
+        "replacementComponentId": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.-]{2,63}$",
+          "description": "Component ID to use in place of this one when sunset"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 64 }
+        },
+        "owner": { "type": "string", "maxLength": 128 },
+        "team": { "type": "string", "maxLength": 128 },
+        "dependsOn": {
+          "type": "array",
+          "description": "Other components this component depends on",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-zA-Z0-9_.-]{2,63}$"
+          }
+        },
+        "changelog": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "publishedAtUtc": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "Dependency": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "source": {
+          "type": "string",
+          "enum": ["npm", "maven", "cocoapods", "pub", "pypi", "internal", "other"]
+        },
+        "license": { "type": "string" },
+        "homepage": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

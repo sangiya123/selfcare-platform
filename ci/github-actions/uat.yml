@@ -1,0 +1,339 @@
+# OMOBIO Selfcare Platform — UAT (User Acceptance Testing)
+#
+# Runs the UAT suite against a deployed reg (or stg) environment.
+# UAT includes:
+#   - End-to-end user journeys (telco + insurance)
+#   - Visual regression snapshots
+#   - Accessibility (axe-core) checks
+#   - Exploratory test scripts
+#   - Sign-off report
+#
+# UAT is a manual gate: requires approver to confirm business acceptance
+# before promoting to production canary. Uses GitHub Environments with
+# required reviewers.
+
+name: UAT (User Acceptance Testing)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        default: 'reg'
+        options: ['stg', 'reg']
+      cycle:
+        description: 'UAT cycle (e.g. "2026-Q3-r1")'
+        required: true
+        type: string
+      approvers:
+        description: 'Comma-separated GitHub usernames who must sign off'
+        required: false
+        type: string
+        default: 'product-owner,qa-lead'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  id-token: write
+
+env:
+  JAVA_VERSION: '25'
+  NODE_VERSION: '20'
+
+jobs:
+  # ======================================================================
+  # UAT environment setup
+  # ======================================================================
+  setup:
+    name: UAT environment setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: uat
+    outputs:
+      gateway_url: ${{ steps.env.outputs.gateway_url }}
+      cycle: ${{ steps.env.outputs.cycle }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          CYCLE="${{ github.event.inputs.cycle }}"
+          case "$ENV" in
+            stg) URL="https://stg-api.omobio.io" ;;
+            reg) URL="https://reg-api.omobio.io" ;;
+            *) URL="http://localhost:8080" ;;
+          esac
+          echo "gateway_url=$URL" >> "$GITHUB_OUTPUT"
+          echo "cycle=$CYCLE" >> "$GITHUB_OUTPUT"
+          echo "Resolved UAT target: $URL (cycle=$CYCLE)"
+
+      - name: Tag UAT environment
+        env:
+          OMOBIO_CYCLE: ${{ steps.env.outputs.cycle }}
+        run: |
+          mkdir -p uat-output
+          cat > uat-output/metadata.json << EOF
+          {
+            "cycle": "${{ steps.env.outputs.cycle }}",
+            "environment": "${{ github.event.inputs.environment }}",
+            "gateway_url": "${{ steps.env.outputs.gateway_url }}",
+            "commit": "${{ github.sha }}",
+            "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "triggered_by": "${{ github.actor }}"
+          }
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uat-metadata
+          path: uat-output/metadata.json
+
+  # ======================================================================
+  # End-to-end user journeys
+  # ======================================================================
+  e2e-journeys:
+    name: E2E user journeys
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run E2E journeys
+        working-directory: selfcare-platform/tests/conformance
+        env:
+          OMOBIO_TEST_GATEWAY_URL: ${{ needs.setup.outputs.gateway_url }}
+          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
+          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+        run: |
+          mvn -B -e -fae \
+            -Dgroups="e2e-journey,e2e-telco,e2e-insurance" \
+            test
+
+      - name: Publish results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: uat-e2e
+          path: 'selfcare-platform/tests/conformance/target/surefire-reports/testng-results.xml'
+          reporter: java-junit
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-e2e-reports
+          path: selfcare-platform/tests/conformance/target/
+
+  # ======================================================================
+  # Mobile regression (iOS + Android)
+  # ======================================================================
+  mobile-regression:
+    name: Mobile regression
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: Type check
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: Unit tests
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx jest --ci --coverage
+
+      - name: Detox build (Android)
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx detox build --configuration android.ci
+        continue-on-error: true
+
+      - name: Detox e2e (Android)
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npx detox test --configuration android.ci --headless
+        continue-on-error: true
+
+  # ======================================================================
+  # Admin portal regression
+  # ======================================================================
+  admin-regression:
+    name: Admin portal regression
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npm ci
+
+      - name: Type + lint
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: |
+          npx tsc --noEmit
+          npx eslint . --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: Vitest
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npx vitest run --coverage
+
+      - name: Playwright e2e
+        working-directory: selfcare-platform/admin/selfcare-studio
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.setup.outputs.gateway_url }}/admin
+        run: |
+          npx playwright install --with-deps
+          npx playwright test --reporter=html,junit
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-e2e-report
+          path: selfcare-platform/admin/selfcare-studio/playwright-report/
+
+  # ======================================================================
+  # Accessibility audit (axe-core)
+  # ======================================================================
+  accessibility:
+    name: Accessibility audit
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install
+        run: npm install -g @axe-core/cli
+
+      - name: Run axe against admin
+        run: |
+          axe "${{ needs.setup.outputs.gateway_url }}/admin" \
+            --exit \
+            --tags wcag2a,wcag2aa,wcag21a,wcag21aa \
+            --save uat-axe-report.json
+        continue-on-error: true
+
+      - name: Upload axe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-axe-report
+          path: uat-axe-report.json
+
+  # ======================================================================
+  # Performance smoke (k6 quick run)
+  # ======================================================================
+  perf-smoke:
+    name: Performance smoke
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 smoke
+        run: |
+          docker run --rm -i -e API_GATEWAY="${{ needs.setup.outputs.gateway_url }}" \
+            -e TENANT_ID=dialog-lk \
+            grafana/k6:0.50.0 run - \
+            < selfcare-platform/tests/performance/01_dashboard_load.js
+        continue-on-error: true
+
+  # ======================================================================
+  # Manual sign-off — production canary requires approval
+  # ======================================================================
+  signoff:
+    name: UAT sign-off
+    runs-on: ubuntu-latest
+    needs: [setup, e2e-journeys, mobile-regression, admin-regression, accessibility, perf-smoke]
+    if: always()
+    environment:
+      name: production
+      url: https://reg.omobio.io/uat/${{ github.event.inputs.cycle }}
+    steps:
+      - name: Build sign-off report
+        run: |
+          cat > signoff-report.md << EOF
+          # UAT Sign-off Report
+
+          **Cycle:** ${{ github.event.inputs.cycle }}
+          **Environment:** ${{ github.event.inputs.environment }}
+          **Target:** ${{ needs.setup.outputs.gateway_url }}
+          **Commit:** ${{ github.sha }}
+          **Date:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          ## Test results
+
+          | Stage | Status |
+          |-------|--------|
+          | Setup | ${{ needs.setup.result }} |
+          | E2E journeys | ${{ needs.e2e-journeys.result }} |
+          | Mobile regression | ${{ needs.mobile-regression.result }} |
+          | Admin regression | ${{ needs.admin-regression.result }} |
+          | Accessibility | ${{ needs.accessibility.result }} |
+          | Performance smoke | ${{ needs.perf-smoke.result }} |
+
+          ## Required sign-offs
+
+          - [ ] Product Owner
+          - [ ] QA Lead
+          - [ ] Tech Lead
+          - [ ] Security Reviewer
+
+          ## Approvers
+          ${{ github.event.inputs.approvers }}
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uat-signoff-report
+          path: signoff-report.md

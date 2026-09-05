@@ -1,0 +1,65 @@
+package com.omobio.providers.dialog.balance;
+
+import com.omobio.platform.common.adapter.ApiAdapter;
+import com.omobio.platform.common.adapter.RegisterAdapter;
+import com.omobio.platform.common.web.ServiceUnavailableException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+
+/**
+ * Dialog Balance Provider.
+ *
+ * Fetches balance information for a Dialog connection via MIFE.
+ */
+@Slf4j
+@Component
+@RegisterAdapter(tenantId = "dialog-lk", providerInterface = ApiAdapter.class)
+public class DialogBalanceProvider implements ApiAdapter {
+
+    @Override
+    public String getAdapterId() {
+        return "dialog-lk";
+    }
+
+    @Value("${omobio.providers.dialog.mife.base-url:https://mife.dialog.lk}")
+    private String mifeBaseUrl;
+
+    @Value("${omobio.providers.dialog.mife.timeout-ms:5000}")
+    private long timeoutMs;
+
+    private final WebClient webClient;
+
+    public DialogBalanceProvider(WebClient.Builder builder) {
+        this.webClient = builder
+                .baseUrl("https://mife.dialog.lk")
+                .build();
+    }
+
+    public Mono<BalanceResponse> getBalance(String connectionId, String tenantId) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/balance/{connectionId}")
+                        .build(connectionId))
+                .retrieve()
+                .bodyToMono(BalanceResponse.class)
+                .timeout(Duration.ofMillis(timeoutMs))
+                .onErrorMap(e -> new ServiceUnavailableException("DialogBalanceProvider", "Balance fetch failed: " + e.getMessage(), true));
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    public static class BalanceResponse {
+        private String connectionId;
+        private BigDecimal balance;
+        private String currency;
+        private String balanceType;  // PREPAID, POSTPAID_DUE
+        private String expiryDate;
+        private long timestamp;
+    }
+}

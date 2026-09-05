@@ -1,0 +1,86 @@
+# environment config: dev
+# Development environment — fast iteration, no approvals
+# Cluster: dev-cluster (local kind/k3d for dev, EKS/AKS for shared dev)
+# Image tag strategy: MUTABLE (always latest)
+# Sync window: Always open
+# Required approvals: None
+
+env:
+  # Environment identity
+  ENV_NAME: dev
+  ENV_DISPLAY_NAME: Development
+  ENV_TIER: 4
+  ENV_PURPOSE: "Developer experimentation, feature integration, smoke tests"
+
+  # Cluster
+  CLUSTER_URL: https://kubernetes.default.svc
+  CLUSTER_NAME: dev-cluster
+  CLUSTER_REGION: us-east-1
+  CLUSTER_ENVIRONMENT: dev
+
+  # Image strategy
+  IMAGE_TAG_MUTABLE: "true"  # Image tag is mutable
+  DEFAULT_IMAGE_TAG: "latest"  # Always pull latest
+  DEFAULT_TARGET_REVISION: "main"  # Track main branch
+  IMAGE_PULL_POLICY: Always
+  IMAGE_REGISTRY: ghcr.io/omobio
+  IMAGE_REPOSITORY: omobio/selfcare-platform
+
+  # Auto-sync
+  AUTO_SYNC_ENABLED: "true"  # Fully automated
+
+  # Sync window
+  SYNC_WINDOW: "always-open"
+  SYNC_WINDOW_DESCRIPTION: "Syncing always allowed in dev"
+
+  # Approvals
+  REQUIRED_APPROVALS: "0"  # No approvals needed
+  APPROVAL_ROLES: "[]"
+
+  # Resource limits (smaller for dev)
+  RESOURCE_LIMITS_CPU: "500m"
+  RESOURCE_LIMITS_MEMORY: "512Mi"
+  RESOURCE_REQUESTS_CPU: "100m"
+  RESOURCE_REQUESTS_MEMORY: "128Mi"
+
+  # Replicas
+  MIN_REPLICAS: "1"
+  MAX_REPLICAS: "3"
+
+  # Ingress
+  INGRESS_ENABLED: "true"
+  INGRESS_CLASS: nginx
+  # INGRESS_HOST is per-tenant, set in tenant config
+
+  # Health checks
+  HEALTH_CHECK_ENABLED: "true"
+  HEALTH_CHECK_PATH: "/actuator/health"
+  HEALTH_CHECK_INITIAL_DELAY: "60"
+
+  # Observability
+  PROMETHEUS_ENABLED: "true"
+  LOG_LEVEL: DEBUG
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "1.0"  # 100% sampling in dev
+
+  # Security
+  TLS_ENABLED: "false"  # Plain HTTP in dev
+  CERT_MANAGER_ISSUER: "letsencrypt-staging"
+  RBAC_ENFORCED: "false"
+
+  # Cleanup
+  CLEANUP_ON_DELETE: "true"
+  RETENTION_DAYS: "7"  # Logs/audit retention
+
+  # Data
+  DATABASE_TIER: "db.t3.micro"
+  DATABASE_BACKUP_ENABLED: "false"
+  REDIS_TIER: "cache.t3.micro"
+
+  # Feature flags for dev
+  EXPERIMENTAL_FEATURES_ENABLED: "true"
+  DEBUG_MODE_ENABLED: "true"
+
+  # Promotion strategy
+  PROMOTION_STRATEGY: "auto"
+  PROMOTION_NEXT_ENV: "stg"

@@ -1,0 +1,405 @@
+{
+  "title": "OMOBIO Tenant Isolation",
+  "uid": "omobio-tenant-isolation",
+  "schemaVersion": 39,
+  "version": 1,
+  "description": "Cross-tenant access attempts, traffic distribution, error rates, latency by tenant, and suspicious access pattern detection. CRITICAL: Any cross-tenant access > 0 must be investigated immediately. Runbook: https://runbooks.omobio.local/tenant-isolation",
+  "tags": ["omobio", "tenant", "isolation", "security", "multi-tenant"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Cross-Tenant Access Attempts",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(255, 0, 0, 1)",
+        "expr": "changes(cross_tenant_access_attempt_total[1m]) > 0",
+        "tagKeys": "source_tenant,target_tenant,service,attempt_type",
+        "titleFormat": "CROSS-TENANT ACCESS: {{source_tenant}} -> {{target_tenant}} via {{service}}"
+      },
+      {
+        "name": "Suspicious Patterns",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(255, 200, 0, 1)",
+        "expr": "changes(suspicious_access_pattern_total[1m]) > 0",
+        "titleFormat": "Suspicious pattern: {{pattern_type}} on tenant {{tenant_id}}"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0
+      },
+      {
+        "name": "tenant",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(tenant_request_total, tenant_id)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Tenant"
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(tenant_request_total, service)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Service"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cross-Tenant Access Attempts (1h)",
+      "description": "CRITICAL: Number of detected cross-tenant data access attempts in the last hour. MUST be zero. Any value > 0 triggers a P1 incident.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(cross_tenant_access_attempt_total[1h]))",
+          "legendFormat": "attempts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Suspicious Access Patterns (1h)",
+      "description": "Detected unusual data access patterns (bulk export, unusual hours, unusual endpoints).",
+      "gridPos": { "x": 6, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(suspicious_access_pattern_total[1h]))",
+          "legendFormat": "patterns"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Tenants Active",
+      "description": "Count of tenants with at least one request in the last 5 minutes.",
+      "gridPos": { "x": 10, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "count(count by (tenant_id) (rate(tenant_request_total{tenant_id=~\"$tenant\",service=~\"$service\"}[5m]) > 0))",
+          "legendFormat": "active tenants"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Isolation Policy Blocks (1h)",
+      "description": "Tenant isolation policy blocks enforced by the service mesh / gateway.",
+      "gridPos": { "x": 14, "y": 0, "w": 5, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(tenant_isolation_policy_block_total[1h]))",
+          "legendFormat": "blocks"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Avg Tenant Error Rate",
+      "description": "Average 5xx error rate across all active tenants.",
+      "gridPos": { "x": 19, "y": 0, "w": 5, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(tenant_request_total{tenant_id=~\"$tenant\",status=~\"5..\"}[5m])) / sum(rate(tenant_request_total{tenant_id=~\"$tenant\"}[5m]))",
+          "legendFormat": "error rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Cross-Tenant Access Attempts Over Time",
+      "description": "CRITICAL: Any non-zero value indicates a potential data breach or misconfiguration. Runbook: https://runbooks.omobio.local/tenant-isolation-incident",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (attempt_type) (rate(cross_tenant_access_attempt_total[1m]))",
+          "legendFormat": "{{attempt_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Tenant Traffic Distribution",
+      "description": "Request rate per tenant to understand load distribution and identify noisy neighbors.",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (tenant_id) (rate(tenant_request_total{tenant_id=~\"$tenant\",service=~\"$service\"}[1m]))",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Tenant Error Rate by Tenant",
+      "description": "5xx error rate per tenant. High error rates on specific tenants indicate tenant-specific issues.",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (tenant_id) (rate(tenant_request_total{tenant_id=~\"$tenant\",status=~\"5..\",service=~\"$service\"}[5m])) / sum by (tenant_id) (rate(tenant_request_total{tenant_id=~\"$tenant\",service=~\"$service\"}[5m]))",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Tenant Latency by Tenant (P95)",
+      "description": "P95 request latency per tenant. High latency for specific tenants indicates noisy-neighbor or resource contention.",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, tenant_id) (rate(tenant_request_seconds_bucket{tenant_id=~\"$tenant\",service=~\"$service\"}[5m])))",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Suspicious Access Patterns Over Time",
+      "description": "Flagged access patterns: bulk exports, off-hours access, unauthorized endpoints, unusual data volumes.",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (pattern_type) (rate(suspicious_access_pattern_total{tenant_id=~\"$tenant\"}[5m]))",
+          "legendFormat": "{{pattern_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Cross-Tenant Access by Source/Destination",
+      "description": "Detailed view of cross-tenant access by source and target tenant. Any value is a security incident.",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (source_tenant, target_tenant) (rate(cross_tenant_access_attempt_total[5m]))",
+          "legendFormat": "{{source_tenant}} -> {{target_tenant}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Tenant Isolation Policy Blocks (Last 1h)",
+      "description": "Isolation policy enforcement events. Blocks indicate a tenant attempted to access out-of-scope data.",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(20, increase(tenant_isolation_policy_block_total[1h]))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "align": "auto" }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+name: omobio-ci
+
+services:
+  sonarqube:
+    image: sonarqube:community
+    container_name: omobio-sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    networks:
+      - omobio-ci
+
+  jenkins:
+    build:
+      context: ./jenkins
+    container_name: omobio-jenkins
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?Set JENKINS_ADMIN_PASSWORD in ci/.env.ci}
+      SONAR_TOKEN: ${SONAR_TOKEN:?Set SONAR_TOKEN in ci/.env.ci}
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Dcasc.jenkins.config=/var/jenkins_home/casc_configs/jenkins.yaml
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - jenkins-workspace:/workspace
+      - maven-cache:/var/maven-cache
+      - //var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: ${USERPROFILE}/.kube
+        target: /var/jenkins_home/.kube
+        read_only: true
+    depends_on:
+      - sonarqube
+    networks:
+      - omobio-ci
+      - omobio-net
+
+volumes:
+  sonarqube-data:
+    name: omobio-sonarqube-data
+  sonarqube-extensions:
+    name: omobio-sonarqube-extensions
+  sonarqube-logs:
+    name: omobio-sonarqube-logs
+  jenkins-home:
+    name: omobio-jenkins-home
+  jenkins-workspace:
+    name: omobio_jenkins_workspace
+  maven-cache:
+    name: omobio_maven_cache
+
+networks:
+  omobio-ci:
+    name: omobio-ci
+  omobio-net:
+    external: true

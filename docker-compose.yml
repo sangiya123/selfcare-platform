@@ -1,0 +1,498 @@
+# OMOBIO Selfcare Platform - Full local stack for Docker Desktop
+#
+# Usage:
+#   docker compose up -d                              # start everything
+#   docker compose up -d mongodb redis kafka          # infra only
+#   docker compose logs -f api-gateway                # tail logs
+#   docker compose down -v                            # tear down (incl. volumes)
+#
+# Tenant: dialog-lk (Sri Lanka telco)
+# Schema is automatically seeded into MongoDB on first boot.
+
+version: "3.9"
+
+x-omobio-common: &omobio-common
+  restart: unless-stopped
+  environment: &omobio-env
+    # Tenant header that all services require
+    X_DEFAULT_TENANT_ID: "dialog-lk"
+    OMOBIO_TENANT_DEFAULT_ID: "dialog-lk"
+    # JVM settings
+    JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+    SPRING_PROFILES_ACTIVE: docker
+  networks:
+    - omobio-net
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # INFRASTRUCTURE LAYER
+  # ─────────────────────────────────────────────────────────────
+
+  mongodb:
+    image: mongo:7.0
+    container_name: omobio-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: omobio
+      MONGO_INITDB_ROOT_PASSWORD: omobio_pw
+      MONGO_INITDB_DATABASE: omobio_config
+    volumes:
+      - mongodb-data:/data/db
+      - ./deploy/local/mongo-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - omobio-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: omobio-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "omobio_pw"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - omobio-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "omobio_pw", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: omobio-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - omobio-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: omobio-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - omobio-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: omobio-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pw
+      MYSQL_DATABASE: omobio_identity
+      MYSQL_USER: omobio
+      MYSQL_PASSWORD: omobio_pw
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./deploy/local/mysql-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - omobio-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pw"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─────────────────────────────────────────────────────────────
+  # OMOBIO MICROSERVICES
+  # ─────────────────────────────────────────────────────────────
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: backend/api-gateway/Dockerfile
+      args:
+        MODULE: api-gateway
+    container_name: omobio-api-gateway
+    <<: *omobio-common
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8080
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-tenant-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  config-tenant-service:
+    build:
+      context: .
+      dockerfile: backend/config-tenant-service/Dockerfile
+      args:
+        MODULE: config-tenant-service
+    container_name: omobio-config-tenant
+    <<: *omobio-common
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8081
+      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  customer-identity-service:
+    build:
+      context: .
+      dockerfile: backend/customer-identity-service/Dockerfile
+      args:
+        MODULE: customer-identity-service
+    container_name: omobio-customer-identity
+    <<: *omobio-common
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: omobio
+      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: omobio_pw
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-identity-service:
+    build:
+      context: .
+      dockerfile: backend/admin-identity-service/Dockerfile
+      args:
+        MODULE: admin-identity-service
+    container_name: omobio-admin-identity
+    <<: *omobio-common
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: omobio
+      SPRING_DATASOURCE_PASSWORD: omobio_pw
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  account-entitlement-service:
+    build:
+      context: .
+      dockerfile: backend/account-entitlement-service/Dockerfile
+      args:
+        MODULE: account-entitlement-service
+    container_name: omobio-account-entitlement
+    <<: *omobio-common
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: omobio
+      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: omobio_pw
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dashboard-bff:
+    build:
+      context: .
+      dockerfile: backend/dashboard-bff/Dockerfile
+      args:
+        MODULE: dashboard-bff
+    container_name: omobio-dashboard-bff
+    <<: *omobio-common
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8085
+    depends_on:
+      - config-tenant-service
+      - account-entitlement-service
+
+  product-service:
+    build:
+      context: .
+      dockerfile: backend/product-service/Dockerfile
+      args:
+        MODULE: product-service
+    container_name: omobio-product
+    <<: *omobio-common
+    ports:
+      - "8086:8086"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8086
+
+  usage-service:
+    build:
+      context: .
+      dockerfile: backend/usage-service/Dockerfile
+      args:
+        MODULE: usage-service
+    container_name: omobio-usage
+    <<: *omobio-common
+    ports:
+      - "8087:8087"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8087
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: backend/billing-service/Dockerfile
+      args:
+        MODULE: billing-service
+    container_name: omobio-billing
+    <<: *omobio-common
+    ports:
+      - "8088:8088"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8088
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: backend/payment-service/Dockerfile
+      args:
+        MODULE: payment-service
+    container_name: omobio-payment
+    <<: *omobio-common
+    ports:
+      - "8089:8089"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8089
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: omobio
+      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: backend/notification-service/Dockerfile
+      args:
+        MODULE: notification-service
+    container_name: omobio-notification
+    <<: *omobio-common
+    ports:
+      - "8090:8090"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8090
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  content-service:
+    build:
+      context: .
+      dockerfile: backend/content-service/Dockerfile
+      args:
+        MODULE: content-service
+    container_name: omobio-content
+    <<: *omobio-common
+    ports:
+      - "8091:8091"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8091
+      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  journey-service:
+    build:
+      context: .
+      dockerfile: backend/journey-service/Dockerfile
+      args:
+        MODULE: journey-service
+    container_name: omobio-journey
+    <<: *omobio-common
+    ports:
+      - "8092:8092"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8092
+      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: backend/reporting-service/Dockerfile
+      args:
+        MODULE: reporting-service
+    container_name: omobio-reporting
+    <<: *omobio-common
+    ports:
+      - "8093:8093"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8093
+
+  ai-gateway:
+    build:
+      context: .
+      dockerfile: backend/ai-gateway/Dockerfile
+      args:
+        MODULE: ai-gateway
+    container_name: omobio-ai-gateway
+    <<: *omobio-common
+    ports:
+      - "8094:8094"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8094
+      # Local AI stub — replace with real API key in production
+      OMOBIO_AI_PROVIDER: stub
+      OMOBIO_AI_STUB_ENABLED: "true"
+      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: backend/audit-service/Dockerfile
+      args:
+        MODULE: audit-service
+    container_name: omobio-audit
+    <<: *omobio-common
+    ports:
+      - "8095:8095"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8095
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  insurance-service:
+    build:
+      context: .
+      dockerfile: backend/insurance-service/Dockerfile
+      args:
+        MODULE: insurance-service
+    container_name: omobio-insurance
+    <<: *omobio-common
+    ports:
+      - "8096:8096"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8096
+      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  approval-service:
+    build:
+      context: .
+      dockerfile: backend/approval-service/Dockerfile
+      args:
+        MODULE: approval-service
+    container_name: omobio-approval
+    <<: *omobio-common
+    ports:
+      - "8097:8097"
+    environment:
+      <<: *omobio-env
+      SERVER_PORT: 8097
+
+  # ─────────────────────────────────────────────────────────────
+  # OBSERVABILITY
+  # ─────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: omobio-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus-scrape.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-alerts.yaml:/etc/prometheus/alerts.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    networks:
+      - omobio-net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: omobio-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - omobio-net
+    depends_on:
+      - prometheus
+
+networks:
+  omobio-net:
+    driver: bridge
+    name: omobio-net
+
+volumes:
+  mongodb-data:
+  redis-data:
+  mysql-data:
+  grafana-data:

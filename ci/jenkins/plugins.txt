@@ -1,0 +1,13 @@
+configuration-as-code
+workflow-aggregator
+pipeline-model-definition
+git
+github
+github-branch-source
+credentials-binding
+sonar
+docker-workflow
+junit
+ws-cleanup
+timestamper
+ansicolor

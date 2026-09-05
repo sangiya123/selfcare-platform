@@ -1,0 +1,247 @@
+# OMOBIO Selfcare Platform — DAST / API Security Scan (OWASP ZAP)
+#
+# Runs OWASP ZAP against deployed staging environment to detect runtime
+# vulnerabilities that static analysis can't find:
+# - XSS (reflected/stored)
+# - SQL injection
+# - Authentication bypass
+# - IDOR / tenant escape
+# - Path traversal
+# - SSRF
+# - Information disclosure
+# - Security misconfiguration
+#
+# Two scan profiles:
+# - baseline: 1-hour full scan, all rules
+# - api-scan: openapi-targeted scan for REST API surface
+#
+# Triggers:
+# - Nightly at 02:00 UTC (matches k6 perf schedule)
+# - Manual dispatch
+# - After deployment to staging
+
+name: DAST / OWASP ZAP
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # nightly 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Base URL to scan (default: stg)'
+        required: false
+        default: 'https://api.stg.omobio.io'
+        type: string
+      scan_type:
+        description: 'baseline (full) or api (OpenAPI-targeted)'
+        required: false
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - api
+      max_duration:
+        description: 'Max scan duration in minutes (default 60)'
+        required: false
+        default: '60'
+        type: string
+
+env:
+  TARGET_URL: ${{ inputs.target_url || 'https://api.stg.omobio.io' }}
+  SCAN_TYPE: ${{ inputs.scan_type || 'baseline' }}
+  MAX_DURATION: ${{ inputs.max_duration || '60' }}
+
+jobs:
+  zap-baseline:
+    name: ZAP ${{ env.SCAN_TYPE }} scan
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(env.MAX_DURATION) + 15 }}
+    if: env.SCAN_TYPE == 'baseline' || env.SCAN_TYPE == 'api'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download OpenAPI spec
+        if: env.SCAN_TYPE == 'api'
+        run: |
+          mkdir -p api-spec
+          # Adjust path to your generated OpenAPI spec location
+          curl -fsSL -o api-spec/openapi.json \
+            "${{ env.TARGET_URL }}/v3/api-docs" 2>/dev/null || \
+          curl -fsSL -o api-spec/openapi.json \
+            "${{ env.TARGET_URL }}/api/v1/openapi.json" 2>/dev/null || \
+          echo "WARN: Could not download OpenAPI spec; will run generic scan"
+          ls -la api-spec/
+
+      - name: Run ZAP scan
+        uses: zaproxy/action-baseline@v0.13.0
+        with:
+          target: ${{ env.TARGET_URL }}
+          ruleset: |
+            10098 # Cross-Domain Misconfiguration
+            10105 # Weak Authentication Method
+            10202 # Absence of Anti-CSRF Tokens
+            10063 # Permissions Policy Header Not Set
+            10054 # Cookie without SameSite Attribute
+            10031 # User Controllable HTML Element Attribute
+            10098 # Cross-Domain Misconfiguration
+            10108 # Reverse Tabnabbing
+            10020 # X-Frame-Options Header Not Set
+            10055 # CSP: X-Content-Security-Policy
+            10055 # CSP: Content-Security-Policy
+            10038 # Important Header Missing
+            10037 # Permissions Policy Header Not Set
+            10203 # Session ID in URL Rewrite
+            10109 # Modern Web Application
+            10111 # Authentication Request Identified
+            10096 # Timestamp Disclosure
+            10097 # Hash Disclosure
+            10050 # Cross-Site Request Forgery (CSRF)
+            10052 # Content-Type Header Missing
+            10112 # Session Management Response Identified
+            10056 # X-DNS-Prefetch-Control Header
+            10024 # Cross Site Scripting (Reflected)
+            10025 # Hash Disclosure
+            10027 # Suspicious Comments
+            10073 # Cross-Domain JavaScript Source File Inclusion
+            10009 # Incomplete or No Cache-control and Pragma HTTP Header Set
+            10010 # Cookie No HttpOnly Flag
+            10011 # Cookie Without Secure Flag
+            10012 # Password Autocomplete in Browser
+            10026 # HTTP Parameter Override
+            10028 # Open Redirect
+            10029 # Cookie Poisoning
+            10039 # Multiple X-Frame-Options Headers
+            10043 # Insufficient Security Headers
+            10045 # Source Code Disclosure
+            10047 # HTTPS Content Available via HTTP
+            10049 # Storable and Cacheable Content
+            10051 # X-DNS-Prefetch-Control Header
+            10057 # Username Hash Found
+            10062 # PII Disclosure
+            10064 # Permissions Policy Header Not Set
+            10070 # Use of Relative Path
+            10078 # Info Disclosure - File/Dir
+            10079 # Source Code Disclosure
+            10084 # Strict-Transport-Security Header
+            10085 # Forbidden Code Word
+            10093 # Application Error Disclosure
+            10094 # Credit Card Disclosure
+            10101 # Improper Handling of HTTP Method Disable
+            10102 # Improper Handling of Windows Newline
+            10103 # Image Exposes Server or Application Information
+            10110 # Dangerous JavaScript API
+            10113 # Insufficient Site Isolation Against Spectre
+            10115 # Insufficient Data Validation
+            10118 # User Agent Fuzzer
+            10120 # Source Code Disclosure via JavaScript Files
+            10121 # HTTP Only Site
+            10123 # Permissions Policy Header
+            10124 # Missing Anti-clickjacking Header
+            10125 # Server Leaks Information via "X-Powered-By" HTTP Response Header Field(s)
+            10127 # Information Disclosure - Sensitive Information in HTTP Headers
+            10128 # Strict-Transport-Security Header
+            10129 # Cookie Scope
+            10131 # Insecure HTTP Method
+            10132 # Strict-Transport-Security
+            10133 # Information Disclosure - Server Software Version
+            10134 # Authentication Bypass
+            10135 # Application Error Disclosure
+            10136 # Information Disclosure - Sensitive Information in URL
+            10137 # Information Disclosure - Suspicious Comments
+            10138 # Information Disclosure - Numeric Value
+            10139 # Information Disclosure - Lowercase Html
+            10140 # Information Disclosure - Mailinator Domain
+            10141 # Information Disclosure - Credit Card Number
+            10142 # Information Disclosure - US Social Security Number
+            10143 # Information Disclosure - Debug Error Messages
+            10144 # Information Disclosure - Sensitive Information in HTTP Response
+            10145 # Information Disclosure - Username in URL
+            10146 # Information Disclosure - Date/Time in URL
+            10147 # Information Disclosure - Microsoft File Path
+            10148 # Information Disclosure - Email Address Pattern
+            10149 # Information Disclosure - API Key in URL
+            10150 # Information Disclosure - Server Information
+            10151 # Information Disclosure - Server Information
+            10152 # Source Code Disclosure
+            10153 # Source Code Disclosure
+            10154 # Information Disclosure - Source Code
+            10155 # Information Disclosure - Suspicious Comments
+            10156 # Information Disclosure - Source Code
+            10157 # Information Disclosure - Source Code
+            10158 # Information Disclosure - Source Code
+            10159 # Information Disclosure - Source Code
+            10160 # Information Disclosure - Source Code
+            10161 # Information Disclosure - Source Code
+            10162 # Information Disclosure - Source Code
+            10163 # Information Disclosure - Source Code
+            10164 # Information Disclosure - Source Code
+            10165 # Information Disclosure - Source Code
+            10166 # Information Disclosure - Source Code
+            10167 # Information Disclosure - Source Code
+            10168 # Information Disclosure - Source Code
+            10169 # Information Disclosure - Source Code
+            10170 # Information Disclosure - Source Code
+            10171 # Information Disclosure - Source Code
+            10172 # Information Disclosure - Source Code
+          fail_on_risks: 'High'
+          fail_on_warning: false
+          allow_issue_writing: false
+          artifact_name: zap-baseline-report
+          output_type: 'all'  # json + html + md + sarif
+          cmd_options: '-m 5 -T 30'  # max 5 recursions, 30s timeout per URL
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: report.sarif
+          category: zap-dast-scan
+
+  zap-api:
+    name: ZAP API scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: env.SCAN_TYPE == 'api'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download OpenAPI spec
+        run: |
+          mkdir -p api-spec
+          curl -fsSL -o api-spec/openapi.json \
+            "${{ env.TARGET_URL }}/v3/api-docs" 2>/dev/null || \
+          curl -fsSL -o api-spec/openapi.json \
+            "${{ env.TARGET_URL }}/api/v1/openapi.json" 2>/dev/null
+          ls -la api-spec/
+
+      - name: Run ZAP API scan
+        uses: zaproxy/action-api-scan@v0.6.0
+        with:
+          target: ${{ env.TARGET_URL }}
+          format: openapi
+          api_definition_file: api-spec/openapi.json
+          fail_on_risks: 'High'
+          fail_on_warning: false
+          allow_issue_writing: false
+          cmd_options: '-m 5 -T 30'
+
+  summary:
+    name: Scan summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [zap-baseline, zap-api]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "ZAP baseline: ${{ needs.zap-baseline.result }}"
+          echo "ZAP API:      ${{ needs.zap-api.result }}"
+          if [ "${{ needs.zap-baseline.result }}" != "success" ] && [ "${{ needs.zap-api.result }}" != "success" ]; then
+            echo "ZAP scan failed"
+            exit 1
+          fi
+          echo "DAST scan completed"

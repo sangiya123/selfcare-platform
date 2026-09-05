@@ -1,0 +1,302 @@
+# argocd-project.yaml — ArgoCD AppProject for OMOBIO Selfcare Platform
+# Defines project scope, source repos, destinations, and multi-tenant RBAC
+# Each tenant namespace has an owner role; each environment has an operator role
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: omobio-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: omobio-platform
+    app.kubernetes.io/component: gitops
+    app.kubernetes.io/part-of: omobio-platform
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: "Validate=true"
+    omobio.gitops.project: "omobio-platform"
+    omobio.gitops.tenant-model: "multi-tenant"
+spec:
+  # Description and metadata
+  description: |
+    OMOBIO Selfcare Platform — multi-tenant multi-environment deployment.
+    Manages deployments for all tenants (Dialog, Hutch, Airtel, AIA) across
+    all environments (dev, stg, reg, prod).
+
+  # Source repositories allowed in this project
+  sourceRepos:
+    - https://github.com/omobio/selfcare-platform
+    - https://github.com/omobio/selfcare-platform.git
+    - ssh://git@github.com/omobio/selfcare-platform
+    # Allow Helm repos if used in future
+    - https://omobio.github.io/helm-charts
+    - https://charts.bitnami.com/bitnami
+    # OCI registry for Helm charts
+    - oci://ghcr.io/omobio/helm-charts
+
+  # Allowed destinations (clusters and namespaces)
+  destinations:
+    # Local cluster — primary deployment target
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+      # Allow all omobio-* namespaces on local cluster
+    - server: https://kubernetes.default.svc
+      namespace: omobio-*
+      description: All OMOBIO tenant namespaces
+    # Staging cluster (for integration testing)
+    - server: https://stg-cluster.omobio.example.com
+      namespace: omobio-*
+      description: Staging cluster namespaces
+    # Production clusters (per region)
+    - server: https://prod-lk.omobio.example.com
+      namespace: omobio-*
+      description: Sri Lanka production cluster
+    - server: https://prod-sg.omobio.example.com
+      namespace: omobio-*
+      description: Singapore production cluster
+    - server: https://prod-th.omobio.example.com
+      namespace: omobio-*
+      description: Thailand production cluster
+    - server: https://prod-my.omobio.example.com
+      namespace: omobio-*
+      description: Malaysia production cluster
+    - server: https://prod-hk.omobio.example.com
+      namespace: omobio-*
+      description: Hong Kong production cluster
+    - server: https://prod-in.omobio.example.com
+      namespace: omobio-*
+      description: India production cluster
+
+  # Cluster Resource Allow List
+  # Permitted cluster-scoped resources (for ClusterRoleBinding, etc.)
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  # Namespace-scoped resources that can be created/managed
+  namespaceResourceBlacklist:
+    # Prevent deletion of critical system namespaces
+    - group: ""
+      kind: Namespace
+      # Note: This blocks ALL namespaces; specific exceptions managed via roles
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+
+  # Roles for RBAC
+  roles:
+    # -------------------------------------------------------------------------
+    # Platform Admin — full access to all resources in the project
+    # -------------------------------------------------------------------------
+    - name: platform-admin
+      description: Platform administrator with full access
+      policies:
+        - p, proj:omobio-platform:platform-admin,applications,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,applicationsets,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,clusters,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,repositories,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,projects,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,exec,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,logs,*,*,* allow
+        - p, proj:omobio-platform:platform-admin,events,*,*,* allow
+      groups:
+        - omobio-platform-admins@example.com
+
+    # -------------------------------------------------------------------------
+    # DevOps Engineer — deploy any tenant to dev/stg/reg
+    # -------------------------------------------------------------------------
+    - name: devops-engineer
+      description: Deploy to dev/stg/reg environments, approve reg promotions
+      policies:
+        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-dev,allow
+        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-stg,allow
+        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-reg,allow
+        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-dev,allow
+        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-stg,allow
+        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-reg,allow
+        - p, proj:omobio-platform:devops-engineer,applications,get,omobio-*-prod,allow
+        - p, proj:omobio-platform:devops-engineer,applicationsets,*,*,allow
+      groups:
+        - omobio-devops@example.com
+
+    # -------------------------------------------------------------------------
+    # Release Manager — manage prod deployments, sync windows
+    # -------------------------------------------------------------------------
+    - name: release-manager
+      description: Approve and execute production deployments
+      policies:
+        - p, proj:omobio-platform:release-manager,applications,*,*,* allow
+        - p, proj:omobio-platform:release-manager,applications,sync,omobio-*-prod,allow
+        - p, proj:omobio-platform:release-manager,applications,rollback,omobio-*-prod,allow
+        - p, proj:omobio-platform:release-manager,sync-windows,*,*,allow
+        - p, proj:omobio-platform:release-manager,events,*,*,allow
+        - p, proj:omobio-platform:release-manager,logs,*,*,allow
+      groups:
+        - omobio-release-managers@example.com
+
+    # -------------------------------------------------------------------------
+    # Tenant Namespace Owner — manage their own tenant namespace only
+    # Pattern: env-{env}-operator and tenant-{tenant}-owner
+    # -------------------------------------------------------------------------
+    - name: tenant-owner
+      description: Manage their own tenant namespace (all environments)
+      policies:
+        # Can view all apps
+        - p, proj:omobio-platform:tenant-owner,applications,get,omobio-*,allow
+        - p, proj:omobio-platform:tenant-owner,applications,list,omobio-*,allow
+        # Can only sync their own tenant's dev/stg
+        - p, proj:omobio-platform:tenant-owner,applications,sync,omobio-{{ name }}-dev,allow
+        - p, proj:omobio-platform:tenant-owner,applications,sync,omobio-{{ name }}-stg,allow
+        # Cannot sync prod without approval (enforced by sync window)
+        - p, proj:omobio-platform:tenant-owner,applications,get,omobio-{{ name }}-prod,allow
+      groups:
+        - omobio-tenant-owners@example.com
+
+    # -------------------------------------------------------------------------
+    # Environment Operators — manage all tenants in a specific environment
+    # -------------------------------------------------------------------------
+    - name: env-dev-operator
+      description: Operate dev environment for all tenants
+      policies:
+        - p, proj:omobio-platform:env-dev-operator,applications,*,omobio-*-dev,allow
+        - p, proj:omobio-platform:env-dev-operator,applications,sync,omobio-*-dev,allow
+        - p, proj:omobio-platform:env-dev-operator,applications,rollback,omobio-*-dev,allow
+      groups:
+        - omobio-devops@example.com
+
+    - name: env-stg-operator
+      description: Operate staging environment for all tenants
+      policies:
+        - p, proj:omobio-platform:env-stg-operator,applications,*,omobio-*-stg,allow
+        - p, proj:omobio-platform:env-stg-operator,applications,sync,omobio-*-stg,allow
+        - p, proj:omobio-platform:env-stg-operator,applications,rollback,omobio-*-stg,allow
+        - p, proj:omobio-platform:env-stg-operator,applications,get,omobio-*-stg,allow
+      groups:
+        - omobio-devops@example.com
+
+    - name: env-reg-operator
+      description: Operate regression environment for all tenants
+      policies:
+        - p, proj:omobio-platform:env-reg-operator,applications,*,omobio-*-reg,allow
+        - p, proj:omobio-platform:env-reg-operator,applications,sync,omobio-*-reg,allow
+        - p, proj:omobio-platform:env-reg-operator,applications,rollback,omobio-*-reg,allow
+        - p, proj:omobio-platform:env-reg-operator,applications,get,omobio-*-reg,allow
+      groups:
+        - omobio-qa@example.com
+        - omobio-devops@example.com
+
+    - name: env-prod-operator
+      description: Operate production environment — requires explicit approval
+      policies:
+        - p, proj:omobio-platform:env-prod-operator,applications,get,omobio-*-prod,allow
+        - p, proj:omobio-platform:env-prod-operator,applications,list,omobio-*-prod,allow
+        # Sync only via manual trigger with approval gate
+        - p, proj:omobio-platform:env-prod-operator,applications,sync,omobio-*-prod,allow
+        - p, proj:omobio-platform:env-prod-operator,applications,rollback,omobio-*-prod,allow
+      groups:
+        - omobio-release-managers@example.com
+
+    # -------------------------------------------------------------------------
+    # Read-Only Observer — view-only access for auditors
+    # -------------------------------------------------------------------------
+    - name: observer
+      description: Read-only access to all resources
+      policies:
+        - p, proj:omobio-platform:observer,applications,get,*,* allow
+        - p, proj:omobio-platform:observer,applications,list,*,* allow
+        - p, proj:omobio-platform:observer,applications,watch,*,* allow
+        - p, proj:omobio-platform:observer,logs,get,*,* allow
+        - p, proj:omobio-platform:observer,events,get,*,* allow
+      groups:
+        - omobio-observers@example.com
+        - security-auditors@example.com
+
+  # Sync windows — restrict when automated syncs can run
+  syncWindows:
+    # Development: always open
+    - kind: allow
+      schedule: "* * * * *"  # Every minute (effectively always)
+      duration: 1h
+      applications:
+        - "omobio-*-dev"
+      clusters:
+        - https://kubernetes.default.svc
+      namespaces:
+        - omobio-*-dev
+      manualSync: false
+
+    # Staging: business hours (Mon-Fri 08:00-18:00 SGT)
+    - kind: allow
+      schedule: "0 8-18 * * MON-FRI"
+      duration: 10h
+      applications:
+        - "omobio-*-stg"
+      clusters:
+        - https://kubernetes.default.svc
+        - https://stg-cluster.omobio.example.com
+      namespaces:
+        - omobio-*-stg
+      manualSync: false
+
+    # Regression: business hours (Mon-Fri 09:00-17:00 SGT)
+    - kind: allow
+      schedule: "0 9-17 * * MON-FRI"
+      duration: 8h
+      applications:
+        - "omobio-*-reg"
+      clusters:
+        - https://kubernetes.default.svc
+      namespaces:
+        - omobio-*-reg
+      manualSync: false
+
+    # Production: maintenance windows only
+    - kind: allow
+      schedule: "0 2-4 * * SUN"  # Sunday 02:00-04:00 UTC
+      duration: 2h
+      applications:
+        - "omobio-*-prod"
+      clusters:
+        - "https://prod-*.omobio.example.com"
+      namespaces:
+        - omobio-*-prod
+      manualSync: false
+
+    # Production secondary: Wednesday maintenance window
+    - kind: allow
+      schedule: "0 2-4 * * WED"  # Wednesday 02:00-04:00 UTC
+      duration: 2h
+      applications:
+        - "omobio-*-prod"
+      clusters:
+        - "https://prod-*.omobio.example.com"
+      namespaces:
+        - omobio-*-prod
+      manualSync: false
+
+    # Block production syncs outside maintenance windows
+    - kind: deny
+      schedule: "* * * * *"
+      duration: 1h
+      applications:
+        - "omobio-*-prod"
+      clusters:
+        - "https://prod-*.omobio.example.com"
+      namespaces:
+        - omobio-*-prod
+      manualSync: false
+
+  # Network policy for ArgCD's ingress
+  # Permitted source namespaces for application webhooks
+  sourceNamespaces:
+    - argocd
+    - omobio-*
+
+  # Resource tracking
+  orphanedResources:
+    warn: true
+    ignore:
+      - kinds:
+          - Event
+        namespaces:
+          - omobio-*

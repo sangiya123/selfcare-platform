@@ -1,0 +1,499 @@
+{
+  "title": "OMOBIO Payment Service",
+  "uid": "omobio-payment",
+  "schemaVersion": 39,
+  "version": 1,
+  "description": "Transaction success/failure rates, reconciliation status, provider latency, and refund metrics for the payment service. Runbook: https://runbooks.omobio.local/payment-service",
+  "tags": ["omobio", "payment", "transactions", "reconciliation"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deployments",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "expr": "changes(deployment_started_total{service=\"payment-service\"}[1m]) > 0",
+        "tagKeys": "service,version,environment",
+        "titleFormat": "Deploy payment-service {{version}}"
+      },
+      {
+        "name": "Reconciliation Events",
+        "datasource": "Prometheus",
+        "enable": true,
+        "iconColor": "rgba(255, 96, 96, 1)",
+        "expr": "changes(reconciliation_discrepancy_total{service=\"payment-service\"}[1m]) > 0",
+        "titleFormat": "Reconciliation discrepancy detected"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0
+      },
+      {
+        "name": "tenant",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(transaction_total{service=\"payment-service\"}, tenant_id)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Tenant"
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(payment_provider_requests_total{service=\"payment-service\"}, provider)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Payment Provider"
+      },
+      {
+        "name": "currency",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(transaction_total{service=\"payment-service\"}, currency)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "label": "Currency"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Transaction Success Rate",
+      "description": "Percentage of transactions completing with status=SUCCESS.",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(transaction_total{service=\"payment-service\",status=\"SUCCESS\",tenant_id=~\"$tenant\"}[5m])) / sum(rate(transaction_total{service=\"payment-service\",tenant_id=~\"$tenant\"}[5m]))",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Transaction Failure Rate",
+      "description": "Percentage of transactions with terminal failure status.",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(transaction_total{service=\"payment-service\",status=~\"FAILED|DECLINED|ERROR\"}[5m])) / sum(rate(transaction_total{service=\"payment-service\"}[5m]))",
+          "legendFormat": "failure rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.03 },
+              { "color": "red", "value": 0.10 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Pending Transactions",
+      "description": "Transactions in PENDING or PROCESSING state. High counts may indicate provider outages.",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(transaction_pending{service=\"payment-service\",tenant_id=~\"$tenant\"})",
+          "legendFormat": "pending"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Idempotency Cache Hits",
+      "description": "Rate of duplicate-safe retried requests served from idempotency cache.",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(idempotency_cache_hits_total{service=\"payment-service\"}[1m]))",
+          "legendFormat": "hits/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Provider Latency P95",
+      "description": "95th percentile external payment provider call latency.",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, provider) (rate(payment_provider_seconds_bucket{service=\"payment-service\",provider=~\"$provider\"}[5m])))",
+          "legendFormat": "p95 {{provider}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Refund Rate",
+      "description": "Refunds as a percentage of total transactions in the last hour.",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(transaction_total{service=\"payment-service\",type=\"REFUND\"}[1h])) / sum(increase(transaction_total{service=\"payment-service\"}[1h]))",
+          "legendFormat": "refund rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.15 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Transaction Success vs Failure Over Time",
+      "description": "Transaction throughput by status over time.",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(transaction_total{service=\"payment-service\",tenant_id=~\"$tenant\"}[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Pending Transactions Trend",
+      "description": "Count of in-flight pending transactions. Runbook: https://runbooks.omobio.local/pending-payments",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (status) (transaction_pending{service=\"payment-service\",tenant_id=~\"$tenant\"})",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Idempotency Hit Rate",
+      "description": "Proportion of retried requests served from cache (safe duplicates) vs unique requests.",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(idempotency_cache_hits_total{service=\"payment-service\"}[1m]))",
+          "legendFormat": "cache_hits"
+        },
+        {
+          "expr": "sum(rate(idempotency_cache_misses_total{service=\"payment-service\"}[1m]))",
+          "legendFormat": "cache_misses"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Payment Provider Latency by Provider",
+      "description": "P95 latency per provider. Alerts fire when provider exceeds SLA thresholds.",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, provider) (rate(payment_provider_seconds_bucket{service=\"payment-service\",provider=~\"$provider\"}[5m])))",
+          "legendFormat": "p50 {{provider}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, provider) (rate(payment_provider_seconds_bucket{service=\"payment-service\",provider=~\"$provider\"}[5m])))",
+          "legendFormat": "p95 {{provider}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, provider) (rate(payment_provider_seconds_bucket{service=\"payment-service\",provider=~\"$provider\"}[5m])))",
+          "legendFormat": "p99 {{provider}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Reconciliation Status",
+      "description": "Reconciliation outcomes: matched, discrepancy, unresolved.",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(reconciliation_total{service=\"payment-service\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Transaction Amount Distribution by Currency",
+      "description": "Average transaction amount per currency. Useful for detecting anomalous transaction values.",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (currency) (rate(transaction_amount_total{service=\"payment-service\",tenant_id=~\"$tenant\",currency=~\"$currency\"}[5m])) / sum by (currency) (rate(transaction_total{service=\"payment-service\",tenant_id=~\"$tenant\",currency=~\"$currency\"}[5m]))",
+          "legendFormat": "avg {{currency}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Step-Up Required Rate",
+      "description": "Fraction of transactions requiring additional authentication (3DS, etc.).",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(transaction_total{service=\"payment-service\",step_up_required=\"true\"}[5m])) / sum(rate(transaction_total{service=\"payment-service\"}[5m]))",
+          "legendFormat": "step-up rate"
+        },
+        {
+          "expr": "sum(rate(transaction_total{service=\"payment-service\",step_up_required=\"true\",step_up_outcome=\"success\"}[5m])) / sum(rate(transaction_total{service=\"payment-service\",step_up_required=\"true\"}[5m]))",
+          "legendFormat": "step-up success"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Refund Rate Over Time",
+      "description": "Refund transactions as a percentage of total throughput.",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(transaction_total{service=\"payment-service\",type=\"REFUND\"}[5m])) / sum(rate(transaction_total{service=\"payment-service\"}[5m]))",
+          "legendFormat": "refund rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+# Platform Common — shared configuration
+# All services inherit from this via parent pom dependencyManagement
+
+# Base config loaded by every service
+spring:
+  application:
+    name: ${service.name:unknown-service}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  # ============================================================
+  # DATABASE (MySQL / JPA)
+  # ============================================================
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:omobio}
+    password: ${DB_PASSWORD:changeme}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+# ============================================================
+# MONGODB
+# ============================================================
+spring.data.mongodb:
+  uri: mongodb://${MONGO_USERNAME:omobio}:${MONGO_PASSWORD:changeme}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:omobio_config}?authSource=admin
+  auto-index-creation: true
+
+# ============================================================
+# REDIS
+# ============================================================
+spring.data.redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  timeout: 2000ms
+  lettuce:
+    pool:
+      max-active: 50
+      max-idle: 10
+      min-idle: 5
+
+# ============================================================
+# KAFKA
+# ============================================================
+spring.kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    acks: all
+    retries: 3
+    properties:
+      enable.idempotence: true
+  consumer:
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    group-id: ${KAFKA_GROUP_ID:${spring.application.name}}
+    auto-offset-reset: earliest
+    properties:
+      spring.json.trusted.packages: "*"
+
+# ============================================================
+# CLIENT / TENANT INTEGRATIONS (per-client config lives in DB — see
+# TenantConfigurationService and admin Studio Integrations page)
+# ============================================================
+# No client-specific URLs/credentials here. To configure a client,
+# use the Selfcare Studio admin portal: Integrations > <client>.
+# At runtime, the TenantConfigurationService loads the config from
+# MongoDB and the industry-pack provider beans read it via the service.
+#
+# Default tenant for local dev (optional — used by services that
+# need a fallback when no DB entry exists).
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:${CUSTOMER_IDENTITY_URL:http://customer-identity:8080}/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_SECONDS:86400}
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL_SECONDS:2592000}
+    cors:
+      allowed-origins: ${ALLOWED_ORIGINS:*}
+  tenant:
+    default-id: ${DEFAULT_TENANT_ID:dialog-lk}
+
+# ============================================================
+# AI GATEWAY (platform-level — same model across all operators)
+# ============================================================
+ai:
+  anthropic:
+    base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com/v1}
+    api-key: ${ANTHROPIC_API_KEY:replace-me}
+    default-model: ${ANTHROPIC_DEFAULT_MODEL:claude-opus-5}
+    max-tokens: 4096
+    default-temperature: 0.7
+
+# ============================================================
+# FEATURE FLAGS
+# ============================================================
+featureflag:
+  provider: ${FEATUREFLAG_PROVIDER:noop}
+  unleash:
+    url: ${UNLEASH_URL:http://localhost:4242/api}
+    api-key: ${UNLEASH_API_KEY:replace-me}
+
+# ============================================================
+# PAYMENT (policy thresholds — per environment, not per operator)
+# Operator-specific payment gateway (DIALOG_MIFE / HUTCH_BSS / STRIPE
+# etc.) is configured per-tenant via admin portal Integrations.
+# ============================================================
+payment:
+  receipt:
+    base-url: ${PAYMENT_RECEIPT_BASE_URL:${PUBLIC_API_BASE_URL:http://localhost:8080}}
+  cross-connection:
+    max-amount: ${PAYMENT_MAX_AMOUNT:100000.00}
+    step-up-threshold: ${PAYMENT_STEP_UP_THRESHOLD:10000.00}
+  reconciliation:
+    interval-ms: ${PAYMENT_RECONCILIATION_INTERVAL_MS:300000}
+
+# ============================================================
+# USAGE / BALANCE CACHE
+# ============================================================
+usage:
+  balance:
+    cache-ttl-seconds: ${USAGE_BALANCE_CACHE_TTL:300}
+  usage:
+    cache-ttl-seconds: ${USAGE_USAGE_CACHE_TTL:60}
+
+# ============================================================
+# OBSERVABILITY
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: ${PROMETHEUS_ENABLED:true}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+
+otel:
+  enabled: ${OTEL_ENABLED:false}
+  service-name: ${spring.application.name}
+  endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
+
+# ============================================================
+# LOGGING
+# ============================================================
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+    org.springframework: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [tenant=%X{tenantId} correlation=%X{correlationId}] %logger{36} - %msg%n"
+    json:
+      enabled: ${LOG_JSON:false}
+
+# ============================================================
+# SERVER
+# ============================================================
+server:
+  port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+  error:
+    include-message: never
+    include-stacktrace: never

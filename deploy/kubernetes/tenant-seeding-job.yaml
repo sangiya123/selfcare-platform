@@ -1,0 +1,155 @@
+# OMOBIO Kubernetes — Tenant Seeding Init Job
+# Runs once after MongoDB becomes available.
+# Seeds the dialog-lk tenant config (theme, layout, feature flags, navigation).
+# Idempotent — re-running won't duplicate data.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: omobio-tenant-seed-dialog
+  namespace: omobio
+  labels:
+    app: omobio-platform
+    purpose: tenant-seeding
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-seeder
+          image: mongo:7.0
+          command: ["mongosh"]
+          args:
+            - "mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+            - "--quiet"
+            - "--eval"
+            - |
+              const tenantId = "dialog-lk";
+              const now = new Date();
+
+              db.tenants.updateOne(
+                { _id: "dialog-lk" },
+                { $set: {
+                    _id: "dialog-lk",
+                    tenantId: "dialog-lk",
+                    displayName: "Dialog Axiata",
+                    industry: "TELCO",
+                    industryPack: "telco",
+                    tenantType: "OPERATOR",
+                    country: "LK",
+                    defaultLocale: "en-LK",
+                    supportedLocales: ["en-LK", "si-LK", "ta-LK"],
+                    timezone: "Asia/Colombo",
+                    currency: "LKR",
+                    enabled: true,
+                    createdAt: now,
+                    updatedAt: now,
+                    version: 1
+                }}, { upsert: true }
+              );
+              print("Seeded: tenants/dialog-lk");
+
+              db.themes.updateOne(
+                { _id: "dialog-lk-default" },
+                { $set: {
+                    _id: "dialog-lk-default",
+                    tenantId: "dialog-lk",
+                    version: "1.0.0",
+                    isDefault: true,
+                    tokens: {
+                      colors: {
+                        primary: "#E50914", secondary: "#0033A0",
+                        accent: "#FFC72C", background: "#FFFFFF",
+                        surface: "#F5F5F5", text: "#1A1A1A",
+                        error: "#D32F2F", success: "#2E7D32"
+                      },
+                      typography: { fontFamily: "Roboto, system-ui, sans-serif" },
+                      spacing: { xs: "4px", sm: "8px", md: "16px", lg: "24px", xl: "32px" }
+                    },
+                    brand: { logo: "https://cdn.dialog.lk/logo.svg", appName: "MyDialog" }
+                }}, { upsert: true }
+              );
+              print("Seeded: themes/dialog-lk-default");
+
+              db.layouts.updateOne(
+                { _id: "dialog-lk-home" },
+                { $set: {
+                    _id: "dialog-lk-home",
+                    tenantId: "dialog-lk",
+                    version: "1.0.0",
+                    isDefault: true,
+                    page: "home",
+                    sections: [
+                      { id: "hero-balance", type: "BALANCE_WIDGET", order: 1, visible: true },
+                      { id: "quick-actions", type: "QUICK_ACTIONS", order: 2, visible: true },
+                      { id: "usage-overview", type: "USAGE_WIDGET", order: 3, visible: true },
+                      { id: "bills", type: "BILLS_WIDGET", order: 4, visible: true },
+                      { id: "ai-assistant", type: "AI_CHAT_ENTRYPOINT", order: 5, visible: true }
+                    ]
+                }}, { upsert: true }
+              );
+              print("Seeded: layouts/dialog-lk-home");
+
+              db.feature_flags.updateOne(
+                { _id: "dialog-lk-flags" },
+                { $set: {
+                    _id: "dialog-lk-flags",
+                    tenantId: "dialog-lk",
+                    version: "1.0.0",
+                    flags: {
+                      "ai.assistant.enabled": { enabled: true, rollout: 100 },
+                      "biometric.login.enabled": { enabled: true, rollout: 100 },
+                      "dashboard.dark-mode.enabled": { enabled: true, rollout: 100 },
+                      "recharge.credit-card.enabled": { enabled: true, rollout: 100 },
+                      "recharge.bank-transfer.enabled": { enabled: true, rollout: 100 }
+                    }
+                }}, { upsert: true }
+              );
+              print("Seeded: feature_flags/dialog-lk-flags");
+
+              db.integrations.updateOne(
+                { _id: "dialog-lk-bss" },
+                { $set: {
+                    _id: "dialog-lk-bss",
+                    tenantId: "dialog-lk",
+                    type: "operator-bss",
+                    industry: "TELCO",
+                    status: "ACTIVE",
+                    endpoint: { baseUrl: "https://bss.dialog.lk/api/v3" },
+                    capabilities: ["getBalance", "getUsage", "getBill", "submitPayment", "recharge"]
+                }}, { upsert: true }
+              );
+              print("Seeded: integrations/dialog-lk-bss");
+
+              db.navigations.updateOne(
+                { _id: "dialog-lk-main" },
+                { $set: {
+                    _id: "dialog-lk-main",
+                    tenantId: "dialog-lk",
+                    version: "1.0.0",
+                    tabs: [
+                      { id: "home", label: "Home", icon: "home", route: "/home" },
+                      { id: "billing", label: "Bills", icon: "bill", route: "/billing" },
+                      { id: "usage", label: "Usage", icon: "chart", route: "/usage" },
+                      { id: "shop", label: "Shop", icon: "shop", route: "/shop" },
+                      { id: "more", label: "More", icon: "menu", route: "/more" }
+                    ]
+                }}, { upsert: true }
+              );
+              print("Seeded: navigations/dialog-lk-main");
+
+              db.tenants.createIndex({ tenantId: 1 }, { unique: true });
+              db.themes.createIndex({ tenantId: 1, isDefault: 1 });
+              db.layouts.createIndex({ tenantId: 1, page: 1 });
+              db.feature_flags.createIndex({ tenantId: 1 });
+              db.integrations.createIndex({ tenantId: 1, type: 1 });
+              db.navigations.createIndex({ tenantId: 1 });
+              print("Seeded: indexes");
+
+              print("=== Tenant dialog-lk seeding complete ===");
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: omobio-tenant-seeder
+  namespace: omobio

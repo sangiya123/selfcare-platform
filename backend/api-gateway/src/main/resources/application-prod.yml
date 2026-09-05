@@ -1,0 +1,44 @@
+# PRODUCTION profile overrides
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "https://admin.omobio.io"
+            allowedMethods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 600
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity}/.well-known/jwks.json}
+  # WAF enabled in production - see waf-rules.yml for rule set
+  waf:
+    enabled: true
+    log-only-mode: false
+    block-on-match: true
+  otel:
+    enabled: true
+
+logging:
+  level:
+    com.omobio: INFO
+    org.springframework.cloud.gateway: WARN
+    reactor.netty: WARN
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 200
+        minimumNumberOfCalls: 50
+        failureRateThreshold: 40
+        waitDurationInOpenState: 60s

@@ -1,0 +1,121 @@
+# =====================================================================
+# OpenTelemetry Collector — local dev configuration
+# Receives traces and metrics from all platform services and exports
+# them to Prometheus (metrics) and the local debug console (traces).
+# =====================================================================
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'omobio-services'
+          metrics_path: /actuator/prometheus
+          static_configs:
+            - targets:
+                - api-gateway:8080
+                - customer-identity-service:8080
+                - admin-identity-service:8080
+                - config-tenant-service:8080
+                - account-entitlement-service:8080
+                - dashboard-bff:8080
+                - product-service:8080
+                - usage-service:8080
+                - billing-service:8080
+                - payment-service:8080
+                - notification-service:8080
+                - content-service:8080
+                - journey-service:8080
+                - reporting-service:8080
+                - ai-gateway:8080
+                - audit-service:8080
+                - insurance-service:8080
+          scrape_interval: 15s
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  resource:
+    attributes:
+      - key: service.namespace
+        value: omobio
+        action: upsert
+      - key: deployment.environment
+        value: dev
+        action: upsert
+
+  filter/local-attrs:
+    metrics:
+      exclude:
+        match_type: strict
+        metric_names:
+          - process.cpu.count
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: omobio
+    const_labels:
+      env: dev
+      platform: omobio-selfcare
+    send_timestamps: true
+    metric_expiration: 5m
+    add_metric_suffixes: true
+
+  logging:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  otlp/backend:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:17777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [logging, otlp/backend]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch, resource]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [logging]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

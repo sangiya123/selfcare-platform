@@ -1,0 +1,10 @@
+# OMOBIO Selfcare Platform — Kubernetes Namespace
+# Apply after enabling Kubernetes in Docker Desktop (Settings → Kubernetes → Enable Kubernetes)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: omobio
+  labels:
+    app: omobio-platform
+    environment: docker-desktop
+    operator: dialog-lk

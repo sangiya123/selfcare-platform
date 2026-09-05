@@ -1,0 +1,213 @@
+# OMOBIO Selfcare Platform — OWASP Dependency-Check
+#
+# Scans all Maven dependencies (backend) and npm packages (admin, mobile)
+# for known CVEs. Fails the build on any Critical/High vulnerability
+# without an approved exception.
+#
+# Why a separate workflow?
+# - OWASP Dependency-Check pulls the NVD data feed (~50MB) on first run
+# - Want to run it independently of unit tests (faster feedback)
+# - Allow extra time for the full transitive scan
+
+name: OWASP Dependency-Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 4 * * *'  # nightly at 04:00 UTC — fresh NVD feed
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx3g -XX:+UseG1GC'
+  NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+  FAIL_ON_CVSS: '7'  # fail on High (CVSS 7.0+)
+
+jobs:
+  # ==========================================
+  # Backend: Maven dependency vulnerability scan
+  # ==========================================
+  backend-owasp:
+    name: Backend OWASP Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Cache OWASP data
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check-data
+          key: owasp-data-${{ hashFiles('**/pom.xml') }}
+          restore-keys: owasp-data-
+
+      - name: Run OWASP dependency-check
+        working-directory: selfcare-platform/backend
+        run: |
+          mvn -B -P owasp-scan \
+            -Dnvd.api.key=${{ env.NVD_API_KEY }} \
+            -DfailBuildOnCVSS=${{ env.FAIL_ON_CVSS }} \
+            -Dformats=HTML,JSON,SARIF \
+            -DoutputDirectory=target/dependency-check \
+            -DskipTests=true \
+            org.owasp:dependency-check-maven:check
+
+      - name: Parse vulnerability report
+        id: parse
+        if: always()
+        working-directory: selfcare-platform/backend
+        run: |
+          if [ -f target/dependency-check/dependency-check-report.json ]; then
+            CRIT=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="CRITICAL")] | length' target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="HIGH")] | length' target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            MED=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="MEDIUM")] | length' target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="LOW")] | length' target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            echo "critical=$CRIT,high=$HIGH,medium=$MED,low=$LOW" >> $GITHUB_OUTPUT
+            echo "::notice::Backend CVEs — Critical: $CRIT, High: $HIGH, Medium: $MED, Low: $LOW"
+          fi
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-backend-html
+          path: selfcare-platform/backend/target/dependency-check/dependency-check-report.html
+          retention-days: 30
+
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-backend-json
+          path: selfcare-platform/backend/target/dependency-check/dependency-check-report.json
+          retention-days: 30
+
+      - name: Upload to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: selfcare-platform/backend/target/dependency-check/dependency-check-report.sarif
+          category: owasp-dependency-check-backend
+
+      - name: Fail on high-severity vulnerabilities
+        if: always()
+        run: |
+          if [ -f selfcare-platform/backend/target/dependency-check/dependency-check-report.json ]; then
+            CRIT_COUNT=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="CRITICAL")] | length' selfcare-platform/backend/target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            HIGH_COUNT=$(jq '[.dependencies[].vulnerabilities[]? | select(.severity=="HIGH")] | length' selfcare-platform/backend/target/dependency-check/dependency-check-report.json 2>/dev/null || echo 0)
+            if [ "${CRIT_COUNT:-0}" -gt 0 ] || [ "${HIGH_COUNT:-0}" -gt 0 ]; then
+              echo "::error::Found $CRIT_COUNT Critical and $HIGH_COUNT High vulnerabilities in backend dependencies."
+              echo "Review: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              exit 1
+            fi
+          fi
+
+  # ==========================================
+  # Admin: npm audit
+  # ==========================================
+  admin-npm-audit:
+    name: Admin npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: npm ci
+
+      - name: Run npm audit (high+ critical fail)
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: |
+          npm audit --audit-level=high --json > npm-audit.json || EXIT=$?
+          if [ -f npm-audit.json ]; then
+            CRIT=$(jq '.metadata.vulnerabilities.critical' npm-audit.json 2>/dev/null || echo 0)
+            HIGH=$(jq '.metadata.vulnerabilities.high' npm-audit.json 2>/dev/null || echo 0)
+            MED=$(jq '.metadata.vulnerabilities.moderate' npm-audit.json 2>/dev/null || echo 0)
+            echo "::notice::Admin npm audit — Critical: $CRIT, High: $HIGH, Moderate: $MED"
+            if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
+              echo "::error::Admin has $CRIT Critical and $HIGH High vulnerabilities."
+              exit 1
+            fi
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-admin
+          path: selfcare-platform/admin/selfcare-studio/npm-audit.json
+          retention-days: 30
+
+  # ==========================================
+  # Mobile: npm audit
+  # ==========================================
+  mobile-npm-audit:
+    name: Mobile npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/mobile/selfcare-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: npm ci
+
+      - name: Run npm audit (high+ critical fail)
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: |
+          npm audit --audit-level=high --json > npm-audit.json || EXIT=$?
+          if [ -f npm-audit.json ]; then
+            CRIT=$(jq '.metadata.vulnerabilities.critical' npm-audit.json 2>/dev/null || echo 0)
+            HIGH=$(jq '.metadata.vulnerabilities.high' npm-audit.json 2>/dev/null || echo 0)
+            MED=$(jq '.metadata.vulnerabilities.moderate' npm-audit.json 2>/dev/null || echo 0)
+            echo "::notice::Mobile npm audit — Critical: $CRIT, High: $HIGH, Moderate: $MED"
+            if [ "${CRIT:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
+              echo "::error::Mobile has $CRIT Critical and $HIGH High vulnerabilities."
+              exit 1
+            fi
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-mobile
+          path: selfcare-platform/mobile/selfcare-app/npm-audit.json
+          retention-days: 30

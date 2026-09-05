@@ -1,0 +1,79 @@
+OMOBIO Selfcare Platform — Start Here
+=====================================
+
+This is the OMOBIO Global Selfcare Product Platform implementation repo.
+
+READ FIRST:
+1. README.md — overview, architecture, quick start
+2. CLAUDE.md — this file, developer guidance for AI assistants
+3. Planning docs — see parent folder "Planning doc/"
+
+DEVELOPMENT ORDER (from planning docs):
+=======================================
+
+PHASE 0 — 2-3 weeks: Product Baseline
+  ✅ Create repo structure (this repo)
+  ⬜ Freeze canonical naming and API versioning rules
+  ⬜ Approve ADRs: mobile framework, tenant isolation, auth/token policy,
+          config model, data-store responsibility
+  ⬜ Build architecture runway: product-kernel, backend-services,
+          operator-packs, config-schema, GitOps
+  ⬜ Create design system/tokens and accessibility baseline
+  ⬜ Establish CI quality/security gates
+
+PHASE 1 — 4-6 weeks: Core Experience Platform
+  ⬜ React Native app shell + Config SDK + cache + compatibility check
+  ⬜ Component Registry v1 + Layout renderer/navigation/action engine
+  ⬜ Config Service + Mongo schemas + compiler + immutable manifests
+  ⬜ Basic Studio preview/publish/rollback + Observability SDK
+  EXIT: two demo tenant themes/layouts from same binary
+
+PHASE 2 — 4-6 weeks: Identity/Account Foundation
+  ⬜ Auth provider abstraction + Refresh-session durable model + Redis AUTH cache
+  ⬜ Profile read model consumer from Kafka
+  ⬜ Account/linked-connection service + Dialog primary-number entitlement
+  ⬜ active-connection context + connection switcher + last-login/audit
+  EXIT: secure login, connection list and switch
+
+PHASE 3 — 4-6 weeks: BFF + Provider Framework
+  ⬜ Canonical provider SDK + REST/SOAP/SQL/Mongo/Kafka connectors
+  ⬜ timeout/retry/circuit/bulkhead common middleware
+  ⬜ resilient dashboard orchestrator + partial widget response/refresh
+  ⬜ mock/contract test harness
+  EXIT: dashboard survives simulated provider failures
+
+PHASE 4 — 6-8 weeks: Core Telco Capabilities
+  ⬜ Product/offer, Balance/usage, Billing, Recharge, Payment, Packages,
+         Notifications/Content
+  ⬜ Build Dialog providers first, then generalize
+
+PHASE 5 — 4-6 weeks: Studio/Admin/Reporting
+  ⬜ Page Builder + Journey Builder + Integration Builder
+  ⬜ Feature manager + Asset/content/localization
+  ⬜ Users/roles + Report catalog/builder + Audit + Environment promotion
+
+PHASE 6 — Dialog Migration
+  ⬜ Wave A: dashboard/config/navigation
+  ⬜ Wave B: profile/connections/support/notifications
+  ⬜ Wave C: catalog/packages/usage
+  ⬜ Wave D: recharge/payment/billing
+  ⬜ Wave E: long-tail journeys (DTV, broadband, VAS, etc.)
+
+PHASE 7 — Hutch Onboarding
+PHASE 8 — Airtel Onboarding
+PHASE 9 — AI Rollout
+PHASE 10 — Productization
+
+OPEN DECISIONS TO RESOLVE BEFORE PRODUCTION:
+============================================
+1. Token policy: 42-day access / 7-month refresh — reconcile with Dialog source defaults
+   See ADR-011 in backend/docs/adrs/
+2. Operator isolation: dedicated EKS cluster vs. dedicated namespace/VPC per operator
+3. Dialog linked-connection: confirmed as primary-number linked list (not NIC ownership)
+
+SEE ALSO:
+=========
+- backend/docs/adrs/ — Architecture Decision Records
+- config-schema/schemas/ — JSON Schema for config validation
+- operator-packs/dialog/ — Dialog operator pack template
+- Planning doc/OMOBIO_SC_FINAL_v2/arch/ — Architecture diagrams (D01-D07)

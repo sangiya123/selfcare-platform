@@ -1,0 +1,56 @@
+# Prometheus scrape config additions for the OMOBIO platform.
+# Place this in your prometheus.yml under scrape_configs or merge with the main config.
+
+- job_name: 'omobio-backend'
+  metrics_path: '/actuator/prometheus'
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  kubernetes_sd_configs:
+    - role: pod
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      action: keep
+      regex: 'omobio-.*'
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+      action: replace
+      target_label: __address__
+      regex: (.+)
+    - source_labels: [__meta_kubernetes_namespace]
+      target_label: namespace
+    - source_labels: [__meta_kubernetes_pod_name]
+      target_label: pod
+
+- job_name: 'omobio-mobile'
+  # Mobile clients don't expose metrics; this is a placeholder
+  # for the analytics pipeline that aggregates mobile events
+
+- job_name: 'omobio-ai-gateway'
+  metrics_path: '/actuator/prometheus'
+  scrape_interval: 15s  # Higher frequency for AI monitoring
+  static_configs:
+    - targets: ['ai-gateway:8080']
+  metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: 'ai_.*'
+      action: keep
+
+# Recording rules for common SLOs
+# Place in a separate file and reference from prometheus.yml
+groups:
+  - name: omobio_slo
+    interval: 30s
+    rules:
+      - record: ai_gateway:chat_p99_latency_seconds
+        expr: histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri="/api/v1/ai/chat"}[5m])) by (le, tenant_id))
+
+      - record: api_gateway:requests_per_second
+        expr: sum(rate(http_server_requests_seconds_count{application="api-gateway"}[1m]))
+
+      - record: payment:success_rate
+        expr: sum(rate(payment_succeeded_total[5m])) / sum(rate(payment_attempted_total[5m]))
+
+      - record: dashboard_bff:partial_response_rate
+        expr: sum(rate(dashboard_partial_response_total[5m])) / sum(rate(dashboard_total_responses[5m]))
+
+      - record: ai_gateway:token_usage_daily
+        expr: sum by (tenant_id) (increase(ai_token_usage_total[1d]))

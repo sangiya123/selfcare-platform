@@ -1,0 +1,349 @@
+# GitHub Actions workflow for security scanning — SBOM, dependency, and container image scanning.
+# Runs on every push to main and on PRs against main.
+# Does NOT run unit tests or build — those are handled by backend-ci.yml, admin-ci.yml, mobile-ci.yml.
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_sbom:
+        description: 'Skip SBOM generation'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_license:
+        description: 'Skip license compliance scan'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_container:
+        description: 'Skip container image scan'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+
+jobs:
+  # ==========================================
+  # Software Bill of Materials (SBOM)
+  # Generates CycloneDX SBOM for backend Maven modules
+  # ==========================================
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sbom_file: sbom/backend-bom.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Create SBOM output dir
+        run: mkdir -p sbom
+
+      - name: Generate CycloneDX SBOM
+        id: sbom-gen
+        working-directory: selfcare-platform/backend
+        run: |
+          # Use Maven CycloneDX plugin to generate SBOM
+          mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom \
+            -B -DoutputFormat=json -DoutputName=../../sbom/backend-bom
+
+      - name: Validate SBOM
+        run: |
+          if [ -f sbom/backend-bom.json ]; then
+            echo "SBOM generated successfully: $(wc -c < sbom/backend-bom.json) bytes"
+            echo "Components: $(cat sbom/backend-bom.json | jq '.components | length')"
+          else
+            echo "ERROR: SBOM file not found"
+            exit 1
+          fi
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom/backend-bom.json
+          retention-days: 90
+          compression-level: 9
+
+  # ==========================================
+  # Dependency Vulnerability Scan (Grype)
+  # Scans the SBOM for known CVEs
+  # ==========================================
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: sbom
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom
+
+      - name: Install Grype
+        run: |
+          if ! command -v grype &> /dev/null; then
+            echo "Installing Grype..."
+            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.80.0
+          fi
+          grype version
+
+      - name: Run Grype vulnerability scan
+        id: grype
+        continue-on-error: true
+        run: |
+          grype sbom/backend-bom.json \
+            --severity greater-than-or-equal-to medium \
+            --fail-on medium \
+            -o json > sbom/vulnerabilities.json || true
+          # Also generate a SARIF report for GitHub Security tab
+          grype sbom/backend-bom.json \
+            --severity greater-than-or-equal-to low \
+            -o template \
+            --template "@/tmp/grype-sarif.tmpl" \
+            -o > sbom/vulnerabilities.sarif 2>/dev/null || true
+
+      - name: Check for critical vulnerabilities
+        run: |
+          if [ -f sbom/vulnerabilities.json ]; then
+            CRIT=$(cat sbom/vulnerabilities.json | jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length')
+            HIGH=$(cat sbom/vulnerabilities.json | jq '[.matches[] | select(.vulnerability.severity == "High")] | length')
+            echo "Critical vulnerabilities: $CRIT"
+            echo "High vulnerabilities: $HIGH"
+
+            if [ "$CRIT" -gt 0 ]; then
+              echo "::error::Critical vulnerabilities found: $CRIT. Build cannot proceed."
+              exit 1
+            fi
+          fi
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vulnerability-report
+          path: sbom/
+          retention-days: 30
+
+      - name: Upload to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: sbom/vulnerabilities.sarif
+          category: grype-dependency-scan
+
+  # ==========================================
+  # Dependency License Compliance Scan
+  # Checks for forbidden/proprietary licenses
+  # ==========================================
+  license-scan:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: sbom
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom
+
+      - name: Install license-check (npx)
+        run: npm install -g license-checker-static
+
+      - name: Check for forbidden licenses
+        run: |
+          echo "Checking SBOM for forbidden licenses..."
+          FORBIDDEN='GPL-3.0 AGPL-3.0 LGPL-3.0 GPL-2.0 AGPL-2.0 EUPL-1.2 CC-BY-NC-4.0 CC-BY-NC-SA-4.0'
+          LICENSE_FILE="sbom/backend-bom.json"
+
+          FOUND_VIOLATIONS=false
+          for lic in $FORBIDDEN; do
+            if grep -qi "$lic" "$LICENSE_FILE"; then
+              echo "::error::Forbidden license found: $lic"
+              FOUND_VIOLATIONS=true
+            fi
+          done
+
+          if $FOUND_VIOLATIONS; then
+            echo "License compliance failed. Review forbidden licenses above."
+            exit 1
+          fi
+
+          echo "License compliance check passed."
+
+      - name: List all detected licenses
+        run: |
+          if [ -f sbom/backend-bom.json ]; then
+            echo "Detected licenses in SBOM:"
+            cat sbom/backend-bom.json | jq -r '.components[].license // "NO-LICENSE" | if type == "object" then .license else . end' 2>/dev/null | sort | uniq -c | sort -rn | head -30
+          fi
+
+  # ==========================================
+  # Container Image Scan (Trivy)
+  # Scans Docker images for vulnerabilities
+  # Only runs on main branch pushes (not PRs)
+  # ==========================================
+  container-scan:
+    name: Container Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: sbom
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Build sample Docker image for scan
+        uses: docker/build-push-action@v5
+        with:
+          context: selfcare-platform/backend/api-gateway
+          push: false
+          load: true
+          tags: omobio-test-image:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Trivy
+        run: |
+          if ! command -v trivy &> /dev/null; then
+            echo "Installing Trivy..."
+            curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v0.54.1/trivy_0.54_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin
+          fi
+          trivy version
+
+      - name: Run Trivy container scan
+        id: trivy
+        continue-on-error: false
+        run: |
+          mkdir -p sbom
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --format json \
+            --output sbom/image-scan.json \
+            omobio-test-image:latest || trivy_exit=$?
+
+          # Allow exit code 1 (vulnerabilities found) but not other errors
+          if [ "${trivy_exit:-0}" -eq 1 ]; then
+            echo "Vulnerabilities found in container image"
+            exit 1
+          fi
+
+      - name: Upload container scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-scan-report
+          path: sbom/image-scan.json
+          retention-days: 30
+
+  # ==========================================
+  # SAST: Static Application Security Testing (Semgrep)
+  # Scans source code for security issues
+  # ==========================================
+  sast-scan:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten-2017
+            p/owasp-top-ten-2021
+            p/java-sec-best-practices
+
+      - name: Upload SAST results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep-sast
+
+  # ==========================================
+  # Secret Scanning
+  # GitHub-native secret scanning is enabled at repo level.
+  # This step provides additional push protection.
+  # ==========================================
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --redact --fail-on-public
+        continue-on-error: false
+
+  # ==========================================
+  # Dependency Review (GitHub-native)
+  # Automatically reviews dependencies for vulnerabilities
+  # ==========================================
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # GitHub-native dependency review — no extra setup needed
+    # Enable this in repo settings: Settings > Security > Dependency review
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-packages: |
+            # Packages with known critical vulnerabilities under active exploitation
+            # Format: package Ecosystem@Name@Version
+            # This is a last-resort blocklist — Grype/Trivy are primary sources

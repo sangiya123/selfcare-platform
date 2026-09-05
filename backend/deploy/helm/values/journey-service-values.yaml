@@ -1,0 +1,61 @@
+# journey-service-values.yaml — Journey Service overrides
+# Handles: onboarding journeys, workflow orchestration, step tracking
+
+replicaCount: 2
+
+image:
+  repository: omobio/journey-service
+
+resources:
+  limits:
+    cpu: 1200m
+    memory: 1.5Gi
+  requests:
+    cpu: 350m
+    memory: 768Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 60
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx1g -XX:MaxRAMPercentage=75.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # Journey step timeout (24 hours default)
+  JOURNEY_STEP_TIMEOUT_HOURS: "24"
+  # Workflow executor thread pool
+  WORKFLOW_EXECUTOR_CORE_POOL_SIZE: "10"
+  WORKFLOW_EXECUTOR_MAX_POOL_SIZE: "50"
+  # Resume token TTL (7 days)
+  RESUME_TOKEN_TTL_DAYS: "7"
+  # Step completion events batch size
+  EVENT_BATCH_SIZE: "100"
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8092
+  initialDelaySeconds: 50
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8092
+  initialDelaySeconds: 25
+  periodSeconds: 10
+  failureThreshold: 3
+
+secrets:
+  databasePassword: "secret-ref:db-password"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true

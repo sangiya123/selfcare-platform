@@ -1,0 +1,366 @@
+{
+  "title": "OMOBIO Mobile App — Crash & Performance",
+  "uid": "omobio-mobile-performance",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["omobio", "mobile", "performance", "crash"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "tenant_id",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(mobile_app_launch_seconds_count, tenant_id)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true
+      },
+      {
+        "name": "platform",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(mobile_app_launch_seconds_count, platform)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "app_version",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(mobile_app_launch_seconds_count, app_version)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Crash-Free Users (24h)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "1 - (sum(increase(mobile_app_crashes_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[24h])) / sum(increase(mobile_app_sessions_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[24h])))",
+          "legendFormat": "Crash-free %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.99 },
+              { "color": "green", "value": 0.999 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "area",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Daily Active Users (DAU)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "count(distinct(mobile_app_active_users_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}))",
+          "legendFormat": "DAU"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Crash Rate (per 1k sessions)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "(sum(increase(mobile_app_crashes_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[1h])) / sum(increase(mobile_app_sessions_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[1h]))) * 1000",
+          "legendFormat": "Crashes/1k sessions"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Cold Start p95 (s)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(mobile_app_cold_start_seconds_bucket{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p95 cold start"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 3 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Crashes by Platform (per hour)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (platform) (rate(mobile_app_crashes_total{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[1h]))",
+          "legendFormat": "{{platform}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Crashes by App Version (per hour)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (app_version) (rate(mobile_app_crashes_total{tenant_id=~\"$tenant_id\", platform=~\"$platform\"}[1h]))",
+          "legendFormat": "v{{app_version}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "App Launch Time (p50, p95, p99)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(mobile_app_cold_start_seconds_bucket{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(mobile_app_cold_start_seconds_bucket{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(mobile_app_cold_start_seconds_bucket{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "ANR (App Not Responding) Rate",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (platform) (rate(mobile_app_anr_total{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m]))",
+          "legendFormat": "{{platform}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "API Request Latency (mobile → gateway)",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(mobile_api_request_duration_seconds_bucket{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(mobile_api_request_duration_seconds_bucket{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(mobile_api_request_duration_seconds_bucket{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "API Error Rate (4xx + 5xx)",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(mobile_api_request_duration_seconds_count{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\", status=~\"4..|5..\"}[5m])) / sum(rate(mobile_api_request_duration_seconds_count{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m]))",
+          "legendFormat": "Error rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "drawStyle": "line", "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.05 },
+              { "color": "red", "value": 0.10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Active Sessions (5m windows)",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (platform) (rate(mobile_app_sessions_total{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])) * 300",
+          "legendFormat": "{{platform}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Avg Session Duration (minutes)",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (platform) (rate(mobile_app_session_duration_seconds_sum{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])) / sum by (platform) (rate(mobile_app_session_duration_seconds_count{tenant_id=~\"$tenant_id\", app_version=~\"$app_version\"}[5m])) / 60",
+          "legendFormat": "{{platform}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "m", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 50,
+      "type": "timeseries",
+      "title": "Memory Usage (MB) by App Version",
+      "gridPos": { "x": 0, "y": 36, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg by (app_version) (mobile_app_memory_mb{tenant_id=~\"$tenant_id\", platform=~\"$platform\"})",
+          "legendFormat": "v{{app_version}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "deckbytes", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 51,
+      "type": "timeseries",
+      "title": "Screen Load Time (p95)",
+      "gridPos": { "x": 12, "y": 36, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, screen) (rate(mobile_screen_load_seconds_bucket{tenant_id=~\"$tenant_id\", platform=~\"$platform\", app_version=~\"$app_version\"}[5m])))",
+          "legendFormat": "{{screen}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 60,
+      "type": "table",
+      "title": "Top Crash Signatures (24h)",
+      "gridPos": { "x": 0, "y": 44, "w": 24, "h": 8 },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, sum by (signature, platform, app_version) (increase(mobile_app_crash_signature_total{tenant_id=~\"$tenant_id\"}[24h])))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

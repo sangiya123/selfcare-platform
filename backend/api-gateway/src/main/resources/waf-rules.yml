@@ -1,0 +1,378 @@
+# OWASP ModSecurity Core Rule Set (CRS) inspired rules for OMOBIO API Gateway
+# These rules are enforced when WAF_ENABLED=true
+# Deployed as a sidecar or inline filter depending on deployment model
+#
+# Rule format follows ModSecurity CRS conventions adapted for Spring Cloud Gateway
+# phase: 1 = request headers + body, 3 = response headers, 4 = response body
+
+rules:
+  # SQL Injection detection
+  - id: 900001
+    phase: 1
+    severity: CRITICAL
+    action: block
+    pattern: "(?i)(union.*select|select.*from|insert.*into|delete.*from|drop.*table|update.*set|exec\\(|execute\\(|xp_cmdshell|--.*$)"
+    message: "SQL Injection attempt detected"
+    targets:
+      - query_string
+      - request_body
+      - user_agent
+      - referer
+
+  # XSS detection - common vectors
+  - id: 900002
+    phase: 1
+    severity: CRITICAL
+    action: block
+    pattern: "(?i)(<script|javascript:|onerror=|onload=|onclick=|onmouseover=|alert\\(|document\\.cookie|window\\.location|<img.*onerror|<svg|<iframe)"
+    message: "Cross-Site Scripting (XSS) attempt detected"
+    targets:
+      - query_string
+      - request_body
+      - user_agent
+      - referer
+
+  # Path traversal detection
+  - id: 900003
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "(\\.\\./|\\.\\.\\\\|%2e%2e/|\\.\\.%2f|%2e%2e%5c|%252e%252e)"
+    message: "Path traversal attempt detected"
+    targets:
+      - query_string
+      - uri
+      - request_body
+
+  # Command injection detection
+  - id: 900004
+    phase: 1
+    severity: CRITICAL
+    action: block
+    pattern: "(?i)(;\\s*(cat|ls|rm|mkdir|chmod|wget|curl|nc|bash|sh)\\s+|`[^`]*\\$|\\|[^|]\\||&&\\s*curl)"
+    message: "Command injection attempt detected"
+    targets:
+      - query_string
+      - request_body
+      - user_agent
+
+  # LDAP injection
+  - id: 900005
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "(?i)(\\*\\)|\\(|\\)|\\\\x00|\\n|\\r)"
+    message: "LDAP injection attempt detected"
+    targets:
+      - query_string
+      - request_body
+
+  # XML injection / XXE
+  - id: 900006
+    phase: 1
+    severity: CRITICAL
+    action: block
+    pattern: "(?i)(<!DOCTYPE|<!ENTITY|<!\\[CDATA|system\\s*\\(|public\\s*\\-|dtd)"
+    message: "XML injection / XXE attempt detected"
+    targets:
+      - query_string
+      - request_body
+      - content_type
+
+  # JSON injection
+  - id: 900007
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "(\\$\\{|\\$\\[|%24\\{|%24\\[)"
+    message: "JSON injection attempt detected"
+    targets:
+      - request_body
+
+  # HTTP Parameter Pollution (HPP)
+  - id: 900008
+    phase: 1
+    severity: MEDIUM
+    action: log
+    pattern: ".+"
+    message: "Potential HTTP Parameter Pollution detected"
+    targets:
+      - query_string
+    detection: "duplicate_params"
+
+  # Request body size limits
+  - id: 900010
+    phase: 1
+    severity: HIGH
+    action: block
+    message: "Request body exceeds maximum size limit"
+    maxBodySize: 1048576  # 1MB in bytes
+    maxBodySizeUnit: bytes
+
+  # Request line length limit
+  - id: 900011
+    phase: 1
+    severity: MEDIUM
+    action: block
+    message: "Request line exceeds maximum length"
+    maxLineLength: 8192
+
+  # Header name validation
+  - id: 900012
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]"
+    message: "Invalid characters in request header name"
+    targets:
+      - request_headers
+
+  # Header value validation
+  - id: 900013
+    phase: 1
+    severity: MEDIUM
+    action: log
+    pattern: "[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]"
+    message: "Invalid characters in request header value"
+    targets:
+      - request_headers
+
+  # Rate limiting per IP - general API
+  - id: 900020
+    phase: 1
+    severity: HIGH
+    action: block
+    rateLimit:
+      windowSeconds: 60
+      maxRequests: 300
+      keyResolver: "remote_addr"
+    message: "Rate limit exceeded - too many requests"
+
+  # Authentication endpoints - stricter limits
+  - id: 900030
+    phase: 1
+    severity: HIGH
+    action: block
+    appliesToPaths:
+      - "/api/v1/auth/login"
+      - "/api/v1/auth/register"
+      - "/api/v1/admin/auth/login"
+      - "/api/v1/auth/otp"
+      - "/api/v1/auth/refresh"
+      - "/api/v1/auth/forgot-password"
+    rateLimit:
+      windowSeconds: 60
+      maxRequests: 10
+      keyResolver: "remote_addr"
+    message: "Too many authentication attempts - rate limit exceeded"
+
+  # Admin endpoints - logging and header enforcement
+  - id: 900040
+    phase: 1
+    severity: MEDIUM
+    action: log
+    appliesToPaths:
+      - "/api/v1/admin/**"
+    requiredHeaders:
+      - "X-Tenant-Id"
+      - "Authorization"
+    message: "Admin endpoint access logged"
+    logHeaders: true
+
+  # Block common PHP code injection vectors
+  - id: 900050
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "(?i)(eval\\(|base64_decode|curl_exec|file_get_contents|file_put_contents|unserialize|passthru|shell_exec|proc_open|popen)"
+    message: "PHP / code injection attempt detected"
+    targets:
+      - query_string
+      - request_body
+      - user_agent
+
+  # OS command file inclusion
+  - id: 900051
+    phase: 1
+    severity: CRITICAL
+    action: block
+    pattern: "(?i)(include\\s*\\(|require\\s*\\(|include_once|require_once)\\s*\\(?(http|ftp|php)"
+    message: "Remote file inclusion attempt detected"
+    targets:
+      - query_string
+      - request_body
+
+  # Header security - add security headers to responses
+  - id: 900100
+    phase: 3
+    severity: LOW
+    action: add
+    message: "Security headers added to response"
+    responseHeadersToAdd:
+      X-Frame-Options: "DENY"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      X-Permitted-Cross-Domain-Policies: "none"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+    # HSTS for HTTPS only (enforced at load balancer level)
+    conditionalHttps: true
+    headers:
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+
+  # Content-Type validation
+  - id: 900110
+    phase: 1
+    severity: HIGH
+    action: block
+    message: "Invalid or missing Content-Type header"
+    requiresContentType: true
+    allowedContentTypes:
+      - "application/json"
+      - "application/x-www-form-urlencoded"
+      - "multipart/form-data"
+      - "text/plain"
+      - "text/xml"
+      - "application/xml"
+
+  # Allowed HTTP methods
+  - id: 900200
+    phase: 1
+    severity: HIGH
+    action: block
+    message: "HTTP method not allowed"
+    allowedMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+      - HEAD
+
+  # API versioning enforcement
+  - id: 900300
+    phase: 1
+    severity: HIGH
+    action: block
+    pattern: "^/api/v\\d+/.*"
+    message: "API version must be specified in path"
+    targets:
+      - uri
+    description: "All API requests must include version prefix (e.g., /api/v1/)"
+
+  # SSRF prevention - detect private/reserved IPs in request
+  - id: 900400
+    phase: 1
+    severity: CRITICAL
+    action: block
+    message: "SSRF: private/reserved IP or hostname detected in request"
+    blockedHosts:
+      - "localhost"
+      - "127.0.0.1"
+      - "0.0.0.0"
+      - "::1"
+      - "169.254.169.254"
+      - "metadata.google.internal"
+      - "metadata.goog"
+      - "100.64.0.0/10"
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+    blockedPatterns:
+      - "(?i)(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|169\\.254\\.169\\.254|metadata\\.google)"
+    targets:
+      - query_string
+      - request_body
+
+  # Prototype pollution prevention
+  - id: 900500
+    phase: 1
+    severity: HIGH
+    action: block
+    message: "Prototype pollution attempt detected"
+    pattern: "(?i)(\\$\\{|__proto__|constructor\\.prototype|__defineGetter__|__defineSetter__|<script>.*?Constructor)"
+    targets:
+      - query_string
+      - request_body
+
+  # Session fixation prevention
+  - id: 900600
+    phase: 1
+    severity: MEDIUM
+    action: log
+    message: "Session fixation - new session cookie detected"
+    targets:
+      - request_headers
+    description: "Log when session cookies change unexpectedly"
+
+  # CSRF token validation (for state-changing operations)
+  - id: 900700
+    phase: 1
+    severity: HIGH
+    action: block
+    appliesToMethods:
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+    appliesToPaths:
+      - "/api/v1/**"
+    message: "CSRF validation failed"
+    description: "Requires X-CSRF-Token header for state-changing requests"
+
+  # Request timeout enforcement
+  - id: 900800
+    phase: 1
+    severity: MEDIUM
+    action: block
+    message: "Request processing timeout exceeded"
+    maxRequestTime: 30  # seconds
+
+  # Error page leakage prevention (block detailed errors in production)
+  - id: 900900
+    phase: 3
+    severity: MEDIUM
+    action: add
+    message: "Error response sanitized"
+    replaceErrorPages: true
+    errorPageTemplate: "generic"
+
+  # Bots and crawlers detection (optional - log only)
+  - id: 901000
+    phase: 1
+    severity: LOW
+    action: log
+    message: "Potential bot or automated request detected"
+    botPatterns:
+      - "(?i)(curl|wget|python|java|scraper|bot|crawler|spider|headless)"
+    targets:
+      - user_agent
+    description: "Logging only - add 'action: block' to enable blocking"
+
+  # IP reputation check placeholder
+  - id: 901100
+    phase: 1
+    severity: HIGH
+    action: block
+    message: "Request blocked due to IP reputation"
+    blockedIpRanges:
+      - "0.0.0.0/0"  # Placeholder - integrate with IP reputation service
+    description: "Integrate with IP reputation service (AbuseIPDB, CrowdSec, etc.)"
+
+  # Sensitive data detection in logs (PII masking)
+  - id: 910000
+    phase: 1
+    severity: LOW
+    action: log
+    message: "Potential sensitive data in request detected"
+    piiPatterns:
+      - "(?i)\\b\\d{16}\\b"  # Credit card numbers
+      - "(?i)ssn[:\\s=]*\\d{3}-\\d{2}-\\d{4}"  # SSN format
+      - "(?i)password[:\\s=]*[^&\\s]+"  # Passwords in plain text
+    targets:
+      - query_string
+      - request_body
+      - request_headers
+    logMasked: true
+    description: "Log with PII masked - ensure no PII is logged"

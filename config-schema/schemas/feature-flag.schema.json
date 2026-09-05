@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/feature-flag.schema.json",
+  "title": "FeatureFlag",
+  "description": "Feature flag definition for the OMOBIO Selfcare Platform. Controls rollout, targeting, kill switches, and expiry for platform features.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "key",
+    "description",
+    "defaultValue",
+    "rollout",
+    "owner",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.]{2,63}$",
+      "description": "Stable feature flag key (e.g. 'recharge.promocode.v2', 'payments.upi-qr')"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Human-readable description of what this flag controls"
+    },
+    "defaultValue": {
+      "type": "boolean",
+      "description": "Default value returned when no rules match or the user has no targeting context"
+    },
+    "rollout": {
+      "type": "object",
+      "description": "Rollout strategy",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["BOOLEAN", "PERCENTAGE", "CANARY", "KILL_SWITCH"],
+          "description": "Rollout strategy type"
+        },
+        "percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of users to target (0-100); only applicable for PERCENTAGE and CANARY"
+        },
+        "canaryUsers": {
+          "type": "array",
+          "description": "Explicit list of user IDs for canary group",
+          "items": { "type": "string" }
+        },
+        "canaryTenantIds": {
+          "type": "array",
+          "description": "Explicit list of tenant IDs for canary",
+          "items": { "type": "string" }
+        },
+        "killSwitch": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, globally disables the feature regardless of other rules"
+        }
+      },
+      "additionalProperties": false
+    },
+    "conditions": {
+      "type": "array",
+      "description": "Ordered list of targeting conditions; first matching condition determines the flag value",
+      "items": { "$ref": "#/$defs/Condition" }
+    },
+    "expiry": {
+      "type": "object",
+      "description": "Optional time-bound flag validity",
+      "properties": {
+        "startUtc": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 UTC start time"
+        },
+        "endUtc": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 UTC end time"
+        }
+      }
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Team or individual who owns this feature flag"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 64 }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "ACTIVE", "PAUSED", "DEPRECATED"],
+      "description": "Runtime status of this flag"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form metadata (JIRA ticket, PR link, etc.)",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "Condition": {
+      "type": "object",
+      "required": ["attribute", "operator", "value"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "enum": [
+            "tenantId",
+            "lob",
+            "segment",
+            "connectionType",
+            "userId",
+            "msisdn",
+            "planType",
+            "devicePlatform",
+            "appVersion",
+            "country",
+            "customAttribute"
+          ],
+          "description": "Targeting attribute to evaluate"
+        },
+        "customAttributeKey": {
+          "type": "string",
+          "description": "Required when attribute is 'customAttribute'"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "in",
+            "notIn",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "regex",
+            "semverEq",
+            "semverGt",
+            "semverLt"
+          ]
+        },
+        "value": {
+          "type": ["string", "number", "boolean", "array"],
+          "description": "Value(s) to compare against"
+        },
+        "variant": {
+          "type": "string",
+          "description": "Flag variant returned when this condition matches (for multi-variant flags)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

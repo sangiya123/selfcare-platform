@@ -1,0 +1,19 @@
+# PRODUCTION profile overrides
+omobio:
+  security:
+    cors:
+      allowed-origins: https://admin.omobio.io
+
+otel:
+  enabled: true
+
+logging:
+  level:
+    com.omobio: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+  pattern:
+    json:
+      enabled: true
+
+spring.jpa.show-sql: false

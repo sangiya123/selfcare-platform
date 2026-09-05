@@ -1,0 +1,71 @@
+# tenant config: aia-lk
+# Client: AIA Sri Lanka — INSURANCE INSURER
+# Region: LK
+# Industry: INSURANCE
+# Tenant Type: INSURER
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: aia-lk
+  TENANT_OPERATOR: aia
+  TENANT_INDUSTRY: INSURANCE
+  TENANT_TYPE: INSURER
+  TENANT_REGION: LK
+  TENANT_DISPLAY_NAME: "AIA Sri Lanka"
+  TENANT_COUNTRY: Sri Lanka
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@aia.lk
+  TENANT_SUPPORT_PHONE: "+94-11-XXXXXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#D9001B"
+  TENANT_BRAND_COLOR_SECONDARY: "#000000"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/aia-lk/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/aia-lk/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: aia.lk
+  TENANT_CDN_DOMAIN: "cdn.aia.lk"
+  TENANT_INGRESS_HOST: "selfcare.aia.lk"
+
+  # Industry-specific provider endpoints (Insurance)
+  INSURANCE_API_URL: "https://api.aia.lk/insurance/v1"
+  INSURANCE_API_KEY_REF: "secret-ref:aia-lk-insurance-api-key"
+  POLICY_API_URL: "https://api.aia.lk/policy/v1"
+  CLAIMS_API_URL: "https://api.aia.lk/claims/v1"
+  AGENT_PORTAL_URL: "https://agents.aia.lk"
+  KYC_PROVIDER_URL: "https://kyc.aia.lk/v1"
+
+  # Feature flags (insurance-specific)
+  POLICY_VIEW_ENABLED: true
+  PREMIUM_CALCULATION_ENABLED: true
+  CLAIM_FILING_ENABLED: true
+  CLAIM_TRACKING_ENABLED: true
+  BENEFICIARY_MANAGEMENT_ENABLED: true
+  RENEWAL_REMINDER_ENABLED: true
+  AI_ASSISTANT_ENABLED: true
+  JOURNEY_ENABLED: true
+  DOCUMENT_UPLOAD_ENABLED: true
+  TELEMEDICINE_ENABLED: false
+  OTP_METHODS:
+    - SMS
+    - EMAIL
+  SUPPORTED_LANGUAGES:
+    - si
+    - ta
+    - en
+
+  # Compliance (insurance-specific — heavier than telco)
+  DATA_RETENTION_DAYS: 730
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+  HIPAA_COMPLIANT: false
+  INSURANCE_REGULATOR_NOTIFY_DAYS: 30
+
+  # Resource sizing (insurance is heavier)
+  RESOURCE_QUOTA_CPU_REQUEST: "1000m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "1Gi"
+  RESOURCE_QUOTA_CPU_LIMIT: "4000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "4Gi"

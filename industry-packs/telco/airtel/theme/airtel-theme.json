@@ -1,0 +1,91 @@
+{
+  "tenantId": "airtel-lk",
+  "name": "airtel-lk",
+  "displayName": "Airtel Sri Lanka",
+  "operator": "airtel",
+  "country": "LK",
+  "industry": "TELECOM",
+  "defaultEnvironment": "prod",
+  "defaultLocale": "en",
+  "supportedLocales": ["en", "si", "ta"],
+  "defaultCurrency": "LKR",
+  "supportedLobs": ["MOBILE", "BB"],
+  "supportedConnectionTypes": ["prepaid", "postpaid"],
+  "operatorPackVersion": "1.0.0",
+  "theme": {
+    "name": "airtel-default",
+    "version": "1.0.0",
+    "tokens": {
+      "colors": {
+        "primary-900": "#B30000",
+        "primary-700": "#E60000",
+        "primary-500": "#FF1A1A",
+        "primary-300": "#FF8080",
+        "accent-500": "#FFC700",
+        "accent-glow": "#FFE066",
+        "surface": "#FFFFFF",
+        "surface-subtle": "#FFF5F5",
+        "text-primary": "#1A0000",
+        "text-secondary": "#6B4F4F",
+        "success": "#28A745",
+        "warning": "#FFC107",
+        "error": "#DC3545",
+        "info": "#17A2B8"
+      },
+      "typography": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSizes": {
+          "xs": 12, "sm": 14, "base": 16, "lg": 18,
+          "xl": 20, "2xl": 24, "3xl": 30, "4xl": 36
+        }
+      },
+      "spacing": {
+        "0": 0, "1": 4, "2": 8, "3": 12, "4": 16,
+        "5": 20, "6": 24, "8": 32, "10": 40, "12": 48, "16": 64
+      },
+      "borderRadius": {
+        "none": 0, "sm": 4, "md": 8, "lg": 12,
+        "xl": 16, "2xl": 24, "full": 9999
+      }
+    }
+  },
+  "navigation": {
+    "type": "bottom-tabs",
+    "tabs": [
+      { "id": "home", "label": "Home", "icon": "home", "route": "/" },
+      { "id": "recharge", "label": "Recharge", "icon": "credit-card", "route": "/recharge" },
+      { "id": "usage", "label": "Usage", "icon": "bar-chart", "route": "/usage" },
+      { "id": "support", "label": "Help", "icon": "help-circle", "route": "/support" },
+      { "id": "account", "label": "Profile", "icon": "user", "route": "/account" }
+    ]
+  },
+  "providerBindings": {
+    "AuthProvider": "com.omobio.providers.airtel.AirtelAuthProvider",
+    "ProfileProvider": "com.omobio.providers.airtel.AirtelProfileProvider",
+    "BalanceProvider": "com.omobio.providers.airtel.AirtelBalanceProvider",
+    "UsageProvider": "com.omobio.providers.airtel.AirtelUsageProvider",
+    "BillingProvider": "com.omobio.providers.airtel.AirtelBillingProvider",
+    "PaymentProvider": "com.omobio.providers.airtel.AirtelPaymentProvider",
+    "RechargeProvider": "com.omobio.providers.airtel.AirtelRechargeProvider",
+    "ProductCatalogProvider": "com.omobio.providers.airtel.AirtelProductCatalogProvider",
+    "NotificationProvider": "com.omobio.providers.airtel.AirtelNotificationProvider"
+  },
+  "endpoints": {
+    "auth": "https://auth.airtel.lk",
+    "billing": "https://billing.airtel.lk",
+    "payments": "https://payments.airtel.lk",
+    "support": "https://support.airtel.lk"
+  },
+  "features": {
+    "cross.connection.payment": {
+      "enabled": false,
+      "note": "Airtel does not support cross-connection payment in this version"
+    },
+    "authMethods": ["OTP", "PASSWORD"]
+  },
+  "entitlement": {
+    "type": "primary-number-linked-list",
+    "note": "ADR-006: Airtel uses the same linked-list model"
+  },
+  "status": "ACTIVE"
+}

@@ -1,0 +1,594 @@
+# OMOBIO Selfcare Platform — Release & Deployment
+#
+# Production-grade deployment pipeline:
+#   1. Tag triggers release
+#   2. Build all Docker images
+#   3. Sign images with cosign (SLSA L3)
+#   4. Push to registry
+#   5. Generate SBOM + Attestation
+#   6. Deploy to dev (auto) → stg (auto) → reg (manual) → prod (manual)
+#   7. Run smoke tests in each env
+#   8. Roll back on failure
+#
+# Manual gates: reg, prod
+# Auto-deploy: dev, stg
+
+name: Release & Deploy
+
+on:
+  push:
+    tags: ['v*.*.*']
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release (e.g. v1.2.3). Default: latest tag.'
+        required: false
+        type: string
+      deploy_dev:
+        description: 'Deploy to dev environment'
+        required: false
+        default: 'true'
+        type: boolean
+      deploy_stg:
+        description: 'Deploy to stg environment'
+        required: false
+        default: 'true'
+        type: boolean
+      deploy_reg:
+        description: 'Deploy to reg environment (manual gate)'
+        required: false
+        default: 'false'
+        type: boolean
+      deploy_prod:
+        description: 'Deploy to prod environment (manual gate)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  REGISTRY_USER: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+  KUSTOMIZE_VERSION: '5.4.3'
+  HELM_VERSION: '3.15.4'
+
+jobs:
+  # ==========================================
+  # Pre-release: smoke checks
+  # ==========================================
+  preflight:
+    name: Pre-release checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Compile (verify build)
+        working-directory: selfcare-platform/backend
+        run: mvn -B -DskipTests=true compile
+
+      - name: Verify admin build
+        working-directory: selfcare-platform/admin/selfcare-studio
+        run: |
+          npm ci
+          npm run build --if-present
+
+      - name: Verify mobile compile
+        working-directory: selfcare-platform/mobile/selfcare-app
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+  # ==========================================
+  # Resolve release version
+  # ==========================================
+  resolve-version:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: preflight
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      short_sha: ${{ steps.ver.outputs.short_sha }}
+      full_sha: ${{ steps.ver.outputs.full_sha }}
+      is_prerelease: ${{ steps.ver.outputs.is_prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            VERSION="${{ inputs.release_tag }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.ref_name }}" ]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            # Default: most recent tag or commit-sha
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0-${GITHUB_SHA::7}")
+          fi
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IS_PRERELEASE="false"
+          if [[ "$VERSION" == *"-rc"* ]] || [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-beta"* ]]; then
+            IS_PRERELEASE="true"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "full_sha=$GITHUB_SHA" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Resolved version: $VERSION (sha: $SHORT_SHA, prerelease: $IS_PRERELEASE)"
+
+  # ==========================================
+  # Build + sign + push all Docker images
+  # ==========================================
+  build-images:
+    name: Build & Sign Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: resolve-version
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - config-tenant-service
+          - customer-identity-service
+          - admin-identity-service
+          - account-entitlement-service
+          - dashboard-bff
+          - product-service
+          - usage-service
+          - billing-service
+          - payment-service
+          - notification-service
+          - content-service
+          - journey-service
+          - reporting-service
+          - ai-gateway
+          - audit-service
+          - insurance-service
+          - approval-service
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          # Multi-stage Dockerfile needs root pom.xml — context is backend/
+          context: selfcare-platform/backend
+          file: selfcare-platform/backend/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }}
+            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.short_sha }}
+            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+          outputs: type=image,name=${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }},push=true
+
+      - name: Sign image with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: |
+          # Install cosign
+          curl -fsSL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 \
+            -o /usr/local/bin/cosign
+          chmod +x /usr/local/bin/cosign
+          # Resolve digest from buildx output
+          DIGEST=$(docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }} \
+            --format '{{.digest}}')
+          echo "Image digest: $DIGEST"
+          FULL_IMAGE="${{ env.REGISTRY }}/omobio/${{ matrix.service }}@$DIGEST"
+          # Sign using GitHub OIDC (keyless)
+          cosign sign --yes "$FULL_IMAGE"
+          echo "Signed: $FULL_IMAGE"
+
+      - name: Attest SLSA provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/omobio/${{ matrix.service }}
+          subject-digest: sha256:${{ steps.build-and-push.outputs.digest }}
+          push-to-registry: true
+
+  # ==========================================
+  # Build admin bundle
+  # ==========================================
+  build-admin:
+    name: Build admin bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: resolve-version
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+
+      - name: Install + build
+        working-directory: selfcare-platform/admin/selfcare-studio
+        env:
+          VITE_APP_ENV: production
+          VITE_API_GATEWAY_URL: ${{ secrets.PROD_API_GATEWAY_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build admin Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: selfcare-platform/admin/selfcare-studio
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/omobio/admin:${{ needs.resolve-version.outputs.version }}
+            ${{ env.REGISTRY }}/omobio/admin:${{ needs.resolve-version.outputs.short_sha }}
+            ${{ env.REGISTRY }}/omobio/admin:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Seed tenant config to dev
+        run: |
+          kubectl config use-context ${{ secrets.DEV_K8S_CONTEXT }}
+          kubectl apply -f selfcare-platform/deploy/kubernetes/namespace.yaml
+          kubectl apply -f selfcare-platform/deploy/kubernetes/secrets.yaml
+          kubectl apply -f selfcare-platform/deploy/kubernetes/configmap.yaml
+          kubectl apply -f selfcare-platform/deploy/kubernetes/tenant-seeding-job.yaml
+          kubectl wait --for=condition=complete --timeout=60s job/omobio-tenant-seed-dialog -n omobio
+
+  # ==========================================
+  # Generate release notes
+  # ==========================================
+  release-notes:
+    name: Generate release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build-images, build-admin, resolve-version]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            CHANGES=$(git log --pretty=format:"- %s (%h)" HEAD~50..HEAD 2>/dev/null || git log --pretty=format:"- %s (%h)")
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD)
+          fi
+          cat > RELEASE_NOTES.md << EOF
+          # Release ${{ needs.resolve-version.outputs.version }}
+
+          **Date:** $(date -u +'%Y-%m-%d %H:%M UTC')
+          **Commit:** ${{ needs.resolve-version.outputs.full_sha }}
+
+          ## Changes
+
+          $CHANGES
+
+          ## Artifacts
+
+          - 18 backend service Docker images
+          - 1 admin portal Docker image
+          - SBOM (CycloneDX) per service
+          - Signed with cosign (SLSA L3)
+          - Provenance attestation
+
+          ## Deployment
+
+          - dev:    auto-deployed
+          - stg:    auto-deployed
+          - reg:    manual approval required
+          - prod:   manual approval required
+          EOF
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ needs.resolve-version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ needs.resolve-version.outputs.is_prerelease == 'true' }}
+          files: |
+            RELEASE_NOTES.md
+
+  # ==========================================
+  # Deploy: dev (auto)
+  # ==========================================
+  deploy-dev:
+    name: Deploy dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-images, build-admin, resolve-version]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_dev == 'true')
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm + kubectl
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v${{ env.HELM_VERSION }}-linux-amd64.tar.gz | tar -xz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+          sudo chmod +x /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.DEV_KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to dev (Helm)
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+
+          for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
+            helm upgrade --install "omobio-${service}" \
+              selfcare-platform/backend/deploy/helm/${service} \
+              --namespace omobio-dev \
+              --create-namespace \
+              --set image.tag=${VERSION} \
+              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set env=dev \
+              --set replicaCount=1 \
+              --wait \
+              --timeout 5m
+          done
+
+          # Admin portal
+          helm upgrade --install omobio-admin \
+            selfcare-platform/admin/selfcare-studio/deploy/helm \
+            --namespace omobio-dev \
+            --create-namespace \
+            --set image.tag=${VERSION} \
+            --set env=dev \
+            --wait \
+            --timeout 5m
+
+      - name: Smoke test dev
+        run: |
+          sleep 30
+          for i in 1 2 3 4 5; do
+            if curl -fsSL --max-time 10 https://api.dev.omobio.io/health; then
+              echo "Dev deployment healthy"
+              exit 0
+            fi
+            echo "Retry $i/5..."
+            sleep 15
+          done
+          echo "::error::Dev smoke test failed"
+          exit 1
+
+  # ==========================================
+  # Deploy: stg (auto)
+  # ==========================================
+  deploy-stg:
+    name: Deploy stg
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [deploy-dev, resolve-version]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_stg == 'true')
+    environment: stg
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm + kubectl
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v${{ env.HELM_VERSION }}-linux-amd64.tar.gz | tar -xz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+          sudo chmod +x /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.STG_KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to stg (Helm)
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
+            helm upgrade --install "omobio-${service}" \
+              selfcare-platform/backend/deploy/helm/${service} \
+              --namespace omobio-stg \
+              --create-namespace \
+              --set image.tag=${VERSION} \
+              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set env=stg \
+              --set replicaCount=2 \
+              --wait \
+              --timeout 5m
+          done
+
+      - name: Smoke test stg
+        run: |
+          sleep 30
+          for i in 1 2 3 4 5; do
+            if curl -fsSL --max-time 10 https://api.stg.omobio.io/health; then
+              echo "Stg deployment healthy"
+              exit 0
+            fi
+            echo "Retry $i/5..."
+            sleep 15
+          done
+          echo "::error::Stg smoke test failed"
+          exit 1
+
+  # ==========================================
+  # Deploy: reg (manual gate)
+  # ==========================================
+  deploy-reg:
+    name: Deploy reg (manual gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [deploy-stg, resolve-version]
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_reg == 'true'
+    environment:
+      name: reg
+      url: https://api.reg.omobio.io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm + kubectl
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v${{ env.HELM_VERSION }}-linux-amd64.tar.gz | tar -xz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+          sudo chmod +x /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.REG_KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to reg (Helm)
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
+            helm upgrade --install "omobio-${service}" \
+              selfcare-platform/backend/deploy/helm/${service} \
+              --namespace omobio-reg \
+              --create-namespace \
+              --set image.tag=${VERSION} \
+              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set env=reg \
+              --set replicaCount=2 \
+              --wait \
+              --timeout 8m
+          done
+
+  # ==========================================
+  # Deploy: prod (manual gate, blue/green)
+  # ==========================================
+  deploy-prod:
+    name: Deploy prod (manual gate, blue/green)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [deploy-reg, resolve-version]
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_prod == 'true'
+    environment:
+      name: prod
+      url: https://api.omobio.io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm + kubectl
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v${{ env.HELM_VERSION }}-linux-amd64.tar.gz | tar -xz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+          sudo chmod +x /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.PROD_KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy blue (10% traffic)
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          helm upgrade --install omobio-api-gateway-blue \
+            selfcare-platform/backend/deploy/helm/api-gateway \
+            --namespace omobio-prod \
+            --reuse-values \
+            --set image.tag=${VERSION} \
+            --set deployment.label=blue \
+            --set replicaCount=2 \
+            --set traffic.weight=10 \
+            --wait --timeout 10m
+
+      - name: Verify blue
+        run: |
+          sleep 60
+          for i in 1 2 3 4 5; do
+            if curl -fsSL --max-time 10 https://api.omobio.io/health; then
+              echo "Blue deployment healthy"
+              break
+            fi
+            sleep 30
+          done
+
+      - name: Shift 50% traffic
+        run: |
+          helm upgrade --install omobio-api-gateway-blue \
+            selfcare-platform/backend/deploy/helm/api-gateway \
+            --namespace omobio-prod \
+            --reuse-values \
+            --set traffic.weight=50 \
+            --wait --timeout 5m
+          sleep 120
+          # Check error rate
+          ERROR_RATE=$(curl -fsSL --max-time 10 https://api.omobio.io/actuator/metrics/http.server.requests?tag=uri:/health 2>/dev/null | jq -r '.measurements[0].value // 0')
+          if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+            echo "::error::Error rate $ERROR_RATE > 1% — rolling back"
+            helm rollback omobio-api-gateway-blue
+            exit 1
+          fi
+
+      - name: Shift 100% traffic
+        run: |
+          helm upgrade --install omobio-api-gateway-blue \
+            selfcare-platform/backend/deploy/helm/api-gateway \
+            --namespace omobio-prod \
+            --reuse-values \
+            --set traffic.weight=100 \
+            --wait --timeout 5m
+
+      - name: Tag release as deployed
+        if: success()
+        run: |
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -X POST \
+            "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}/reactions" \
+            -H "Content-Type: application/json" \
+            -d '{"content":"rocket","content_type":"application/vnd.github.symmetra-preview+json"}' || true

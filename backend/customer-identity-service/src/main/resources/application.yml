@@ -1,0 +1,187 @@
+# ============================================================
+# OMOBIO Customer Identity Service — Base Configuration
+# ============================================================
+# Profile is activated by OMOBIO_ENV → SPRING_PROFILES_ACTIVE
+# Environment-specific overrides live in application-{dev,stg,reg,prod}.yml
+# ============================================================
+
+spring:
+  application:
+    name: customer-identity-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # ============================================================
+  # DATABASE (MySQL / JPA) — durable store for sessions and OTPs
+  # ============================================================
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_identity}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:omobio}
+    password: ${DB_PASSWORD:changeme}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${JPA_SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  # ============================================================
+  # JPA Auditing
+  # ============================================================
+  jpa-auditing:
+    enabled: true
+
+  # ============================================================
+  # MONGODB — used for client/tenant config (cross-service)
+  # ============================================================
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USERNAME:omobio}:${MONGO_PASSWORD:changeme}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:omobio_config}?authSource=admin
+      auto-index-creation: true
+
+  # ============================================================
+  # REDIS — hot cache for sessions and OTP lockouts
+  # ============================================================
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 10
+          min-idle: 5
+
+  # ============================================================
+  # KAFKA — auth/identity events
+  # ============================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: ${KAFKA_GROUP_ID:customer-identity-service}
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+  # ============================================================
+  # FLYWAY — database migrations
+  # ============================================================
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+# ============================================================
+# OMOBIO SECURITY
+# ============================================================
+omobio:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
+      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      # ADR-011 token policy: see CLAUDE.md. 24h access, 30d refresh (configurable).
+      access-token-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:86400}
+      refresh-token-seconds: ${JWT_REFRESH_TOKEN_TTL_SECONDS:2592000}
+      key-id: ${JWT_KEY_ID:omobio-selfcare-1}
+      # Optional: PEM-encoded PKCS#8 private key. If unset, a fresh key pair
+      # is generated at startup (NOT recommended for production).
+      private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+    session:
+      refresh-ttl-seconds: ${SESSION_REFRESH_TTL_SECONDS:2592000}
+      inactivity-timeout-seconds: ${SESSION_INACTIVITY_TIMEOUT_SECONDS:1800}
+    otp:
+      ttl-seconds: ${OTP_TTL_SECONDS:300}
+      max-attempts: ${OTP_MAX_ATTEMPTS:5}
+      lockout-seconds: ${OTP_LOCKOUT_SECONDS:1800}
+      code-length: ${OTP_CODE_LENGTH:6}
+    cors:
+      allowed-origins: ${ALLOWED_ORIGINS:*}
+
+  # ============================================================
+  # NOTIFICATION SERVICE — used to dispatch OTPs
+  # ============================================================
+  notification:
+    service:
+      url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8090}
+
+  # ============================================================
+  # TENANT
+  # ============================================================
+  tenant:
+    default-id: ${DEFAULT_TENANT_ID:dialog-lk}
+
+  featureflags:
+    provider: ${FEATUREFLAG_PROVIDER:noop}
+
+# ============================================================
+# MANAGEMENT / OBSERVABILITY
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    redis:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+otel:
+  enabled: ${OTEL_ENABLED:false}
+  service-name: customer-identity-service
+  endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
+
+# ============================================================
+# SERVER
+# ============================================================
+server:
+  port: ${SERVER_PORT:8081}
+  compression:
+    enabled: true
+  error:
+    include-message: never
+    include-stacktrace: never
+
+# ============================================================
+# LOGGING
+# ============================================================
+logging:
+  level:
+    com.omobio: ${LOG_LEVEL:INFO}
+    org.springframework: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [tenant=%X{tenantId} correlation=%X{correlationId}] %logger{36} - %msg%n"
+    json:
+      enabled: ${LOG_JSON:false}

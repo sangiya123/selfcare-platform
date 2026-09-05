@@ -1,0 +1,337 @@
+# OMOBIO Selfcare Platform — System Integration Testing (SIT)
+#
+# Runs end-to-end conformance + contract tests against a fully-deployed
+# environment (typically stg or reg) with all 18 services + 3 datastores
+# (MongoDB, MySQL, Redis) + Kafka.
+#
+# Layers covered (matches `tests/conformance`):
+#   - API contract (response envelope, status codes, headers)
+#   - Tenant isolation (cross-tenant access blocked)
+#   - Auth flow (login, refresh, JWT expiry, replay)
+#   - Dashboard partial response
+#   - Payment idempotency
+#   - Provider adapter pattern
+#   - AI tool permission
+#   - Journey simulation
+#   - Correlation ID propagation
+#   - Synthetic monitoring probes
+#
+# This is the gate before UAT and canary.
+
+name: SIT (System Integration Testing)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        default: 'stg'
+        options: ['stg', 'reg']
+      gateway_url:
+        description: 'Gateway URL (override default)'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'selfcare-platform/backend/**'
+      - 'selfcare-platform/tests/**'
+      - 'selfcare-platform/industry-packs/**'
+      - 'selfcare-platform/config-schema/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  JAVA_VERSION: '25'
+  MAVEN_OPTS: '-Xmx2g -XX:+UseG1GC'
+
+jobs:
+  # ======================================================================
+  # Pre-flight — wait for the environment to be fully ready
+  # ======================================================================
+  preflight:
+    name: Pre-flight checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment || 'stg' }}"
+          if [ -z "${{ github.event.inputs.gateway_url }}" ]; then
+            case "$ENV" in
+              stg) URL="https://stg-api.omobio.io" ;;
+              reg) URL="https://reg-api.omobio.io" ;;
+              *) URL="http://localhost:8080" ;;
+            esac
+          else
+            URL="${{ github.event.inputs.gateway_url }}"
+          fi
+          echo "ENV=$ENV" >> "$GITHUB_OUTPUT"
+          echo "URL=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for gateway health endpoint
+        run: |
+          URL="${{ steps.env.outputs.URL }}"
+          ENV="${{ steps.env.outputs.ENV }}"
+          echo "Waiting for gateway at $URL ..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "$URL/actuator/health" 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Gateway is healthy"
+              exit 0
+            fi
+            echo "Attempt $i: status=$STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::Gateway did not become healthy"
+          exit 1
+
+      - name: Smoke check per service
+        run: |
+          URL="${{ steps.env.outputs.URL }}"
+          for path in /actuator/health \
+                      /api/v1/config/manifest \
+                      /api/v1/content/faqs; do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" -H "X-Tenant-Id: dialog-lk" "$URL$path" 2>/dev/null || echo "000")
+            echo "$path → $STATUS"
+            if [ "$STATUS" = "000" ] || [ "$STATUS" = "404" ]; then
+              echo "::warning::$path returned $STATUS"
+            fi
+          done
+
+      - name: Upload env metadata
+        run: |
+          mkdir -p sit-output
+          cat > sit-output/env.json << EOF
+          {
+            "environment": "${{ steps.env.outputs.ENV }}",
+            "gateway_url": "${{ steps.env.outputs.URL }}",
+            "commit": "${{ github.sha }}",
+            "run_id": "${{ github.run_id }}"
+          }
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sit-env
+          path: sit-output/env.json
+
+  # ======================================================================
+  # Backend conformance (TestNG + RestAssured against live env)
+  # ======================================================================
+  conformance:
+    name: Backend conformance
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 60
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+      mysql:
+        image: mysql:8
+        ports: ['3306:3306']
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: selfcare_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run conformance suite
+        working-directory: selfcare-platform/tests/conformance
+        env:
+          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
+          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          OMOBIO_TEST_ENV: ${{ needs.preflight.outputs.ENV }}
+        run: |
+          mvn -B -e -fae \
+            -Dgroups="api-contract,auth,dashboard,payment,provider,tenant,security,journey" \
+            test
+
+      - name: Publish TestNG results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: sit-conformance
+          path: 'selfcare-platform/tests/conformance/target/surefire-reports/testng-results.xml'
+          reporter: java-junit
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sit-conformance-reports
+          path: |
+            selfcare-platform/tests/conformance/target/surefire-reports/
+            selfcare-platform/tests/conformance/target/reports/
+
+  # ======================================================================
+  # API automation suite — end-to-end REST automation
+  # ======================================================================
+  api-automation:
+    name: API automation
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run API automation suite
+        working-directory: selfcare-platform/tests/conformance
+        env:
+          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
+          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+        run: |
+          mvn -B -e -fae \
+            -Dgroups="api-automation,e2e-api" \
+            -Dit.test='ApiAutomationTest,EndToEndApiTest' \
+            test
+
+      - name: Generate Allure report
+        if: always()
+        uses: simple-elf/allure-report-action@master
+        with:
+          allure_results: selfcare-platform/tests/conformance/target/allure-results
+          allure_history: allure-history
+          publish: true
+          allure_url: ${{ secrets.ALLURE_URL }}
+
+  # ======================================================================
+  # DAST (OWASP ZAP) — re-scan the deployed env
+  # ======================================================================
+  dast:
+    name: DAST scan (ZAP)
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run OWASP ZAP baseline
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: ${{ needs.preflight.outputs.URL }}
+          rules_file_name: .zap/rules.tsv
+          cmd_options: '-a -l WARN'
+        continue-on-error: true
+
+      - name: Run OWASP ZAP API scan
+        uses: zaproxy/action-api-scan@v0.4.0
+        with:
+          target: ${{ needs.preflight.outputs.URL }}
+          format: openapi
+          api_definition: selfcare-platform/api/openapi.yaml
+          cmd_options: '-a -l WARN'
+        continue-on-error: true
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sit-zap-report
+          path: |
+            report_html.html
+            report_json.json
+
+  # ======================================================================
+  # Synthetic monitoring probes
+  # ======================================================================
+  probes:
+    name: Synthetic probes
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run synthetic monitoring
+        env:
+          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+        run: |
+          mvn -B -e -fae -pl selfcare-platform/tests/conformance \
+            -Dgroups=synthetic-monitoring \
+            test
+
+  # ======================================================================
+  # Aggregate results
+  # ======================================================================
+  summary:
+    name: SIT summary
+    runs-on: ubuntu-latest
+    needs: [preflight, conformance, api-automation, dast, probes]
+    if: always()
+    steps:
+      - name: Build summary
+        run: |
+          cat > sit-summary.md << EOF
+          ## 🧪 SIT Report
+
+          | Stage | Status |
+          |-------|--------|
+          | Pre-flight | ${{ needs.preflight.result }} |
+          | Conformance | ${{ needs.conformance.result }} |
+          | API automation | ${{ needs.api-automation.result }} |
+          | DAST | ${{ needs.dast.result }} |
+          | Synthetic probes | ${{ needs.probes.result }} |
+          EOF
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sit-summary
+          path: sit-summary.md
+
+      - name: Fail if any stage failed
+        if: |
+          needs.conformance.result == 'failure' ||
+          needs.api-automation.result == 'failure' ||
+          needs.probes.result == 'failure'
+        run: |
+          echo "::error::SIT failed"
+          exit 1

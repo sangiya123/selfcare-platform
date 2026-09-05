@@ -1,0 +1,188 @@
+{
+  "mappings": [
+    {
+      "name": "AIA Insurance Policies - List All",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/insurance/policies"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "policies": [
+            {
+              "policyId": "AIA-POL-001",
+              "productType": "LIFE",
+              "policyholderId": "CUST-001",
+              "sumAssured": 5000000.00,
+              "currency": "LKR",
+              "premiumAmount": 12500.00,
+              "premiumFrequency": "MONTHLY",
+              "status": "ACTIVE",
+              "startDate": "2024-01-01",
+              "nextPremiumDue": "2026-10-01",
+              "beneficiaries": [
+                {
+                  "name": "Spouse",
+                  "relationship": "SPOUSE",
+                  "share": 100
+                }
+              ]
+            },
+            {
+              "policyId": "AIA-POL-002",
+              "productType": "HEALTH",
+              "policyholderId": "CUST-001",
+              "sumAssured": 2000000.00,
+              "currency": "LKR",
+              "premiumAmount": 8500.00,
+              "premiumFrequency": "MONTHLY",
+              "status": "ACTIVE",
+              "startDate": "2024-06-01",
+              "nextPremiumDue": "2026-10-15"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Insurance Policy Details",
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/api/insurance/policies/AIA-POL-.*"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "policyId": "{{request.pathSegments.[3]}}",
+          "productType": "LIFE",
+          "policyholderId": "CUST-001",
+          "sumAssured": 5000000.00,
+          "currency": "LKR",
+          "premiumAmount": 12500.00,
+          "premiumFrequency": "MONTHLY",
+          "status": "ACTIVE",
+          "startDate": "2024-01-01",
+          "nextPremiumDue": "2026-10-01",
+          "coverageDetails": {
+            "deathBenefit": 5000000,
+            "criticalIllness": 2000000,
+            "accidentalDeath": 5000000
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Claims Submission",
+      "request": {
+        "method": "POST",
+        "urlPath": "/api/insurance/claims"
+      },
+      "response": {
+        "status": 202,
+        "jsonBody": {
+          "claimId": "AIA-CLM-{{randomValue length=8 type='ALPHANUMERIC'}}",
+          "status": "SUBMITTED",
+          "submittedAt": "{{now}}",
+          "estimatedProcessingDays": 14,
+          "requiredDocuments": [
+            "medical-reports.pdf",
+            "police-report.pdf"
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Claims List",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/insurance/claims"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "claims": [
+            {
+              "claimId": "AIA-CLM-001",
+              "policyId": "AIA-POL-001",
+              "claimType": "HOSPITALISATION",
+              "status": "IN_REVIEW",
+              "amount": 250000.00,
+              "currency": "LKR",
+              "submittedAt": "2026-08-15T10:00:00Z"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Premium Payment",
+      "request": {
+        "method": "POST",
+        "urlPath": "/api/insurance/premium/pay"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "transactionId": "AIA-TXN-{{randomValue length=8 type='ALPHANUMERIC'}}",
+          "policyId": "{{jsonPath request.body '$.policyId'}}",
+          "amount": "{{jsonPath request.body '$.amount'}}",
+          "currency": "LKR",
+          "status": "SUCCESS",
+          "processedAt": "{{now}}",
+          "nextPremiumDue": "2026-11-01"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Policy Not Found",
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/api/insurance/policies/AIA-POL-INVALID-.*"
+      },
+      "response": {
+        "status": 404,
+        "jsonBody": {
+          "error": "Policy not found",
+          "code": "POLICY_NOT_FOUND"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "name": "AIA Service Health",
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/insurance/health"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "status": "UP",
+          "service": "AIACore",
+          "version": "2.1.0"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,286 @@
+# kustomize overlay: dialog-lk-prod
+# Dialog (Sri Lanka) — Production deployment
+# This is the pattern for per-tenant per-environment overlays
+# Reference: backend/deploy/gitops/tenants/dialog-lk.yaml
+# Reference: backend/deploy/gitops/environments/prod.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: omobio-dialog-lk-prod
+  annotations:
+    omobio.platform/tenant-id: "dialog-lk"
+    omobio.platform/environment: "prod"
+    omobio.platform/industry: "TELCO"
+    omobio.platform/region: "LK"
+    omobio.platform/promotion-strategy: "immutable"
+    omobio.platform/build-once: "true"
+    omobio.platform/artifact-version: ""  # Pinned at deploy time
+
+# Namespace for this tenant+env combination
+namespace: omobio-dialog-lk-prod
+
+# Inherit from base
+resources:
+  # All base resources inherited via bases field
+  - ../../base
+
+# Additional labels specific to this overlay
+labels:
+  - includeSelectors: false
+    pairs:
+      omobio.tenant: dialog-lk
+      omobio.tenant-name: "Dialog Axiata"
+      omobio.tenant-type: OPERATOR
+      omobio.industry: TELCO
+      omobio.environment: prod
+      omobio.region: LK
+      omobio.cluster: prod-lk
+      omobio.zone: "ap-southeast-1a"
+      omobio.compliance.pdpa: "true"
+      omobio.compliance.gdpr: "true"
+      omobio.deployment.strategy: immutable
+      omobio.gitops.source: selfcare-platform
+
+# Additional annotations
+annotations:
+  - includeSelectors: false
+    pairs:
+      omobio.tenant.support-email: "support@dialog.lk"
+      omobio.tenant.support-phone: "+94-77-XXX-XXXX"
+      omobio.tenant.ingress-host: "selfcare.dialog.lk"
+      omobio.tenant.brand-color-primary: "#E20000"
+
+# Image pinning — IMMUTABLE for prod
+# Override mutable base with pinned version
+images:
+  - name: omobio/api-gateway
+    newName: omobio/api-gateway
+    newTag: ""  # PINNED AT DEPLOY — must be set via CI/CD
+    digest: ""  # SHA256 digest required for immutability
+  - name: omobio/config-tenant-service
+    newName: omobio/config-tenant-service
+    newTag: ""
+  - name: omobio/customer-identity-service
+    newName: omobio/customer-identity-service
+    newTag: ""
+  - name: omobio/dashboard-bff
+    newName: omobio/dashboard-bff
+    newTag: ""
+  - name: omobio/account-entitlement-service
+    newName: omobio/account-entitlement-service
+    newTag: ""
+  - name: omobio/product-service
+    newName: omobio/product-service
+    newTag: ""
+  - name: omobio/usage-service
+    newName: omobio/usage-service
+    newTag: ""
+  - name: omobio/billing-service
+    newName: omobio/billing-service
+    newTag: ""
+  - name: omobio/payment-service
+    newName: omobio/payment-service
+    newTag: ""
+  - name: omobio/notification-service
+    newName: omobio/notification-service
+    newTag: ""
+  - name: omobio/content-service
+    newName: omobio/content-service
+    newTag: ""
+  - name: omobio/journey-service
+    newName: omobio/journey-service
+    newTag: ""
+  - name: omobio/reporting-service
+    newName: omobio/reporting-service
+    newTag: ""
+  - name: omobio/ai-gateway
+    newName: omobio/ai-gateway
+    newTag: ""
+  - name: omobio/audit-service
+    newName: omobio/audit-service
+    newTag: ""
+
+# Tenant-specific ConfigMap
+configMapGenerator:
+  - name: omobio-tenant-config
+    literals:
+      # Tenant identity
+      - OMOBIO_TENANT_ID=dialog-lk
+      - OMOBIO_TENANT_OPERATOR=dialog
+      - OMOBIO_TENANT_INDUSTRY=TELCO
+      - OMOBIO_TENANT_TYPE=OPERATOR
+      - OMOBIO_TENANT_REGION=LK
+      - OMOBIO_TENANT_DISPLAY_NAME="Dialog Axiata"
+      # Environment
+      - OMOBIO_ENVIRONMENT=prod
+      - OMOBIO_ENVIRONMENT_TIER=1
+      - SPRING_PROFILES_ACTIVE=prod,prod-dialog-lk
+      # Provider endpoints (Dialog BSS)
+      - DIALOG_BSS_API_URL=https://bss-api.dialog.lk/v1
+      - SMSC_URL=http://smsc.dialog.lk:8080
+      - VAS_API_URL=https://vas-api.dialog.lk/v1
+      # Branding
+      - TENANT_BRAND_COLOR_PRIMARY=#E20000
+      - TENANT_BRAND_COLOR_SECONDARY=#000000
+      - TENANT_BRAND_LOGO_URL=https://assets.omobio.example/brands/dialog/logo.svg
+      # Domain
+      - TENANT_INGRESS_HOST=selfcare.dialog.lk
+      - TENANT_DOMAIN=dialog.lk
+      - TENANT_CDN_DOMAIN=cdn.dialog.lk
+      # Feature flags (telco-specific)
+      - FEATURE_SHOW_DTV_BUNDLES=false
+      - FEATURE_SHOW_FIBRE_BUNDLES=false
+      - FEATURE_ROAMING_ENABLED=true
+      - FEATURE_DATA_ROLL_OVER_ENABLED=true
+      - FEATURE_AI_ASSISTANT_ENABLED=true
+      - FEATURE_JOURNEY_ENABLED=true
+      - FEATURE_IN_APP_CALL_ENABLED=true
+      # Languages
+      - SUPPORTED_LANGUAGES=si,ta,en
+      - DEFAULT_LANGUAGE=en
+      # Compliance
+      - DATA_RETENTION_DAYS=365
+      - GDPR_COMPLIANT=true
+      - PDPA_COMPLIANT=true
+      # Logging
+      - LOG_LEVEL=WARN
+      - TRACING_SAMPLE_RATE=0.1
+      # Timeouts
+      - WIDGET_TIMEOUT_MS=3000
+      - DASHBOARD_DEADLINE_MS=5000
+      - DOWNSTREAM_TIMEOUT_MS=2000
+    options:
+      disableNameSuffixHash: true
+      labels:
+        omobio.config: tenant
+        omobio.tenant: dialog-lk
+
+# Patches — strategic merge patches
+patches:
+  # Patch API Gateway with prod-specific settings
+  - target:
+      kind: Deployment
+      name: api-gateway
+      group: apps
+    path: patches/api-gateway-prod.yaml
+
+  # Patch all deployments with prod resource limits
+  - target:
+      kind: Deployment
+      group: apps
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+
+  # Add PodDisruptionBudget
+  - target:
+      kind: PodDisruptionBudget
+    patch: |-
+      - op: add
+        path: /spec
+        value:
+          minAvailable: 2
+
+  # Add HPA for prod
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+      - op: replace
+        path: /spec/metrics
+        value:
+          - type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+          - type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 80
+
+# Secret references — using External Secrets Operator
+secretGenerator:
+  - name: omobio-tenant-secrets
+    literals:
+      - DIALOG_BSS_API_KEY=__ESO_RESOLVED__:secret/dialog-lk/bss-api-key
+      - SMSC_USER=__ESO_RESOLVED__:secret/dialog-lk/smsc-user
+      - SMSC_PASSWORD=__ESO_RESOLVED__:secret/dialog-lk/smsc-password
+      - DB_PASSWORD=__ESO_RESOLVED__:secret/dialog-lk/db-password
+      - REDIS_PASSWORD=__ESO_RESOLVED__:secret/dialog-lk/redis-password
+    options:
+      disableNameSuffixHash: true
+
+# Components — additional components for prod
+components:
+  - ../../../components/network-policy-prod
+  - ../../../components/pod-security-policy
+  - ../../../components/service-monitor
+  - ../../../components/prometheus-rules
+
+# Replicas — production HA
+replicas:
+  - name: api-gateway
+    count: 3
+  - name: config-tenant-service
+    count: 2
+  - name: customer-identity-service
+    count: 3
+  - name: dashboard-bff
+    count: 3
+  - name: account-entitlement-service
+    count: 3
+  - name: product-service
+    count: 2
+  - name: usage-service
+    count: 3
+  - name: billing-service
+    count: 2
+  - name: payment-service
+    count: 3
+  - name: notification-service
+    count: 2
+  - name: content-service
+    count: 2
+  - name: journey-service
+    count: 2
+  - name: reporting-service
+    count: 2
+  - name: ai-gateway
+    count: 2
+  - name: audit-service
+    count: 2
+
+# Configurations
+configurations:
+  - kustomize.config.k8s.io/aggregate

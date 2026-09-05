@@ -1,0 +1,67 @@
+# tenant config: hutch-lk
+# Operator: Hutchison Telecom (Sri Lanka) — TELCO OPERATOR
+# Region: LK
+# Industry: TELCO
+# Tenant Type: OPERATOR
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: hutch-lk
+  TENANT_OPERATOR: hutch
+  TENANT_INDUSTRY: TELCO
+  TENANT_TYPE: OPERATOR
+  TENANT_REGION: LK
+  TENANT_DISPLAY_NAME: "Hutch Sri Lanka"
+  TENANT_COUNTRY: Sri Lanka
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@hutch.lk
+  TENANT_SUPPORT_PHONE: "+94-73-XXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#FF6B00"
+  TENANT_BRAND_COLOR_SECONDARY: "#1A1A1A"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/hutch/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/hutch/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: hutch.lk
+  TENANT_CDN_DOMAIN: "cdn.hutch.lk"
+  TENANT_INGRESS_HOST: "selfcare.hutch.lk"
+
+  # Industry-specific provider endpoints
+  BSS_API_URL: "https://bss-api.hutch.lk/v1"
+  BSS_API_KEY_REF: "secret-ref:hutch-bss-api-key"
+  SMSC_URL: "http://smsc.hutch.lk:8080"
+  SMSC_USER_REF: "secret-ref:hutch-smsc-user"
+  SMSC_PASSWORD_REF: "secret-ref:hutch-smsc-password"
+  VAS_API_URL: "https://vas-api.hutch.lk/v1"
+
+  # Feature flags (telco-specific)
+  SHOW_DTV_BUNDLES: false
+  SHOW_FIBRE_BUNDLES: false
+  SHOW_POSTPAID_ONLY: false
+  ROAMING_ENABLED: true
+  DATA_ROLL_OVER_ENABLED: false
+  AI_ASSISTANT_ENABLED: false
+  JOURNEY_ENABLED: true
+  IN_APP_CALL_ENABLED: false
+  OTP_METHODS:
+    - SMS
+    - USSD
+  SUPPORTED_LANGUAGES:
+    - si
+    - ta
+    - en
+
+  # Compliance
+  DATA_RETENTION_DAYS: 365
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+
+  # Resource sizing
+  RESOURCE_QUOTA_CPU_REQUEST: "500m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "512Mi"
+  RESOURCE_QUOTA_CPU_LIMIT: "2000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "2Gi"

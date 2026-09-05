@@ -1,0 +1,52 @@
+# client-aia-lk-values.yaml — AIA (multi-country) tenant overrides
+# Industry: INSURANCE, Tenant type: INSURER
+
+tenant:
+  id: aia-lk
+  operator: aia
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0"
+  OMOBIO_TENANT_ID: "aia-lk"
+  OMOBIO_TENANT_INDUSTRY: "INSURANCE"
+  OMOBIO_TENANT_TYPE: "INSURER"
+  # AIA-specific provider endpoint
+  AIA_API_BASE_URL: "https://api.aia.lk/v2"
+  AIA_API_KEY_REF: "secret-ref:aia-api-key"
+  AIA_CLIENT_ID_REF: "secret-ref:aia-client-id"
+
+# Insurance-specific feature flags
+featureFlags:
+  SHOW_TELCO_BUNDLES: false
+  SHOW_BILLING: false
+  SHOW_VOICE_USAGE: false
+  INSURANCE_POLICIES_ENABLED: true
+  INSURANCE_CLAIMS_ENABLED: true
+  INSURANCE_BENEFICIARIES_ENABLED: true
+  AI_ASSISTANT_ENABLED: false
+  JOURNEY_ENABLED: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: selfcare.aia.lk
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - selfcare.aia.lk
+      secretName: aia-selfcare-tls
+
+service:
+  type: ClusterIP
+  port: 8080
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 15
+  targetCPUUtilizationPercentage: 70

@@ -1,0 +1,72 @@
+# tenant config: aia-th
+# Client: AIA Thailand — INSURANCE INSURER
+# Region: TH
+# Industry: INSURANCE
+# Tenant Type: INSURER
+# Created by: OMOBIO Platform Team
+
+env:
+  # Tenant identity
+  TENANT_ID: aia-th
+  TENANT_OPERATOR: aia
+  TENANT_INDUSTRY: INSURANCE
+  TENANT_TYPE: INSURER
+  TENANT_REGION: TH
+  TENANT_DISPLAY_NAME: "AIA Thailand"
+  TENANT_COUNTRY: Thailand
+
+  # Contact and support
+  TENANT_SUPPORT_EMAIL: support@aia.co.th
+  TENANT_SUPPORT_PHONE: "+66-2-XXX-XXXX"
+
+  # Branding
+  TENANT_BRAND_COLOR_PRIMARY: "#D9001B"
+  TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
+  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/aia-th/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/aia-th/favicon.ico"
+
+  # Domain configuration
+  TENANT_DOMAIN: aia.co.th
+  TENANT_CDN_DOMAIN: "cdn.aia.co.th"
+  TENANT_INGRESS_HOST: "selfcare.aia.co.th"
+
+  # Industry-specific provider endpoints
+  INSURANCE_API_URL: "https://api.aia.co.th/insurance/v1"
+  INSURANCE_API_KEY_REF: "secret-ref:aia-th-insurance-api-key"
+  POLICY_API_URL: "https://api.aia.co.th/policy/v1"
+  CLAIMS_API_URL: "https://api.aia.co.th/claims/v1"
+  AGENT_PORTAL_URL: "https://agents.aia.co.th"
+  KYC_PROVIDER_URL: "https://kyc.aia.co.th/v1"
+
+  # Feature flags
+  POLICY_VIEW_ENABLED: true
+  PREMIUM_CALCULATION_ENABLED: true
+  CLAIM_FILING_ENABLED: true
+  CLAIM_TRACKING_ENABLED: true
+  BENEFICIARY_MANAGEMENT_ENABLED: true
+  RENEWAL_REMINDER_ENABLED: true
+  AI_ASSISTANT_ENABLED: true
+  JOURNEY_ENABLED: true
+  DOCUMENT_UPLOAD_ENABLED: true
+  INVESTMENT_LINKED_POLICIES_ENABLED: false
+  TELEMEDICINE_ENABLED: false
+  OTP_METHODS:
+    - SMS
+    - EMAIL
+    - THAI_NATIONAL_ID
+  SUPPORTED_LANGUAGES:
+    - th
+    - en
+
+  # Compliance (Thailand OIC regulations)
+  DATA_RETENTION_DAYS: 1095
+  GDPR_COMPLIANT: true
+  PDPA_COMPLIANT: true
+  OIC_REGULATED: true
+  INSURANCE_REGULATOR_NOTIFY_DAYS: 7
+
+  # Resource sizing
+  RESOURCE_QUOTA_CPU_REQUEST: "1000m"
+  RESOURCE_QUOTA_MEMORY_REQUEST: "1Gi"
+  RESOURCE_QUOTA_CPU_LIMIT: "4000m"
+  RESOURCE_QUOTA_MEMORY_LIMIT: "4Gi"

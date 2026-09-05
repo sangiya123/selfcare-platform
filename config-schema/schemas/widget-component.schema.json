@@ -1,0 +1,492 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/widget-component.schema.json",
+  "title": "WidgetComponent",
+  "description": "Defines an individual widget component registered in the OMOBIO Selfcare Platform component registry. Covers props schema, data binding, actions, states, design tokens, accessibility semantics, analytics, and security classification.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "componentId",
+    "name",
+    "version",
+    "platforms",
+    "propsSchema",
+    "dataBinding",
+    "actions",
+    "states",
+    "security",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "componentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9_.-]{2,63}$",
+      "description": "Stable component identifier (e.g. 'BalanceCard', 'RechargeButton', 'PackageList')"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Human-readable component name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1024
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (e.g. '1.2.0')"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "DISPLAY", "INPUT", "CONTAINER", "NAVIGATION",
+        "FEEDBACK", "CHART", "PAYMENT", "AUTH", "UTILITY", "COMPOSITE"
+      ]
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["ios", "android", "huawei", "web"]
+      }
+    },
+    "propsSchema": {
+      "type": "object",
+      "description": "JSON Schema for the component's props (input parameters)",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": { "type": "string", "enum": ["object"] },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/PropDefinition" }
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "additionalProperties": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "dataBinding": {
+      "type": "object",
+      "description": "Data binding contract for the component",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["OBJECT", "ARRAY", "PRIMITIVE", "NONE"]
+        },
+        "apiRef": {
+          "type": "string",
+          "description": "Reference to the API endpoint that provides data to this component"
+        },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 900000,
+          "description": "Auto-refresh interval in milliseconds"
+        },
+        "staticData": {
+          "type": "object",
+          "description": "Hardcoded static data used when apiRef is absent"
+        },
+        "transform": {
+          "type": "object",
+          "description": "Response transformation / mapping",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "JSONPath-like selector (e.g. 'data.account')"
+            },
+            "mapping": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "cacheStrategy": {
+          "type": "string",
+          "enum": ["NO_CACHE", "MEMORY", "DISK", "CDN"],
+          "default": "NO_CACHE"
+        },
+        "cacheTtlSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        }
+      },
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "array",
+      "description": "Actions the component can trigger",
+      "items": { "$ref": "#/$defs/ComponentAction" }
+    },
+    "states": {
+      "type": "object",
+      "description": "Named UI states the component can render",
+      "properties": {
+        "loading": {
+          "type": "object",
+          "description": "Loading / skeleton state",
+          "properties": {
+            "variant": { "type": "string", "enum": ["skeleton", "spinner", "progress"] },
+            "skeletonLines": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "shimmer": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
+        },
+        "empty": {
+          "type": "object",
+          "description": "Empty state when no data is available",
+          "properties": {
+            "icon": { "type": "string" },
+            "title": { "type": "string" },
+            "message": { "type": "string" },
+            "ctaLabel": { "type": "string" },
+            "ctaAction": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "description": "Error state",
+          "properties": {
+            "icon": { "type": "string" },
+            "title": { "type": "string" },
+            "message": { "type": "string" },
+            "retryAction": { "type": "string" },
+            "showSupport": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": false
+        },
+        "stale": {
+          "type": "object",
+          "description": "Stale-data state shown when cache is out of date",
+          "properties": {
+            "banner": { "type": "string" },
+            "refreshAction": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "designTokens": {
+      "type": "object",
+      "description": "Design tokens this component references (platform-agnostic names mapped to theme values)",
+      "properties": {
+        "colors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\{[a-z][a-zA-Z0-9_.]*\\}$",
+            "description": "Token name wrapped in braces (e.g. '{color.primary}')"
+          }
+        },
+        "typography": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\{[a-z][a-zA-Z0-9_.]*\\}$"
+          }
+        },
+        "spacing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\{[a-z][a-zA-Z0-9_.]*\\}$"
+          }
+        },
+        "radius": {
+          "type": "string",
+          "pattern": "^\\{[a-z][a-zA-Z0-9_.]*\\}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "accessibility": {
+      "type": "object",
+      "description": "Accessibility semantics and ARIA configuration",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "ARIA role (e.g. 'button', 'list', 'dialog')"
+        },
+        "label": {
+          "type": "string",
+          "description": "Static accessibility label text"
+        },
+        "labelFromProp": {
+          "type": "string",
+          "description": "Name of the prop whose value is used as the accessibility label"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Static accessibility hint text"
+        },
+        "hintFromProp": { "type": "string" },
+        "stateDescription": {
+          "type": "object",
+          "description": "ARIA live-region descriptions per component state",
+          "additionalProperties": { "type": "string" }
+        },
+        "announceOnFocus": {
+          "type": "boolean",
+          "default": false
+        },
+        "announceStrategy": {
+          "type": "string",
+          "enum": ["polite", "assertive"]
+        },
+        "focusTrap": { "type": "boolean", "default": false },
+        "tabIndex": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 0
+        },
+        "keyboardNav": {
+          "type": "object",
+          "description": "Keyboard navigation map",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "analytics": {
+      "type": "object",
+      "description": "Analytics events emitted by this component",
+      "properties": {
+        "viewEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event fired when the component enters the viewport"
+        },
+        "impressionEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event fired on first visible impression"
+        },
+        "clickEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["selector", "event"],
+            "properties": {
+              "selector": { "type": "string" },
+              "event": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{2,99}$" },
+              "properties": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "customEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{2,99}$" },
+              "trigger": {
+                "type": "string",
+                "enum": ["onMount", "onUpdate", "onUnmount", "onAction"]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "description": "Security classification and runtime constraints",
+      "required": ["classification"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": [
+            "PUBLIC",
+            "INTERNAL",
+            "CONFIDENTIAL",
+            "PII",
+            "PCI",
+            "PCI-DSS"
+          ],
+          "description": "Security classification of data handled by this component"
+        },
+        "piiFields": {
+          "type": "array",
+          "description": "List of prop names that contain PII",
+          "items": { "type": "string" }
+        },
+        "encryptionRequired": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowedDomains": {
+          "type": "array",
+          "description": "Whitelist of allowed domains for outbound requests (images, fonts, etc.)",
+          "items": { "type": "string", "format": "uri" }
+        },
+        "allowedIntentSchemes": {
+          "type": "array",
+          "description": "Whitelist of allowed intent/scheme URIs for navigation",
+          "items": { "type": "string" }
+        },
+        "sandboxPermissions": {
+          "type": "array",
+          "description": "Explicitly granted sandbox permissions (web platform only)",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "performance": {
+      "type": "object",
+      "description": "Performance budgets and hints",
+      "properties": {
+        "budgetMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Rendering budget in milliseconds"
+        },
+        "lazyLoad": {
+          "type": "boolean",
+          "default": false
+        },
+        "preloadTrigger": {
+          "type": "string",
+          "enum": ["viewport", "interaction", "none"]
+        },
+        "virtualization": {
+          "type": "object",
+          "description": "Virtualization / windowing hints for list components",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "estimatedItemHeight": { "type": "integer" },
+            "overscan": { "type": "integer", "minimum": 0, "maximum": 10 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "testability": {
+      "type": "object",
+      "description": "Testability metadata",
+      "properties": {
+        "testId": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.-]{2,63}$",
+          "description": "Stable test identifier used in automated UI tests"
+        },
+        "testSelectors": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "versions": {
+      "type": "object",
+      "description": "Cross-version compatibility metadata",
+      "properties": {
+        "minCompatibleVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "deprecationVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "changelog": { "type": "string", "maxLength": 2048 }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "DEPRECATED", "RETIRED"]
+    },
+    "owner": { "type": "string", "maxLength": 128 },
+    "team": { "type": "string", "maxLength": 128 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 64 }
+    }
+  },
+  "$defs": {
+    "PropDefinition": {
+      "type": "object",
+      "description": "Definition of a single prop",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "integer", "object", "array", "null"]
+        },
+        "description": { "type": "string" },
+        "enum": {
+          "type": "array",
+          "items": true
+        },
+        "default": true,
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 1 },
+        "pattern": { "type": "string" },
+        "format": { "type": "string" },
+        "items": { "type": "object" },
+        "properties": { "type": "object" },
+        "additionalProperties": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ComponentAction": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_]{2,63}$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "NAVIGATE", "BACK", "START_JOURNEY", "CALL_API", "OPEN_WEB",
+            "OPEN_WEB_SSO", "EXTERNAL_BROWSER", "DEEP_LINK", "CALL_PHONE",
+            "EMAIL", "COPY", "SHARE", "DOWNLOAD", "MODAL", "BOTTOM_SHEET",
+            "LOGIN", "LOGOUT", "PAYMENT", "REFRESH", "TOGGLE", "SUBMIT",
+            "SELECT", "DISMISS", "CUSTOM"
+          ]
+        },
+        "route": { "type": "string" },
+        "journeyId": { "type": "string" },
+        "apiRef": { "type": "string" },
+        "confirmation": {
+          "type": "string",
+          "enum": ["none", "policy", "explicit"]
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "analyticsEvent": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{2,99}$" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,369 @@
+# Prometheus alerting rules for OMOBIO Selfcare Platform
+# Apply via: kubectl apply -f prometheus-alerts.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: omobio-platform-alerts
+  labels:
+    app: omobio-platform
+    prometheus: omobio
+spec:
+  groups:
+    - name: platform-availability
+      interval: 30s
+      rules:
+        - alert: ServiceDown
+          expr: up{job=~"omobio-.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "OMOBIO service {{ $labels.job }} is down"
+            description: "Service {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (job, instance)
+            /
+            sum(rate(http_server_requests_seconds_count[5m])) by (job, instance) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High 5xx error rate on {{ $labels.job }}"
+            description: "Service {{ $labels.instance }} of job {{ $labels.job }} has 5xx error rate > 5% for 5 minutes."
+
+        - alert: VeryHighErrorRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (job, instance)
+            /
+            sum(rate(http_server_requests_seconds_count[5m])) by (job, instance) > 0.20
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Very high 5xx error rate on {{ $labels.job }}"
+            description: "Service {{ $labels.instance }} of job {{ $labels.job }} has 5xx error rate > 20% for 2 minutes."
+
+    - name: dashboard-bff
+      interval: 30s
+      rules:
+        - alert: DashboardOverallLatencyHigh
+          expr: histogram_quantile(0.95, sum(rate(dashboard_overall_seconds_bucket[5m])) by (le)) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: dashboard-bff
+          annotations:
+            summary: "Dashboard P95 latency > 500ms"
+            description: "Dashboard orchestration P95 is {{ $value }}s, exceeds 500ms target for 5 minutes."
+
+        - alert: WidgetTimeoutRateHigh
+          expr: |
+            sum(rate(widget_status_total{status="TIMEOUT"}[5m]))
+            /
+            sum(rate(widget_status_total[5m])) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: dashboard-bff
+          annotations:
+            summary: "Widget timeout rate > 10%"
+            description: "More than 10% of widgets are timing out, indicating downstream provider issues."
+
+        - alert: WidgetSuccessRateLow
+          expr: |
+            sum(rate(widget_status_total{status="SUCCESS"}[5m]))
+            /
+            sum(rate(widget_status_total[5m])) < 0.80
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+            service: dashboard-bff
+          annotations:
+            summary: "Widget success rate < 80%"
+            description: "Less than 80% of widgets are succeeding, indicating widespread downstream issues."
+
+        - alert: CircuitBreakerOpen
+          expr: sum(circuitbreaker_state{state="open"}) by (widget_id) > 0
+          for: 2m
+          labels:
+            severity: warning
+            team: platform
+            service: dashboard-bff
+          annotations:
+            summary: "Circuit breaker open for widget {{ $labels.widget_id }}"
+            description: "Circuit breaker has been open for widget {{ $labels.widget_id }} for 2+ minutes."
+
+    - name: identity-security
+      interval: 30s
+      rules:
+        - alert: HighLoginFailureRate
+          expr: |
+            sum(rate(login_attempts_total{result="FAILURE"}[5m]))
+            /
+            sum(rate(login_attempts_total[5m])) > 0.30
+          for: 5m
+          labels:
+            severity: warning
+            team: security
+            service: customer-identity
+          annotations:
+            summary: "High login failure rate"
+            description: "Login failure rate > 30%, possible brute force attack."
+
+        - alert: JWTValidationErrorsHigh
+          expr: sum(rate(jwt_validation_errors_total[5m])) by (reason) > 10
+          for: 5m
+          labels:
+            severity: warning
+            team: security
+            service: customer-identity
+          annotations:
+            summary: "High JWT validation error rate"
+            description: "Reason: {{ $labels.reason }}. Investigate possible token abuse."
+
+    - name: ai-gateway
+      interval: 30s
+      rules:
+        - alert: AIProviderErrorRateHigh
+          expr: |
+            sum(rate(ai_provider_errors_total[5m])) by (provider)
+            /
+            sum(rate(ai_provider_requests_total[5m])) by (provider) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            team: data
+            service: ai-gateway
+          annotations:
+            summary: "AI provider {{ $labels.provider }} error rate > 10%"
+            description: "Provider may be unavailable or rate-limited."
+
+        - alert: AICostSpike
+          expr: increase(ai_cost_usd_total[1h]) > 100
+          for: 5m
+          labels:
+            severity: warning
+            team: data
+            service: ai-gateway
+          annotations:
+            summary: "AI cost spike: ${{ $value }} in last hour"
+            description: "Investigate unusual usage patterns."
+
+    - name: capacity
+      interval: 30s
+      rules:
+        - alert: HighMemoryUsage
+          expr: |
+            (container_memory_working_set_bytes{pod=~"omobio-.*"}
+            / container_spec_memory_limit_bytes{pod=~"omobio-.*"}) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            team: sre
+          annotations:
+            summary: "High memory usage on {{ $labels.pod }}"
+            description: "Pod memory usage > 85% of limit for 10 minutes."
+
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{pod=~"omobio-.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            team: sre
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod has restarted {{ $value }} times in last 15 minutes."
+
+    - name: billing
+      interval: 30s
+      rules:
+        - alert: BillingProviderErrorRateHigh
+          expr: |
+            sum(rate(billing_provider_errors_total[5m])) by (provider)
+            /
+            sum(rate(billing_provider_requests_total[5m])) by (provider) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: billing-service
+          annotations:
+            summary: "Billing provider {{ $labels.provider }} error rate > 10%"
+            description: "Provider may be unavailable; check downstream BSS health."
+
+        - alert: BillingReconciliationLag
+          expr: max(time() - billing_reconciliation_last_run_timestamp_seconds) > 3600
+          for: 10m
+          labels:
+            severity: critical
+            team: finance
+            service: billing-service
+          annotations:
+            summary: "Billing reconciliation not running"
+            description: "Last reconciliation ran {{ $value | humanizeDuration }} ago; investigate scheduler."
+
+        - alert: BillingDocumentGenerationFailing
+          expr: |
+            sum(rate(billing_document_errors_total[5m]))
+            /
+            sum(rate(billing_document_requests_total[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+            service: billing-service
+          annotations:
+            summary: "Bill document generation failing > 5%"
+            description: "Check PDF template engine and object storage availability."
+
+    - name: payment
+      interval: 30s
+      rules:
+        - alert: PaymentIdempotencyConflictRateHigh
+          expr: |
+            sum(rate(payment_idempotency_conflict_total[5m]))
+            /
+            sum(rate(payment_idempotency_requests_total[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: payment-service
+          annotations:
+            summary: "Idempotency key conflict rate > 5%"
+            description: "Many clients reusing keys; investigate client SDK or upstream retries."
+
+        - alert: PaymentReconciliationLag
+          expr: max(time() - payment_reconciliation_last_run_timestamp_seconds) > 1800
+          for: 10m
+          labels:
+            severity: critical
+            team: finance
+            service: payment-service
+          annotations:
+            summary: "Payment reconciliation not running"
+            description: "Last reconciliation ran {{ $value | humanizeDuration }} ago."
+
+        - alert: PaymentStuckTransactions
+          expr: sum(payment_transaction_status_total{status="PENDING"}) by (tenant) > 100
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+            service: payment-service
+          annotations:
+            summary: "Tenant {{ $labels.tenant }} has > 100 PENDING payments"
+            description: "Investigate upstream payment provider; do not retry blindly."
+
+    - name: notification
+      interval: 30s
+      rules:
+        - alert: NotificationProviderErrorRateHigh
+          expr: |
+            sum(rate(notification_provider_errors_total[5m])) by (channel, provider)
+            /
+            sum(rate(notification_provider_requests_total[5m])) by (channel, provider) > 0.15
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: notification-service
+          annotations:
+            summary: "{{ $labels.channel }} provider {{ $labels.provider }} error rate > 15%"
+            description: "Provider may be throttling; check failover to backup provider."
+
+        - alert: NotificationQueueBacklog
+          expr: sum(notification_queue_depth) by (channel) > 10000
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+            service: notification-service
+          annotations:
+            summary: "{{ $labels.channel }} queue depth > 10k"
+            description: "Notification queue is backing up; scale consumers or check downstream provider."
+
+    - name: insurance
+      interval: 30s
+      rules:
+        - alert: InsuranceProviderErrorRateHigh
+          expr: |
+            sum(rate(insurance_provider_errors_total[5m])) by (provider)
+            /
+            sum(rate(insurance_provider_requests_total[5m])) by (provider) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+            service: insurance-service
+          annotations:
+            summary: "Insurance provider {{ $labels.provider }} error rate > 10%"
+            description: "Check upstream insurer API health."
+
+        - alert: ClaimProcessingStuck
+          expr: sum(claim_status_total{status="IN_REVIEW"}) by (tenant) > 200
+          for: 30m
+          labels:
+            severity: warning
+            team: ops
+            service: insurance-service
+          annotations:
+            summary: "Tenant {{ $labels.tenant }} has > 200 claims IN_REVIEW for 30m"
+            description: "Investigate claims adjuster workload; consider auto-assignment."
+
+    - name: kafka
+      interval: 30s
+      rules:
+        - alert: KafkaConsumerLagHigh
+          expr: sum(kafka_consumergroup_lag{topic=~"omobio-.*"}) by (consumergroup, topic) > 10000
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Kafka consumer group {{ $labels.consumergroup }} lag > 10k on {{ $labels.topic }}"
+            description: "Consumer is falling behind; scale consumers or check downstream sink health."
+
+        - alert: KafkaConsumerLagCritical
+          expr: sum(kafka_consumergroup_lag{topic=~"omobio-.*"}) by (consumergroup, topic) > 100000
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Kafka consumer group {{ $labels.consumergroup }} lag > 100k on {{ $labels.topic }}"
+            description: "Profile read model is severely stale; risk of inconsistent views."
+
+    - name: auth-redis
+      interval: 30s
+      rules:
+        - alert: AuthRedisMemoryHigh
+          expr: |
+            (redis_memory_used_bytes{redis_instance=~".*auth.*"}
+            / redis_memory_max_bytes{redis_instance=~".*auth.*"}) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Auth Redis memory > 85%"
+            description: "AUTH pool at risk; disable non-auth cache on this instance and evict sessions > 7d."
+
+        - alert: AuthRedisEvictions
+          expr: increase(redis_evicted_keys_total{redis_instance=~".*auth.*"}[5m]) > 1000
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Auth Redis evicting > 1000 keys in 5m"
+            description: "Auth pool is evicting; users will be logged out. Scale cluster or reduce TTL drift."

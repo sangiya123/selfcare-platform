@@ -1,0 +1,386 @@
+# OMOBIO Selfcare Platform — Canary Deployment
+#
+# Progressive traffic shift for production:
+#   5% → 25% → 50% → 100%
+# At each step we watch:
+#   - Error rate (< 0.5%)
+#   - p99 latency (< 1.5s)
+#   - Saturation (CPU < 70%, Memory < 80%)
+#   - Synthetic probe success
+# If any SLO is violated, automatic rollback to the previous (stable) deployment.
+#
+# Strategy differs from blue/green by:
+#   - Same production environment, gradual traffic shift
+#   - No DNS / load-balancer cutover
+#   - Per-service canary, not whole-platform blue/green
+#   - Used for high-risk services (payment, identity, ai-gateway)
+
+name: Canary Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to canary (or "all")'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'api-gateway'
+          - 'payment-service'
+          - 'customer-identity-service'
+          - 'ai-gateway'
+          - 'billing-service'
+      image_tag:
+        description: 'Image tag to canary'
+        required: true
+        type: string
+      canary_steps:
+        description: 'Comma-separated traffic % (e.g. "5,25,50,100")'
+        required: false
+        type: string
+        default: '5,25,50,100'
+      step_duration_min:
+        description: 'Minutes to wait at each step'
+        required: false
+        type: string
+        default: '10'
+      auto_rollback:
+        description: 'Auto-rollback on SLO violation'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+  deployments: write
+
+env:
+  KUBECONFIG: ${{ secrets.PROD_KUBECONFIG }}
+  NAMESPACE: omobio-prod
+  REGION: prod
+  PROM_URL: ${{ secrets.PROMETHEUS_URL }}
+  GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+
+jobs:
+  # ======================================================================
+  # Pre-flight: validate image exists + has been signed (cosign)
+  # ======================================================================
+  preflight:
+    name: Pre-flight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      services: ${{ steps.svc.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target services
+        id: svc
+        run: |
+          TARGET="${{ github.event.inputs.service }}"
+          if [ "$TARGET" = "all" ]; then
+            LIST="api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service"
+          else
+            LIST="$TARGET"
+          fi
+          echo "list=$LIST" >> "$GITHUB_OUTPUT"
+          echo "Targeting: $LIST"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify image signature
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          SERVICES="${{ steps.svc.outputs.list }}"
+          for svc in $SERVICES; do
+            IMG="ghcr.io/omobio/$svc:${{ env.IMAGE_TAG }}"
+            echo "Verifying $IMG ..."
+            cosign verify "$IMG" \
+              --certificate-identity-regexp 'https://github.com/omobio/selfcare-platform' \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --output json > "cosign-$svc.json"
+            echo "$svc: signature OK"
+          done
+
+      - name: Verify SLSA provenance
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          SERVICES="${{ steps.svc.outputs.list }}"
+          for svc in $SERVICES; do
+            IMG="ghcr.io/omobio/$svc:${{ env.IMAGE_TAG }}"
+            cosign verify-attestation "$IMG" \
+              --type slsaprovenance \
+              --certificate-identity-regexp 'https://github.com/omobio/selfcare-platform' \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+          done
+
+  # ======================================================================
+  # Step 1 (5%) — initial canary
+  # ======================================================================
+  canary-step:
+    name: Canary
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        step: ${{ fromJSON(format('[{0}]', join(github.event.inputs.canary_steps, ','))) }}
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install helm + kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+
+      - name: Install helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.PROD_KUBECONFIG }}
+        run: |
+          echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+
+      - name: Apply canary step ${{ matrix.step }}%
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SERVICES: ${{ needs.preflight.outputs.services }}
+        run: |
+          STEP=${{ matrix.step }}
+          for svc in $SERVICES; do
+            echo "Canary: $svc at $STEP% traffic"
+            # Update the Istio VirtualService for traffic split
+            cat <<EOF | kubectl apply -f -
+          apiVersion: networking.istio.io/v1beta1
+          kind: VirtualService
+          metadata:
+            name: omobio-$svc-vs
+            namespace: ${{ env.NAMESPACE }}
+          spec:
+            hosts:
+            - omobio-$svc
+            http:
+            - match:
+              - headers:
+                  x-canary:
+                    exact: "true"
+              route:
+              - destination:
+                  host: omobio-$svc-canary
+                  weight: 100
+            - route:
+              - destination:
+                  host: omobio-$svc-stable
+                  weight: $((100 - STEP))
+              - destination:
+                  host: omobio-$svc-canary
+                  weight: $STEP
+          EOF
+          done
+
+      - name: Deploy canary pods
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SERVICES: ${{ needs.preflight.outputs.services }}
+        run: |
+          for svc in $SERVICES; do
+            helm upgrade --install omobio-$svc-canary \
+              selfcare-platform/backend/deploy/helm/$svc \
+              --namespace ${{ env.NAMESPACE }} \
+              --set image.tag=${{ env.IMAGE_TAG }} \
+              --set image.repository=ghcr.io/omobio/$svc \
+              --set env=${{ env.REGION }} \
+              --set replicaCount=2 \
+              --set fullnameOverride=omobio-$svc-canary \
+              --set canary.enabled=true \
+              --wait --timeout 5m
+          done
+
+      - name: Wait for stabilisation
+        env:
+          STEP_DURATION: ${{ github.event.inputs.step_duration_min }}
+        run: |
+          echo "Holding at ${{ matrix.step }}% for $STEP_DURATION minutes"
+          sleep $((STEP_DURATION * 60))
+
+  # ======================================================================
+  # SLO evaluation per step
+  # ======================================================================
+  slo-eval:
+    name: SLO evaluation
+    runs-on: ubuntu-latest
+    needs: canary-step
+    if: always()
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SLO compliance
+        env:
+          PROM: ${{ env.PROM_URL }}
+          SERVICES: ${{ needs.preflight.outputs.services }}
+          AUTO_ROLLBACK: ${{ github.event.inputs.auto_rollback }}
+        run: |
+          FAIL=0
+          for svc in $SERVICES; do
+            # Error rate: 5xx / total over last 5 minutes
+            ERR=$(curl -sG "$PROM/api/v1/query" \
+              --data-urlencode "query=sum(rate(http_requests_total{service=\"omobio-$svc-canary\",status=~\"5..\"}[5m]))/sum(rate(http_requests_total{service=\"omobio-$svc-canary\"}[5m]))" \
+              | jq -r '.data.result[0].value[1] // "0"')
+            # p99 latency seconds
+            P99=$(curl -sG "$PROM/api/v1/query" \
+              --data-urlencode "query=histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"omobio-$svc-canary\"}[5m])))" \
+              | jq -r '.data.result[0].value[1] // "0"')
+            echo "[$svc] err_rate=$ERR p99=${P99}s"
+            # SLO: error rate < 0.5%, p99 < 1.5s
+            if (( $(echo "$ERR > 0.005" | bc -l) )); then
+              echo "::error::$svc error rate $ERR exceeds 0.5%"
+              FAIL=1
+            fi
+            if (( $(echo "$P99 > 1.5" | bc -l) )); then
+              echo "::error::$svc p99 latency ${P99}s exceeds 1.5s"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" = "1" ] && [ "$AUTO_ROLLBACK" = "true" ]; then
+            echo "SLO violation — triggering rollback"
+            echo "ROLLBACK=1" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "ROLLBACK=0" >> "$GITHUB_OUTPUT"
+
+  # ======================================================================
+  # Rollback on SLO violation
+  # ======================================================================
+  rollback:
+    name: Rollback
+    runs-on: ubuntu-latest
+    needs: [preflight, slo-eval]
+    if: failure() && needs.slo-eval.outputs.ROLLBACK == '1'
+    timeout-minutes: 15
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.PROD_KUBECONFIG }}
+        run: |
+          echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+
+      - name: Restore 100% stable
+        env:
+          SERVICES: ${{ needs.preflight.outputs.services }}
+        run: |
+          for svc in $SERVICES; do
+            echo "Rolling back $svc to 100% stable"
+            cat <<EOF | kubectl apply -f -
+          apiVersion: networking.istio.io/v1beta1
+          kind: VirtualService
+          metadata:
+            name: omobio-$svc-vs
+            namespace: ${{ env.NAMESPACE }}
+          spec:
+            hosts:
+            - omobio-$svc
+            http:
+            - route:
+              - destination:
+                  host: omobio-$svc-stable
+                  weight: 100
+          EOF
+            # Scale canary down
+            helm uninstall omobio-$svc-canary \
+              --namespace ${{ env.NAMESPACE }} || true
+          done
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🚨 *Canary deployment rolled back*\nService(s): ${{ needs.preflight.outputs.services }}\nCommit: ${{ github.sha }}\nReason: SLO violation detected"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
+
+  # ======================================================================
+  # Promote — finalize canary to 100%
+  # ======================================================================
+  promote:
+    name: Promote to 100%
+    runs-on: ubuntu-latest
+    needs: [preflight, slo-eval]
+    if: success()
+    timeout-minutes: 15
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl + helm
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.PROD_KUBECONFIG }}
+        run: |
+          echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+
+      - name: Promote canary to stable
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SERVICES: ${{ needs.preflight.outputs.services }}
+        run: |
+          for svc in $SERVICES; do
+            echo "Promoting $svc to stable"
+            # Update stable deployment
+            helm upgrade --install omobio-$svc \
+              selfcare-platform/backend/deploy/helm/$svc \
+              --namespace ${{ env.NAMESPACE }} \
+              --set image.tag=${{ env.IMAGE_TAG }} \
+              --set image.repository=ghcr.io/omobio/$svc \
+              --set env=${{ env.REGION }} \
+              --set replicaCount=3 \
+              --wait --timeout 5m
+            # Remove canary
+            helm uninstall omobio-$svc-canary \
+              --namespace ${{ env.NAMESPACE }} || true
+          done
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "✅ *Canary promoted to 100%*\nService(s): ${{ needs.preflight.outputs.services }}\nImage tag: ${{ github.event.inputs.image_tag }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true

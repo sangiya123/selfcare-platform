@@ -1,0 +1,29 @@
+# DEV profile overrides — local Docker Compose
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000,http://localhost:8081,http://localhost:19006"
+            allowedMethods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+omobio:
+  security:
+    jwt:
+      jwks-uri: ${CUSTOMER_IDENTITY_URL:http://localhost:8081}/.well-known/jwks.json
+  otel:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+
+logging:
+  level:
+    com.omobio: DEBUG

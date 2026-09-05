@@ -1,0 +1,14 @@
+# REGIONAL profile overrides
+omobio:
+  security:
+    cors:
+      allowed-origins: https://admin.reg.omobio.io
+
+otel:
+  enabled: true
+
+logging:
+  level:
+    com.omobio: INFO
+
+spring.jpa.show-sql: false

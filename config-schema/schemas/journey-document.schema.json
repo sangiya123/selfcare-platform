@@ -1,0 +1,240 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/journey-document.schema.json",
+  "title": "JourneyDocument",
+  "description": "Defines a multi-step user journey (a flow of screens, API calls, and branching logic) for the OMOBIO Selfcare Platform. Used by the journey orchestrator to render and execute flows server-driven.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "journeyId",
+    "name",
+    "version",
+    "status",
+    "entryStepId",
+    "steps",
+    "analytics",
+    "rollbackVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Journey document schema version"
+    },
+    "journeyId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{2,63}$",
+      "description": "Stable journey identifier (e.g. 'recharge.postpaid', 'portin.flow')"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Human-readable journey name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1024
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonically increasing journey version"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED", "DEPRECATED"]
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Optional tenant override; if absent the journey is global"
+    },
+    "lob": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["MOBILE", "BB", "DTV", "FIBRE", "ENTERPRISE"]
+      },
+      "description": "Lines of business the journey applies to"
+    },
+    "entryStepId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "ID of the first step to execute when the journey starts"
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Step" }
+    },
+    "analytics": {
+      "type": "object",
+      "description": "Stable analytics event IDs emitted by the orchestrator for this journey",
+      "required": ["startEvent", "stepEvent", "completeEvent", "abandonEvent"],
+      "properties": {
+        "startEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event ID fired on journey start (e.g. 'journey.recharge.start')"
+        },
+        "stepEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event ID fired on each step entry"
+        },
+        "completeEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event ID fired on successful completion"
+        },
+        "abandonEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event ID fired when the user abandons the journey"
+        },
+        "errorEvent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{2,99}$",
+          "description": "Event ID fired on a step error"
+        },
+        "customEvents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.]{2,99}$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rollbackVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Previous published version to roll back to if this version is unhealthy (0 means none)"
+    },
+    "compatibility": {
+      "type": "object",
+      "description": "Client compatibility constraints",
+      "properties": {
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ios", "android", "huawei", "web"]
+          }
+        },
+        "minAppVersion": { "type": "string" },
+        "maxAppVersion": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form owner / SLA / tag metadata",
+      "properties": {
+        "owner": { "type": "string" },
+        "team": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sla": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "Step": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "SCREEN",
+            "API",
+            "CONDITION",
+            "CONFIRMATION",
+            "OTP",
+            "PAYMENT",
+            "DOCUMENT",
+            "WAIT",
+            "WEB_SSO",
+            "SUCCESS",
+            "ERROR"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "description": "Type-specific configuration (component refs, API endpoints, OTP length, payment gateway, etc.)",
+          "additionalProperties": true
+        },
+        "nextStepId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Default next step on success"
+        },
+        "errorStepId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Step to branch to on error"
+        },
+        "branches": {
+          "type": "array",
+          "description": "Conditional next-step mapping (typically used by CONDITION type)",
+          "items": { "$ref": "#/$defs/Branch" }
+        },
+        "timeout": {
+          "type": "object",
+          "description": "Per-step timeout",
+          "properties": {
+            "ms": { "type": "integer", "minimum": 100, "maximum": 600000 },
+            "onTimeout": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" }
+          }
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "analytics": {
+          "type": "object",
+          "properties": {
+            "enterEvent": { "type": "string" },
+            "exitEvent": { "type": "string" },
+            "errorEvent": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "Branch": {
+      "type": "object",
+      "required": ["when", "nextStepId"],
+      "properties": {
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expression evaluated against journey context (e.g. 'context.balance > 0')"
+        },
+        "nextStepId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

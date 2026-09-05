@@ -1,0 +1,94 @@
+# environment config: reg
+# Regression environment — full regression testing
+# Cluster: reg-cluster (isolated, production-like)
+# Image tag strategy: PINNED to release tag (mutable, but controlled)
+# Sync window: Business hours
+# Required approvals: 2 (Developer + QA)
+
+env:
+  # Environment identity
+  ENV_NAME: reg
+  ENV_DISPLAY_NAME: Regression
+  ENV_TIER: 2
+  ENV_PURPOSE: "Full regression suite, performance testing, security scans"
+
+  # Cluster
+  CLUSTER_URL: https://kubernetes.default.svc
+  CLUSTER_NAME: reg-cluster
+  CLUSTER_REGION: ap-southeast-1
+  CLUSTER_ENVIRONMENT: reg
+
+  # Image strategy
+  IMAGE_TAG_MUTABLE: "true"  # Mutable but pinned to RC tag
+  DEFAULT_IMAGE_TAG: "rc-stable"  # Specific RC tag
+  DEFAULT_TARGET_REVISION: "release/*"  # Track release branches
+  IMAGE_PULL_POLICY: IfNotPresent
+  IMAGE_REGISTRY: ghcr.io/omobio
+  IMAGE_REPOSITORY: omobio/selfcare-platform
+
+  # Auto-sync
+  AUTO_SYNC_ENABLED: "true"
+
+  # Sync window
+  SYNC_WINDOW: "business-hours"
+  SYNC_WINDOW_DESCRIPTION: "Mon-Fri 09:00-17:00 SGT"
+  SYNC_WINDOW_CRON: "0 9-17 * * MON-FRI"
+
+  # Approvals
+  REQUIRED_APPROVALS: "2"
+  APPROVAL_ROLES: '["developer", "qa-engineer"]'
+  APPROVAL_DESCRIPTION: "Developer + QA Engineer approval required"
+
+  # Resource limits (production-like)
+  RESOURCE_LIMITS_CPU: "2000m"
+  RESOURCE_LIMITS_MEMORY: "2Gi"
+  RESOURCE_REQUESTS_CPU: "500m"
+  RESOURCE_REQUESTS_MEMORY: "512Mi"
+
+  # Replicas
+  MIN_REPLICAS: "2"
+  MAX_REPLICAS: "10"
+
+  # Ingress
+  INGRESS_ENABLED: "true"
+  INGRESS_CLASS: nginx
+  CERT_MANAGER_ISSUER: "letsencrypt-prod"
+
+  # Health checks
+  HEALTH_CHECK_ENABLED: "true"
+  HEALTH_CHECK_PATH: "/actuator/health"
+  HEALTH_CHECK_INITIAL_DELAY: "30"
+
+  # Observability
+  PROMETHEUS_ENABLED: "true"
+  LOG_LEVEL: INFO
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "0.25"  # 25% sampling
+
+  # Security
+  TLS_ENABLED: "true"
+  RBAC_ENFORCED: "true"
+  SECURITY_SCANS_REQUIRED: "true"
+  VULNERABILITY_SCAN_THRESHOLD: "medium"
+
+  # Cleanup
+  CLEANUP_ON_DELETE: "false"
+  RETENTION_DAYS: "90"
+
+  # Data
+  DATABASE_TIER: "db.r5.large"
+  DATABASE_BACKUP_ENABLED: "true"
+  DATABASE_BACKUP_RETENTION_DAYS: "30"
+  REDIS_TIER: "cache.r5.large"
+
+  # Feature flags
+  EXPERIMENTAL_FEATURES_ENABLED: "false"
+  DEBUG_MODE_ENABLED: "false"
+
+  # Promotion strategy
+  PROMOTION_STRATEGY: "manual-after-regression"
+  PROMOTION_NEXT_ENV: "prod"
+  PROMOTION_GATE: "regression-suite-passed"
+  REGRESSION_TESTS_REQUIRED: "true"
+  PERFORMANCE_TESTS_REQUIRED: "true"
+  SECURITY_SCAN_REQUIRED: "true"

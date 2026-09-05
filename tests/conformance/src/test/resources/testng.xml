@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="OMOBIO Conformance Test Suite" parallel="classes" thread-count="4" verbose="2"
+       configfailurepolicy="continue">
+
+    <listeners>
+        <listener class-name="com.omobio.conformance.TestRunner"/>
+    </listeners>
+
+    <test name="Tenant Isolation Tests">
+        <groups>
+            <run>
+                <include name="tenant-isolation"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.tenant.TenantIsolationTest"/>
+        </classes>
+    </test>
+
+    <test name="Authentication Flow Tests">
+        <groups>
+            <run>
+                <include name="auth-flow"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.auth.AuthFlowTest"/>
+            <class name="com.omobio.conformance.auth.RefreshTokenReplayTest"/>
+        </classes>
+    </test>
+
+    <test name="API Contract Tests">
+        <groups>
+            <run>
+                <include name="api-contract"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.api.ApiContractTest"/>
+        </classes>
+    </test>
+
+    <test name="Config Schema Tests">
+        <groups>
+            <run>
+                <include name="config-schema"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.config.ConfigSchemaTest"/>
+        </classes>
+    </test>
+
+    <test name="Provider Adapter Tests">
+        <groups>
+            <run>
+                <include name="provider-adapter"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.provider.ProviderAdapterTest"/>
+        </classes>
+    </test>
+
+    <test name="Journey Simulation Tests">
+        <groups>
+            <run>
+                <include name="journey-simulation"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.journey.JourneySimulationTest"/>
+        </classes>
+    </test>
+
+    <test name="Dashboard Partial Response Tests">
+        <groups>
+            <run>
+                <include name="partial-response"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.dashboard.PartialResponseTest"/>
+        </classes>
+    </test>
+
+    <test name="Payment Tests">
+        <groups>
+            <run>
+                <include name="payment"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.payment.IdempotencyTest"/>
+            <class name="com.omobio.conformance.payment.StepUpTest"/>
+        </classes>
+    </test>
+
+    <test name="AI Governance Tests">
+        <groups>
+            <run>
+                <include name="ai-governance"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.ai.ToolPermissionTest"/>
+            <class name="com.omobio.conformance.ai.RAGIsolationTest"/>
+        </classes>
+    </test>
+
+    <test name="Observability Tests">
+        <groups>
+            <run>
+                <include name="observability"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.observability.CorrelationIdTest"/>
+        </classes>
+    </test>
+
+    <test name="Security Tests">
+        <groups>
+            <run>
+                <include name="security"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.security.RateLimitTest"/>
+            <class name="com.omobio.conformance.security.IdempotencyKeyTest"/>
+        </classes>
+    </test>
+
+    <test name="Smoke Tests - All Categories">
+        <groups>
+            <run>
+                <include name="replay-detection"/>
+                <include name="e2e"/>
+                <include name="resilience"/>
+                <include name="rag-isolation"/>
+                <include name="correlation-id"/>
+                <include name="idempotency"/>
+                <include name="step-up"/>
+                <include name="rate-limiting"/>
+                <include name="ai-permissions"/>
+            </run>
+        </groups>
+        <classes>
+            <class name="com.omobio.conformance.tenant.TenantIsolationTest"/>
+            <class name="com.omobio.conformance.auth.AuthFlowTest"/>
+            <class name="com.omobio.conformance.auth.RefreshTokenReplayTest"/>
+            <class name="com.omobio.conformance.api.ApiContractTest"/>
+            <class name="com.omobio.conformance.config.ConfigSchemaTest"/>
+            <class name="com.omobio.conformance.provider.ProviderAdapterTest"/>
+            <class name="com.omobio.conformance.journey.JourneySimulationTest"/>
+            <class name="com.omobio.conformance.dashboard.PartialResponseTest"/>
+            <class name="com.omobio.conformance.payment.IdempotencyTest"/>
+            <class name="com.omobio.conformance.payment.StepUpTest"/>
+            <class name="com.omobio.conformance.ai.ToolPermissionTest"/>
+            <class name="com.omobio.conformance.ai.RAGIsolationTest"/>
+            <class name="com.omobio.conformance.observability.CorrelationIdTest"/>
+            <class name="com.omobio.conformance.security.RateLimitTest"/>
+            <class name="com.omobio.conformance.security.IdempotencyKeyTest"/>
+        </classes>
+    </test>
+
+</suite>

@@ -1,0 +1,124 @@
+// OMOBIO Selfcare Platform — Jenkinsfile
+// Builds the multi-module backend, runs tests, then optionally builds Docker
+// images and deploys to a target environment via Helm.
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        ansiColor('xterm')
+    }
+
+    environment {
+        MAVEN_OPTS = '-Xmx2g -Dmaven.repo.local=.m2'
+        IMAGE_REGISTRY = credentials('omobio-image-registry')
+        DOCKER_CREDENTIALS = credentials('omobio-dockerhub')
+        K8S_CREDENTIALS = credentials('omobio-k8s-kubeconfig')
+    }
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'stg', 'reg', 'prod'], defaultValue: 'dev', description: 'Target environment')
+        string(name: 'SERVICES', defaultValue: '', description: 'Comma-separated list of services to build (empty = all)')
+        booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Deploy after build')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip tests')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    cd backend
+                    mvn -B -T 1C -DskipTests clean install
+                '''
+            }
+        }
+
+        stage('Test') {
+            when { expression { !params.SKIP_TESTS } }
+            steps {
+                sh '''
+                    cd backend
+                    mvn -B test
+                '''
+            }
+            post {
+                always {
+                    junit 'backend/**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Docker Build & Push') {
+            when { expression { params.DEPLOY } }
+            steps {
+                script {
+                    def services = params.SERVICES?.split(',')?.collect { it.trim() } ?: ALL_SERVICES
+                    for (svc in services) {
+                        if (fileExists("backend/${svc}/Dockerfile")) {
+                            sh """
+                                cd backend
+                                docker build -t ${IMAGE_REGISTRY}/${svc}:${BUILD_NUMBER} -f ${svc}/Dockerfile .
+                                docker push ${IMAGE_REGISTRY}/${svc}:${BUILD_NUMBER}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when { expression { params.DEPLOY } }
+            steps {
+                sh '''
+                    helm upgrade --install omobio-selfcare backend/deploy/helm/ \
+                        --namespace omobio-${ENVIRONMENT} \
+                        --kubeconfig ${K8S_CREDENTIALS} \
+                        --values backend/deploy/helm/values.yaml \
+                        --set image.tag=${BUILD_NUMBER} \
+                        --wait --timeout 10m
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline succeeded: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        failure {
+            echo "❌ Pipeline failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
+
+static final ALL_SERVICES = [
+    'api-gateway',
+    'config-tenant-service',
+    'customer-identity-service',
+    'admin-identity-service',
+    'account-entitlement-service',
+    'dashboard-bff',
+    'product-service',
+    'usage-service',
+    'billing-service',
+    'payment-service',
+    'notification-service',
+    'content-service',
+    'journey-service',
+    'reporting-service',
+    'ai-gateway',
+    'audit-service',
+    'insurance-service',
+    'approval-service'
+]

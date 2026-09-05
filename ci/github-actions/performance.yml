@@ -1,0 +1,174 @@
+# OMOBIO Selfcare Platform — k6 Performance Tests CI
+#
+# Runs the k6 performance test suite against stg environment on:
+#   - Pull requests that touch backend/ or config-tenant-service/
+#   - Nightly at 02:00 UTC
+#
+# Performance regressions (>10% P95 latency increase) fail the build.
+
+name: k6-performance
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'config-schema/**'
+      - 'tests/performance/**'
+  schedule:
+    - cron: '0 2 * * *'  # nightly at 02:00 UTC
+  workflow_dispatch:
+
+env:
+  API_GATEWAY: ${{ secrets.PERF_API_GATEWAY || 'http://api.stg.omobio.io' }}
+  TENANT_ID: ${{ vars.PERF_TENANT || 'dialog-lk' }}
+
+jobs:
+  k6-smoke:
+    name: k6 smoke (1 VU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run k6 smoke
+        env:
+          API_GATEWAY: ${{ env.API_GATEWAY }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+        run: |
+          k6 run --vus 1 --duration 30s \
+            --out json=results/dashboard_smoke.json \
+            tests/performance/01_dashboard_load.js
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-smoke-results
+          path: results/
+
+  k6-load:
+    name: k6 load (200 VUs, 5m)
+    runs-on: ubuntu-latest
+    needs: k6-smoke
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Dashboard load (P95<300ms target)
+        env:
+          API_GATEWAY: ${{ env.API_GATEWAY }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+        run: |
+          k6 run --vus 200 --duration 5m \
+            --out json=results/dashboard_load.json \
+            tests/performance/01_dashboard_load.js
+
+      - name: Config fetch (P95<100ms target)
+        env:
+          API_GATEWAY: ${{ env.API_GATEWAY }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+        run: |
+          k6 run --vus 1000 --duration 3m \
+            --out json=results/config_fetch.json \
+            tests/performance/03_config_compile_publish.js
+
+      - name: Payment idempotency
+        env:
+          API_GATEWAY: ${{ env.API_GATEWAY }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+        run: |
+          k6 run --vus 50 --duration 2m \
+            --out json=results/payment_idempotency.json \
+            tests/performance/02_payment_idempotency.js
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-load-results
+          path: results/
+
+  k6-resilience:
+    name: k6 resilience (provider outage)
+    runs-on: ubuntu-latest
+    needs: k6-smoke
+    timeout-minutes: 15
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    environment: stg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Enable provider fault injection
+        env:
+          K8S_KUBECONFIG: ${{ secrets.STAGING_KUBECONFIG }}
+        run: |
+          # Use the platform's chaos toggle to inject a 60s outage in a non-critical
+          # downstream provider (e.g. balance provider). The dashboard should
+          # continue serving partial responses.
+          kubectl -n omobio-stg exec deploy/chaos-controller -- \
+            enable-fault --provider balance-provider --duration 60s
+
+      - name: Run k6 resilience test
+        env:
+          API_GATEWAY: ${{ env.API_GATEWAY }}
+          TENANT_ID: ${{ env.TENANT_ID }}
+        run: |
+          sleep 5  # let fault injection kick in
+          k6 run --vus 100 --duration 60s \
+            --out json=results/resilience.json \
+            tests/performance/04_resilience_provider_outage.js
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-resilience-results
+          path: results/
+
+  perf-regression-check:
+    name: Check for performance regressions
+    runs-on: ubuntu-latest
+    needs: k6-load
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Download previous baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: k6-load-baseline
+          path: baseline/
+        continue-on-error: true
+
+      - name: Download current results
+        uses: actions/download-artifact@v4
+        with:
+          name: k6-load-results
+          path: current/
+
+      - name: Compare P95 latencies
+        run: |
+          python3 scripts/perf-compare.py \
+            --baseline baseline/dashboard_load.json \
+            --current current/dashboard_load.json \
+            --threshold 0.10

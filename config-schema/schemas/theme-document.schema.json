@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omobio.example.com/schemas/theme-document.schema.json",
+  "title": "ThemeDocument",
+  "description": "Theme / design tokens for a tenant brand",
+  "type": "object",
+  "required": ["schemaVersion", "tenantId", "name", "colors", "typography", "radius", "spacing"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["2.0"]
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Theme name (e.g. 'dialog-primary', 'aia-light')"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "colors": {
+      "type": "object",
+      "required": ["primary500", "primary700", "accent500", "surface", "textPrimary", "textSecondary"],
+      "properties": {
+        "primary900": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "primary700": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "primary500": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "primary300": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "accent500": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "accentGlow": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "surface": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "surfaceSubtle": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "textPrimary": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "textSecondary": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "success": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "warning": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "error": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "info": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" },
+        "border": { "type": "string", "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$" }
+      },
+      "additionalProperties": true
+    },
+    "typography": {
+      "type": "object",
+      "required": ["fontFamily", "sizes", "weights"],
+      "properties": {
+        "fontFamily": { "type": "string", "minLength": 1 },
+        "sizes": {
+          "type": "object",
+          "required": ["xs", "sm", "base", "lg", "xl"],
+          "properties": {
+            "xs": { "type": "string" },
+            "sm": { "type": "string" },
+            "base": { "type": "string" },
+            "lg": { "type": "string" },
+            "xl": { "type": "string" },
+            "2xl": { "type": "string" },
+            "3xl": { "type": "string" },
+            "4xl": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "weights": {
+          "type": "object",
+          "required": ["normal", "medium", "semibold", "bold"],
+          "properties": {
+            "normal": { "type": "integer", "minimum": 100, "maximum": 900 },
+            "medium": { "type": "integer", "minimum": 100, "maximum": 900 },
+            "semibold": { "type": "integer", "minimum": 100, "maximum": 900 },
+            "bold": { "type": "integer", "minimum": 100, "maximum": 900 }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "radius": {
+      "type": "string",
+      "description": "Default border radius (e.g. '12px')"
+    },
+    "spacing": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 },
+      "minItems": 1,
+      "maxItems": 16,
+      "description": "Spacing scale in px (e.g. [4, 8, 12, 16, 24, 32, 48])"
+    },
+    "logoUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Brand logo URL"
+    },
+    "darkMode": {
+      "type": "object",
+      "description": "Optional dark mode overrides",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

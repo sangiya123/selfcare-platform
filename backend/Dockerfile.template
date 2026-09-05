@@ -1,0 +1,19 @@
+// template used to generate per-service Dockerfiles
+FROM eclipse-temurin:25-jdk-jammy AS builder
+WORKDIR /build
+COPY backend/pom.xml ./pom.xml
+COPY backend/platform-common platform-common
+COPY backend/{{SERVICE_NAME}} {{SERVICE_NAME}}
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -pl {{SERVICE_NAME}} -am -DskipTests clean package
+
+FROM eclipse-temurin:25-jre-jammy
+WORKDIR /app
+RUN groupadd -r omobio && useradd -r -g omobio -u 1001 omobio
+COPY --from=builder --chown=omobio:omobio /build/{{SERVICE_NAME}}/target/*.jar app.jar
+USER omobio
+EXPOSE {{PORT}}
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom"
+HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 \
+    CMD wget -qO- http://localhost:{{PORT}}/actuator/health/liveness || exit 1
+ENTRYPOINT ["sh","-c","exec java $JAVA_OPTS -jar app.jar"]

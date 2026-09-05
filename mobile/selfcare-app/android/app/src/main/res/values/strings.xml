@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity -->
+    <string name="app_name">OMOBIO Selfcare</string>
+    <string name="app_subtitle">Powered by OMOBIO</string>
+
+    <!-- Network security config -->
+    <string name="network_security_config">network_security_config</string>
+
+    <!-- ============================================================ -->
+    <!-- Common UI strings (used by both native shell and React UI) -->
+    <!-- ============================================================ -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_loading">Loading…</string>
+    <string name="common_error_generic">Something went wrong. Please try again.</string>
+    <string name="common_error_network">No network connection. Please check your internet.</string>
+
+    <!-- ============================================================ -->
+    <!-- Authentication -->
+    <!-- ============================================================ -->
+    <string name="auth_login_title">Sign in</string>
+    <string name="auth_login_subtitle">Enter your mobile number to continue</string>
+    <string name="auth_identifier_hint">Mobile number</string>
+    <string name="auth_continue">Continue</string>
+    <string name="auth_otp_title">Enter verification code</string>
+    <string name="auth_otp_subtitle">We sent a 6-digit code to</string>
+    <string name="auth_otp_resend">Resend code</string>
+    <string name="auth_otp_resend_in">Resend in %1$ds</string>
+    <string name="auth_otp_invalid">Invalid code. Please try again.</string>
+    <string name="auth_otp_expired">Code expired. Please request a new one.</string>
+
+    <!-- ============================================================ -->
+    <!-- Dashboard -->
+    <!-- ============================================================ -->
+    <string name="dashboard_title">Home</string>
+    <string name="dashboard_refresh_pull">Pull to refresh</string>
+    <string name="dashboard_widget_timeout">This widget is taking too long to load</string>
+
+    <!-- ============================================================ -->
+    <!-- Bills -->
+    <!-- ============================================================ -->
+    <string name="bills_title">Bills</string>
+    <string name="bills_empty">No bills to display</string>
+    <string name="bills_pay_button">Pay now</string>
+    <string name="bills_view_details">View details</string>
+
+    <!-- ============================================================ -->
+    <!-- Usage -->
+    <!-- ============================================================ -->
+    <string name="usage_title">Usage</string>
+    <string name="usage_data">Data</string>
+    <string name="usage_voice">Voice</string>
+    <string name="usage_sms">SMS</string>
+    <string name="usage_remaining">%1$s remaining</string>
+
+    <!-- ============================================================ -->
+    <!-- Profile -->
+    <!-- ============================================================ -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_account_info">Account information</string>
+    <string name="profile_settings">Settings</string>
+    <string name="profile_support">Help &amp; support</string>
+    <string name="profile_signout">Sign out</string>
+    <string name="profile_signout_confirm">Are you sure you want to sign out?</string>
+
+    <!-- ============================================================ -->
+    <!-- Support -->
+    <!-- ============================================================ -->
+    <string name="support_title">Support</string>
+    <string name="support_call_us">Call us</string>
+    <string name="support_email_us">Email us</string>
+    <string name="support_chat">Live chat</string>
+    <string name="support_faq">Frequently asked questions</string>
+</resources>

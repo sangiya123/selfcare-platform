@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/suppressions_1_3.dtd">
+
+<!-- Checkstyle suppressions. Files listed here skip checkstyle enforcement.
+     Keep this list small — prefer fixing the code instead. -->
+<suppressions>
+    <!-- DTOs and value records can skip Javadoc (Java 14+ records). -->
+    <suppress checks="JavadocType|JavadocMethod|JavadocVariable"
+              files=".*Application\.java"/>
+    <suppress checks="JavadocType|JavadocMethod|JavadocVariable"
+              files=".*Config\.java"/>
+    <suppress checks="JavadocType|JavadocMethod|JavadocVariable"
+              files=".*Constants\.java"/>
+
+    <!-- Generated code -->
+    <suppress checks=".*" files=".*[\\/]target[\\/].*"/>
+    <suppress checks=".*" files=".*generated-sources.*"/>
+
+    <!-- Lombok-generated methods are excluded by pattern. -->
+    <suppress checks="MagicNumber|RedundantModifier"
+              files=".*[\\/]lombok[\\/].*"/>
+
+    <!-- Migrations are usually auto-generated SQL — no style enforcement. -->
+    <suppress checks=".*" files=".*[\\/]db[\\/]migration[\\/].*"/>
+</suppressions>
