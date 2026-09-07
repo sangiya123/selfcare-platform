@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -25,11 +26,15 @@ import java.util.UUID;
  * Always clears TenantContext at the end.
  *
  * Requests without a valid X-Tenant-Id receive 400 Bad Request.
+ *
+ * Servlet-only: reactive apps (e.g. api-gateway / Spring Cloud Gateway) use
+ * the TenantRoutingGatewayFilterFactory for tenant resolution.
  */
 @Slf4j
 @Component
 @Order(1) // Run very early — before security, before everything
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class TenantResolverFilter extends OncePerRequestFilter {
 
     public static final String TENANT_HEADER = "X-Tenant-Id";

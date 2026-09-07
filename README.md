@@ -62,6 +62,39 @@ Once running, the platform is accessible at:
 
 For Kubernetes, replace `localhost:8080` with `localhost:30080`, etc.
 
+### Per-service access (Kubernetes / NodePort 30080)
+
+| Service | Gateway route | Local port |
+|---|---|---|
+| API Gateway | http://localhost:30080 | 80 → 8080 |
+| Admin portal (Selfcare Studio) | http://localhost:30081 | 80 |
+| Customer Identity (auth/OTP/JWKS) | http://localhost:30080/api/v1/auth/** | 8081 |
+| Admin Identity (SAML/RBAC login) | http://localhost:30080/api/v1/admin/** | 8082 |
+| Config Tenant (tenant config) | http://localhost:30080/api/v1/config/** | 8083 |
+| Account & Entitlement | http://localhost:30080/api/v1/account/** | 8084 |
+| Dashboard BFF | http://localhost:30080/api/v1/dashboard/** | 8085 |
+| Product Catalog | http://localhost:30080/api/v1/product/** | 8086 |
+| Usage & Balance | http://localhost:30080/api/v1/usage/** | 8087 |
+| Billing | http://localhost:30080/api/v1/billing/** | 8088 |
+| Payment | http://localhost:30080/api/v1/payment/** | 8089 |
+| Notification | http://localhost:30080/api/v1/notification/** | 8090 |
+| Content (CMS/FAQ) | http://localhost:30080/api/v1/content/** | 8091 |
+| Journey | http://localhost:30080/api/v1/journey/** | 8092 |
+| Reporting | http://localhost:30080/api/v1/reporting/** | 8093 |
+| AI Gateway | http://localhost:30080/api/v1/ai/** | 8094 |
+| Audit | http://localhost:30080/api/v1/audit/** | 8095 |
+| Insurance | http://localhost:30080/api/v1/insurance/** | 8096 |
+| Approval | http://localhost:30080/api/v1/approval/** | 8097 |
+| Grafana | http://localhost:30300 | admin / admin |
+| Prometheus | http://localhost:30090 | |
+
+Direct per-service access (port-forward):
+
+```bash
+kubectl port-forward -n omobio svc/customer-identity-service 8081:8081
+kubectl port-forward -n omobio svc/product-service 8086:8086
+```
+
 ## Tenant: dialog-lk
 
 The platform is pre-configured for **Dialog Axiata PLC (Sri Lanka)**. Tenant config
@@ -142,6 +175,11 @@ Each service exposes Spring Actuator endpoints:
 docker compose logs mongodb
 docker exec omobio-mongodb mongosh --eval "db.adminCommand('ping')"
 ```
+
+> **Spring Boot 4.1.1 note:** the MongoDB property prefix is `spring.mongodb.*`,
+> not `spring.data.mongodb.*`. Config is injected cluster-wide from the
+> `omobio-config` ConfigMap (SPRING_MONGODB_HOST / _PORT / _URI / ...). If pods
+> log `hosts=[localhost:27017]`, those env keys are missing from the ConfigMap.
 
 ### "API Gateway returns 502"
 - Check upstream service health: `docker compose ps`

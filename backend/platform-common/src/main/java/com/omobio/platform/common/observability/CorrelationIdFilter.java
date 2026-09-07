@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -23,10 +24,14 @@ import java.util.UUID;
  * Also generates a new correlation ID if not present.
  *
  * Runs after TenantResolverFilter.
+ *
+ * Servlet-only: reactive apps (e.g. api-gateway / Spring Cloud Gateway) use
+ * their own WebFilter-based correlation handling.
  */
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10) // After tenant resolver
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";

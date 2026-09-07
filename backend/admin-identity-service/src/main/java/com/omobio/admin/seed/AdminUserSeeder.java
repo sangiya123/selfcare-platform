@@ -1,7 +1,7 @@
 package com.omobio.admin.seed;
 
 import com.omobio.admin.domain.AdminUser;
-import com.omobio.admin.domain.AdminUserRepository;
+import com.omobio.admin.repository.AdminUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

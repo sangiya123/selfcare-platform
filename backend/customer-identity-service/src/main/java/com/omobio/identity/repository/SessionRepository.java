@@ -51,7 +51,7 @@ public interface SessionRepository extends JpaRepository<Session, String> {
      * @param status    expected status
      * @return the session if found and status matches
      */
-    Optional<Session> findByIdAndStatus(String sessionId, String status);
+    Optional<Session> findBySessionIdAndStatus(String sessionId, String status);
 
     /**
      * Find a session by tenant and session ID (cross-tenant guard).

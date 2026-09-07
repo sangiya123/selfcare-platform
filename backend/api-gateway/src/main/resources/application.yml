@@ -7,6 +7,8 @@ spring:
     name: api-gateway
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  main:
+    web-application-type: reactive
 
   cloud:
     gateway:

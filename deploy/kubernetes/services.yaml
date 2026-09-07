@@ -103,7 +103,7 @@ spec:
         - name: config-tenant-service
           image: omobio/config-tenant-service:local-v2
           args:
-            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+            - "--spring.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
           ports:
             - containerPort: 8081
           env:
@@ -175,7 +175,7 @@ spec:
         - name: customer-identity-service
           image: omobio/customer-identity-service:local-v4
           args:
-            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+            - "--spring.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
           ports:
             - containerPort: 8082
           env:
@@ -375,7 +375,7 @@ spec:
         - name: dashboard-bff
           image: omobio/dashboard-bff:local-v2
           args:
-            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+            - "--spring.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
           ports:
             - containerPort: 8085
           env:
@@ -1032,7 +1032,7 @@ spec:
         - name: insurance-service
           image: omobio/insurance-service:local-v2
           args:
-            - "--spring.data.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+            - "--spring.mongodb.uri=mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
           ports:
             - containerPort: 8096
           env:

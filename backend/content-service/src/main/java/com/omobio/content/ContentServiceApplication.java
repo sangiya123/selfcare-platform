@@ -20,7 +20,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
  * Stored in MongoDB (flexible content model).
  */
 @SpringBootApplication
-@EnableMongoRepositories(basePackages = "com.omobio.content.repository")
+@EnableMongoRepositories(basePackages = {"com.omobio.content.repository", "com.omobio.platform.common.config"})
 @ComponentScan(basePackages = {
     "com.omobio.content",
     "com.omobio.platform.common"

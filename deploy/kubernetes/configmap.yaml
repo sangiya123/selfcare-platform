@@ -10,7 +10,13 @@ data:
   X_DEFAULT_TENANT_ID: "dialog-lk"
   OMOBIO_TENANT_DEFAULT_ID: "dialog-lk"
 
-  # MongoDB
+  # MongoDB (Boot 4.1.1 property prefix is spring.mongodb, not spring.data.mongodb)
+  SPRING_MONGODB_URI: "mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
+  SPRING_MONGODB_HOST: "mongodb"
+  SPRING_MONGODB_PORT: "27017"
+  SPRING_MONGODB_DATABASE: "omobio_config"
+  SPRING_MONGODB_USERNAME: "omobio"
+  SPRING_MONGODB_PASSWORD: "omobio_pw"
   SPRING_DATA_MONGODB_URI: "mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin"
   SPRING_DATA_MONGODB_HOST: "mongodb"
   SPRING_DATA_MONGODB_PORT: "27017"
@@ -37,6 +43,7 @@ data:
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
   REDIS_PASSWORD: "omobio_pw"
+  REDIS_URL: "redis://:omobio_pw@redis:6379"
 
   # Local development uses Hibernate to create missing service tables.
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
@@ -44,6 +51,7 @@ data:
 
   # Kafka
   SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+  KAFKA_BROKERS: "kafka:29092"
 
   # Tracing (no OTLP collector deployed in local cluster)
   OMOBIO_OTEL_ENABLED: "false"

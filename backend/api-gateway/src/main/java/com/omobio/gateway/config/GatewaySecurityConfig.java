@@ -4,9 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 /**
@@ -46,21 +44,6 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class GatewaySecurityConfig {
 
     /**
-     * Permits all traffic through the gateway.  Downstream services enforce
-     * their own authentication / authorisation against the same JWKS endpoint.
-     */
-    @Bean
-    public SecurityFilterChain servletSecurityFilterChain(HttpSecurity http) throws Exception {
-        log.info("Configuring API gateway: Spring Security disabled (auth handled at downstream services)");
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> {
-            })
-            .authorizeHttpRequests(authz -> authz.anyRequest().permitAll());
-        return http.build();
-    }
-
-    /**
      * Reactive security filter chain is set to a no-op.  This prevents the
      * default {@code spring-boot-starter-webflux} auto-configuration from
      * activating a default chain that would block or redirect traffic before
@@ -68,11 +51,10 @@ public class GatewaySecurityConfig {
      */
     @Bean
     @Primary
-    public SecurityWebFilterChain reactiveSecurityFilterChain(
-            org.springframework.security.config.web.server.ServerHttpSecurity http) {
+    public SecurityWebFilterChain reactiveSecurityFilterChain() {
         log.info("Configuring API gateway reactive security: SecurityWebFilterChain disabled");
-        return http
-                .csrf(org.springframework.security.config.web.server.ServerHttpSecurity.CsrfSpec::disable)
+        return ServerHttpSecurity.http()
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(authz -> authz.anyExchange().permitAll())
                 .build();
     }

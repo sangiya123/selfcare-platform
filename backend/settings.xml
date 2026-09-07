@@ -8,6 +8,12 @@
       <properties>
         <maven.compiler.fork>true</maven.compiler.fork>
         <maven.compiler.argument>-Xlint:all -parameters</maven.compiler.argument>
+        <aether.transport.http.retryHandler.count>10</aether.transport.http.retryHandler.count>
+        <aether.transport.http.retryHandler.defaultDelay>2</aether.transport.http.retryHandler.defaultDelay>
+        <aether.transport.http.retryHandler.maxDelay>30</aether.transport.http.retryHandler.maxDelay>
+        <maven.wagon.http.retryHandler.count>10</maven.wagon.http.retryHandler.count>
+        <maven.wagon.http.connectionTimeout>60000</maven.wagon.http.connectionTimeout>
+        <maven.wagon.http.readTimeout>120000</maven.wagon.http.readTimeout>
       </properties>
     </profile>
   </profiles>

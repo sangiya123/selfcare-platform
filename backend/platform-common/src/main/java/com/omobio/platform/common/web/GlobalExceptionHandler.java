@@ -2,6 +2,7 @@ package com.omobio.platform.common.web;
 
 import com.omobio.platform.common.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,9 +25,13 @@ import java.util.Map;
  * Every error response includes correlationId, path, and timestamp.
  *
  * Add @RestControllerAdvice to your service's package or use component scan.
+ *
+ * Servlet-only: reactive apps (e.g. api-gateway / Spring Cloud Gateway) use
+ * the gateway's reactive WebExceptionHandler instead.
  */
 @Slf4j
 @RestControllerAdvice
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)

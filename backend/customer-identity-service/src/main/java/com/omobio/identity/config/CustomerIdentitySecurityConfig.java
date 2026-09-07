@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -104,17 +105,19 @@ public class CustomerIdentitySecurityConfig {
     }
 
     @Bean
+    @Primary
     public JwtDecoder selfJwtDecoder(
-            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwksUri) {
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwksUri,
+            @Value("${omobio.security.jwt.base-url:http://localhost:8081}") String baseUrl) {
         // If no external JWKS URI is configured, fall back to self (local discovery)
         String uri = (jwksUri != null && !jwksUri.isBlank())
                 ? jwksUri
                 : "/.well-known/jwks.json";
 
-        log.info("JWT decoder using JWKS: {}", uri);
+        log.info("JWT decoder using JWKS: {}{}", baseUrl, uri);
         // Use JWK set URI relative to this service
         return NimbusJwtDecoder
-                .withJwkSetUri("http://localhost:8081" + uri)
+                .withJwkSetUri(baseUrl + uri)
                 .build();
     }
 

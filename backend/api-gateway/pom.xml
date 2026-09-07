@@ -82,10 +82,45 @@
 
         <!-- ============================================================ -->
         <!-- PLATFORM COMMON                                              -->
+        <!-- Gateway is reactive-only (Spring Cloud Gateway / WebFlux).  -->
+        <!-- Exclude the servlet web + servlet security starters pulled  -->
+        <!-- in by platform-common so MVC / servlet auto-config          -->
+        <!-- (WebMvcSecurityConfiguration, WebSecurityConfiguration,     -->
+        <!-- Tomcat / jakarta.servlet.Filter) cannot load on the reactive -->
+        <!-- Netty stack.                                                -->
         <!-- ============================================================ -->
         <dependency>
             <groupId>com.omobio</groupId>
             <artifactId>platform-common</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-security</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- ============================================================ -->
+        <!-- SECURITY (reactive, no servlet auto-config)                 -->
+        <!-- From Spring Security 7.x the reactive web support lives in  -->
+        <!-- spring-security-web (SecurityWebFilterChain) and the config  -->
+        <!-- API (ServerHttpSecurity) in spring-security-config. These    -->
+        <!-- are managed by the spring-boot-dependencies BOM. The gateway -->
+        <!-- defines its own SecurityWebFilterChain (GatewaySecurityConfig) -->
+        <!-- so neither the servlet SecurityFilterChain nor Boot's default -->
+        <!-- reactive deny-all chain gets created.                        -->
+        <!-- ============================================================ -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
         </dependency>
 
         <!-- ============================================================ -->

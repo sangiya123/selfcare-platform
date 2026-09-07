@@ -8,6 +8,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /** Shared beans used by services that do not otherwise enable the related auto-configuration. */
@@ -24,6 +25,12 @@ public class CommonInfrastructureConfig {
     @ConditionalOnMissingBean
     public WebClient.Builder webClientBuilder() {
         return WebClient.builder();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public RestClient.Builder restClientBuilder() {
+        return RestClient.builder();
     }
 
     @Bean

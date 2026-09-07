@@ -53,6 +53,7 @@ omobio:
     admin-jwt:
       issuer: ${JWT_ISSUER:omobio-admin-identity}
       audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      secret: ${ADMIN_JWT_SECRET:omobio-admin-jwt-dev-secret-change-me}
       access-token-seconds: 3600
       refresh-token-seconds: 2592000
     password:

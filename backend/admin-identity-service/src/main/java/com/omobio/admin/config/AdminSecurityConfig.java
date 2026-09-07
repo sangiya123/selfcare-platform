@@ -29,13 +29,19 @@ import java.nio.charset.StandardCharsets;
 @EnableMethodSecurity
 public class AdminSecurityConfig {
 
-    @Value("${omobio.admin.jwt.secret}")
+    @Value("${omobio.security.admin-jwt.secret}")
     private String jwtSecret;
 
     private final AdminAuthenticationConverter authConverter;
 
     public AdminSecurityConfig(AdminAuthenticationConverter authConverter) {
         this.authConverter = authConverter;
+    }
+
+    @Bean
+    public org.springframework.security.crypto.password.PasswordEncoder passwordEncoder(
+            @Value("${omobio.security.password.bcrypt-strength:12}") int strength) {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(strength);
     }
 
     @Bean
