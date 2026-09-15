@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Config Publish & Adoption",
-  "uid": "omobio-config-publish",
+﻿{
+  "title": "selfcare Config Publish & Adoption",
+  "uid": "selfcare-config-publish",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Config publish rate, rollback, validation, schema, approval, and per-tenant adoption metrics. Runbook: https://runbooks.omobio.local/config-publish",
-  "tags": ["omobio", "config", "publish", "approval", "adoption"],
+  "description": "Config publish rate, rollback, validation, schema, approval, and per-tenant adoption metrics. Runbook: https://runbooks.selfcare.local/config-publish",
+  "tags": ["selfcare", "config", "publish", "approval", "adoption"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -164,7 +164,7 @@
       "id": 4,
       "type": "stat",
       "title": "Schema Violations (1h)",
-      "description": "Configs that failed JSON-schema validation. Runbook: https://runbooks.omobio.local/config-schema",
+      "description": "Configs that failed JSON-schema validation. Runbook: https://runbooks.selfcare.local/config-schema",
       "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
       "datasource": "Prometheus",
       "targets": [
@@ -408,7 +408,7 @@
       "id": 12,
       "type": "timeseries",
       "title": "Adoption Rate by Tenant",
-      "description": "Per-tenant adoption of the latest config version. Runbook: https://runbooks.omobio.local/config-adoption",
+      "description": "Per-tenant adoption of the latest config version. Runbook: https://runbooks.selfcare.local/config-adoption",
       "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [
@@ -435,7 +435,7 @@
       "id": 13,
       "type": "piechart",
       "title": "Config Version Distribution",
-      "description": "Active tenants per config version. Runbook: https://runbooks.omobio.local/config-version-rollout",
+      "description": "Active tenants per config version. Runbook: https://runbooks.selfcare.local/config-version-rollout",
       "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

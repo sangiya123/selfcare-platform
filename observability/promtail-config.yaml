@@ -1,4 +1,4 @@
-server:
+﻿server:
   http_listen_port: 9080
   grpc_listen_port: 0
 
@@ -21,13 +21,13 @@ scrape_configs:
       - docker: {}
 
   # Application logs from k8s/systemd
-  - job_name: omobio
+  - job_name: selfcare
     static_configs:
       - targets:
           - localhost
         labels:
-          job: omobio
-          __path__: /var/log/omobio/*.log
+          job: selfcare
+          __path__: /var/log/selfcare/*.log
     pipeline_stages:
       - regex:
           expression: '(?P<level>\w+)\s+\[(?P<tenantId>[^,]+),(?P<correlationId>[^\]]+)\]\s+(?P<logger>\S+)\s+-\s+(?P<message>.*)'
@@ -37,7 +37,7 @@ scrape_configs:
           correlationId:
           logger:
       - match:
-          selector: '{job="omobio"}'
+          selector: '{job="selfcare"}'
           stages:
             - template:
                 source: message

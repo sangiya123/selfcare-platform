@@ -1,0 +1,43 @@
+﻿// ============================================================================
+// Selfcare — STG train (wrapper)
+// ============================================================================
+// Pins DEPLOY_ENV=stg. QA flows ON. Security/sonar OFF.
+// Flow: Compile → Unit Test → Admin QA → Mobile QA → Docker Build+Push
+//       → Deploy DEV → API Automation → SIT/Regression → Deploy STG → Smoke.
+//
+// Point a Jenkins job at: ci/jenkins/Jenkinsfile.stg
+// ============================================================================
+
+def masterJob = env.SELFCARE_SELF_CARE_MASTER_JOB ?: 'selfcare-Selfcare-Platform'
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+        timeout(time: 120, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+        githubPush()
+    }
+
+    stages {
+        stage('Trigger Staging') {
+            steps {
+                build job: masterJob, wait: true, propagate: true,
+                    parameters: [
+                        choice(name: 'DEPLOY_ENV', choices: ['stg']),
+                        string(name: 'RELEASE_TAG', value: ''),
+                        booleanParam(name: 'FORCE_QA', value: false),
+                        booleanParam(name: 'FORCE_SECURITY', value: false),
+                        booleanParam(name: 'SKIP_DEPLOY', value: false)
+                    ]
+            }
+        }
+    }
+
+    post { failure { echo 'STG train failed — check selfcare-Selfcare-Platform build.' } }
+}

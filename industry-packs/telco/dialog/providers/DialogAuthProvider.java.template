@@ -1,8 +1,8 @@
-package com.omobio.providers.dialog.auth;
+﻿package com.selfcare.providers.dialog.auth;
 
-import com.omobio.platform.common.adapter.ApiAdapter;
-import com.omobio.platform.common.adapter.RegisterAdapter;
-import com.omobio.platform.common.web.ServiceUnavailableException;
+import com.selfcare.platform.common.adapter.ApiAdapter;
+import com.selfcare.platform.common.adapter.RegisterAdapter;
+import com.selfcare.platform.common.web.ServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -18,10 +18,10 @@ import java.time.Duration;
  * Returns a canonical AuthResult for use by customer-identity-service.
  *
  * Configuration in application.yml:
- *   omobio.providers.dialog.auth.base-url: https://auth.dialog.lk
- *   omobio.providers.dialog.auth.timeout-ms: 5000
- *   omobio.providers.dialog.auth.client-id: ${DIALOG_AUTH_CLIENT_ID}
- *   omobio.providers.dialog.auth.client-secret: ${DIALOG_AUTH_CLIENT_SECRET}
+ *   selfcare.providers.dialog.auth.base-url: https://auth.dialog.lk
+ *   selfcare.providers.dialog.auth.timeout-ms: 5000
+ *   selfcare.providers.dialog.auth.client-id: ${DIALOG_AUTH_CLIENT_ID}
+ *   selfcare.providers.dialog.auth.client-secret: ${DIALOG_AUTH_CLIENT_SECRET}
  */
 @Slf4j
 @Component
@@ -33,10 +33,10 @@ public class DialogAuthProvider implements ApiAdapter {
         return "dialog-lk";
     }
 
-    @Value("${omobio.providers.dialog.auth.base-url:https://auth.dialog.lk}")
+    @Value("${selfcare.providers.dialog.auth.base-url:https://auth.dialog.lk}")
     private String baseUrl;
 
-    @Value("${omobio.providers.dialog.auth.timeout-ms:5000}")
+    @Value("${selfcare.providers.dialog.auth.timeout-ms:5000}")
     private long timeoutMs;
 
     private final WebClient webClient;
@@ -44,7 +44,7 @@ public class DialogAuthProvider implements ApiAdapter {
     public DialogAuthProvider(WebClient.Builder builder) {
         this.webClient = builder
                 .baseUrl("https://auth.dialog.lk")
-                .defaultHeader("User-Agent", "omobio-selfcare/1.0")
+                .defaultHeader("User-Agent", "selfcare/1.0")
                 .build();
     }
 

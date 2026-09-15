@@ -1,133 +1,295 @@
-# Default values for omobio-microservice chart
-# Override per service via -f <service>-values.yaml
-# Override per operator via -f operator-values/operator-<name>-values.yaml
+# =============================================================================
+# selfcare-platform — core Helm values
+# Pure config: no hardcoded credentials. Passwords/usernames are referenced by
+# name from the selfcare-infra-creds Secret (created by deploy/kubernetes).
+# =============================================================================
 
-replicaCount: 2
+# --- Release metadata -------------------------------------------------------
+nameOverride: "selfcare"
+fullnameOverride: "selfcare"
 
+# Deploy mode. `isolated` is used by Jenkins to promote ONE service at a time:
+# deploy:
+#   isolated: true
+#   service: config-tenant-service
+#   image:
+#     repository: <registry>
+#     tag: <build-tag>
+deploy:
+  isolated: false
+  service: ""
+  image: {}
+
+# --- Tenant (per-tenant overrides live in values/client-<tenant>-values.yaml)
+tenant:
+  id: dialog-lk
+  industry: telco
+  type: operator
+  region: lk
+
+# --- Environment behavior ---------------------------------------------------
+environment:
+  name: dev
+  profiles: docker
+
+# --- Global image defaults (overridden per service or via deploy.image) -----
 image:
-  repository: omobio/api-gateway
+  repository: ghcr.io/sangiya123
+  tag: latest
   pullPolicy: IfNotPresent
-  tag: "latest"
 
-imagePullSecrets:
-  - name: omobio-registry-secret
+# Optional registry pull secret (imagePullSecrets)
+imagePullSecret: selfcare-registry-secret
 
-nameOverride: ""
-fullnameOverride: ""
+# --- Credentials: referenced by name, never inline --------------------------
+# Created by deploy/kubernetes/secrets.yaml per namespace. Values live AWS
+# Secrets Manager / EKS Secrets and are injected at deploy time.
+credentials:
+  secretName: selfcare-infra-creds
 
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
+# --- Database / middleware endpoints (Kubernetes service names) -------------
+db:
+  host: mysql
+  port: "3306"
 
-podAnnotations: {}
+mongo:
+  host: mongodb
+  port: "27017"
 
-podSecurityContext:
-  fsGroup: 2000
+redis:
+  host: redis
+  port: "6379"
 
-securityContext:
-  capabilities:
-    drop:
-      - ALL
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 1000
+kafka:
+  bootstrapServers: kafka:9092
 
-service:
-  type: ClusterIP
-  port: 8080
+# --- SSRF allow list (outbound hosts providers may call) --------------------
+allowlist: "localhost,mock,bss-dialog.svc,smsc-dialog.svc,bss-hutch.svc,smsc-hutch.svc,bss-airtel.svc,smsc-airtel.svc,aia-api.svc"
 
+# --- JVM defaults -----------------------------------------------------------
+jvm:
+  options: "-Xmx768m -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# --- Topology / locality ----------------------------------------------------
+topologySpreadZone: topology.kubernetes.io/zone
+tolerations: []
+nodeSelector: {}
+
+# --- Ingress ----------------------------------------------------------------
 ingress:
+  # Enabled in dev via values/dev.yaml, forced on for prod
   enabled: false
-  className: ""
-  annotations: {}
-  hosts: []
-  tls: []
+  className: nginx
+  host: selfcare.example.com
+  adminHost: ""
+  rateLimit: ""
+  waf: true
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
 
+# --- Autoscaling (prod scales up via values/prod.yaml) ----------------------
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCpu: 75
+  targetMemory: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+networkPolicy:
+  enabled: false
+
+# --- Service mesh / injection -----------------------------------------------
+istio:
+  injection:
+    enabled: false
+
+linkerd:
+  injection:
+    enabled: false
+
+# --- Observability ----------------------------------------------------------
+observability:
+  logLevel: INFO
+  tracing:
+    enabled: false
+    endpoint: ""
+  prometheus:
+    enabled: false
+    podMonitorSelector: app.kubernetes.io/name
+    scrapeInterval: 30s
+
+# --- Resource defaults ------------------------------------------------------
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
   requests:
     cpu: 250m
     memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
 
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
+# --- Shared per-service defaults (merged under every service below) ---------
+defaultService:
+  replicas: 1
+  service:
+    type: ClusterIP
+  image: {}
+  env: {}
+  envFrom: []
+  probes:
+    enabled: true
+  livenessProbe:
+    path: /actuator/health
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    path: /actuator/health
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startupProbe:
+    path: /actuator/health
+    periodSeconds: 10
+    failureThreshold: 30
+  securityContext: {}
+  priorityClassName: ""
+  sidecars: []
+  volumes: []
+  volumeMounts: []
+  resources: {}
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+# =============================================================================
+# MICROSERVICES — one entry per service.
+# Image repository is the chart-global `image.repository` unless overridden.
+# =============================================================================
+services:
 
-# Application configuration
-env:
-  SPRING_PROFILES_ACTIVE: prod
-  JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-  OTEL_SERVICE_NAME: ""
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
-
-# Tenant configuration
-tenant:
-  id: ""
-  operator: ""
-
-# Probes
-livenessProbe:
-  httpGet:
-    path: /actuator/health/liveness
+  api-gateway:
     port: 8080
-  initialDelaySeconds: 60
-  periodSeconds: 10
-  timeoutSeconds: 3
-  failureThreshold: 3
+    tier: edge
+    env:
+      SERVER_PORT: "8080"
+    livenessProbe:
+      path: /actuator/health
+      initialDelaySeconds: 50
+    readinessProbe:
+      path: /actuator/health
+      initialDelaySeconds: 20
 
-readinessProbe:
-  httpGet:
-    path: /actuator/health/readiness
-    port: 8080
-  initialDelaySeconds: 30
-  periodSeconds: 5
-  timeoutSeconds: 3
-  failureThreshold: 3
+  config-tenant-service:
+    port: 8081
+    tier: core
+    env:
+      SPRING_PROFILES_ACTIVE: dev
 
-# Service-specific secrets (referenced from Kubernetes secret)
-secrets:
-  # Secret references only — values injected at runtime
-  jwtSigningKey: ""
-  databasePassword: ""
-  redisPassword: ""
-  kafkaCredentials: ""
+  customer-identity-service:
+    port: 8082
+    tier: core
+    env:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true"
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
 
-# Pod disruption budget
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
+  admin-identity-service:
+    port: 8083
+    tier: core
+    env:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_admin?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      SPRING_DATASOURCE_USERNAME: selfcare
 
-# Argo Rollouts canary
-rollout:
-  enabled: false
-  canary:
-    steps:
-      - setWeight: 10
-      - pause: { duration: 5m }
-      - setWeight: 25
-      - pause: { duration: 5m }
-      - setWeight: 50
-      - pause: { duration: 5m }
-      - setWeight: 100
+  account-entitlement-service:
+    port: 8084
+    tier: core
+    env:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_core?useSSL=false&serverTimezone=UTC"
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
 
-# Network policies
-networkPolicy:
-  enabled: true
-  ingressNamespaceSelector: {}
-  ingressPodSelector: {}
+  dashboard-bff:
+    port: 8085
+    tier: bff
+    env:
+      CONFIG_TENANT_URL: "http://config-tenant-service:8081"
 
-# Service monitor for Prometheus
-serviceMonitor:
-  enabled: true
-  interval: 30s
-  scrapeTimeout: 10s
+  product-service:
+    port: 8086
+    tier: domain
+
+  usage-service:
+    port: 8087
+    tier: domain
+    env:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  support-service:
+    port: 8098
+    tier: domain
+    env:
+      SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+
+  billing-service:
+    port: 8088
+    tier: domain
+
+  payment-service:
+    port: 8089
+    tier: domain
+    env:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_payment?useSSL=false&serverTimezone=UTC"
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  notification-service:
+    port: 8090
+    tier: domain
+    env:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  content-service:
+    port: 8091
+    tier: domain
+    env:
+      SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+
+  journey-service:
+    port: 8092
+    tier: domain
+    env:
+      SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+
+  reporting-service:
+    port: 8093
+    tier: domain
+
+  ai-gateway:
+    port: 8094
+    tier: ai
+    env:
+      SELFCARE_AI_PROVIDER: "stub"
+      SELFCARE_AI_STUB_ENABLED: "true"
+      SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+
+  audit-service:
+    port: 8095
+    tier: cross-cutting
+    env:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  insurance-service:
+    port: 8096
+    tier: domain
+    env:
+      SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+
+  approval-service:
+    port: 8097
+    tier: cross-cutting

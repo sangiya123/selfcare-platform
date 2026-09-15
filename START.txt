@@ -1,7 +1,7 @@
-OMOBIO Selfcare Platform — Start Here
+Selfcare Platform — Start Here
 =====================================
 
-This is the OMOBIO Global Selfcare Product Platform implementation repo.
+This is the selfcare Global selfcare Product Platform implementation repo.
 
 READ FIRST:
 1. README.md — overview, architecture, quick start
@@ -76,4 +76,4 @@ SEE ALSO:
 - backend/docs/adrs/ — Architecture Decision Records
 - config-schema/schemas/ — JSON Schema for config validation
 - operator-packs/dialog/ — Dialog operator pack template
-- Planning doc/OMOBIO_SC_FINAL_v2/arch/ — Architecture diagrams (D01-D07)
+- Planning doc/selfcare_SC_FINAL_v2/arch/ — Architecture diagrams (D01-D07)

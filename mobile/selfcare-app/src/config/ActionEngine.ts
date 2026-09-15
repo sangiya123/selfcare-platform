@@ -24,9 +24,13 @@
  *  17. CALL_NUMBER    — dial a phone number
  *  18. SEND_SMS       — open SMS composer
  */
-import { Linking, Clipboard, Share, Alert } from 'react-native';
+import { Clipboard, Share, Alert } from 'react-native';
+import LinkingDefault from 'react-native/Libraries/Linking/Linking';
+import type { Linking as LinkingStatic } from 'react-native';
 import type { Action } from './types';
 import type { SelfcareSDK } from './ConfigSDK';
+
+const Linking = LinkingDefault as unknown as LinkingStatic;
 
 export interface ActionContext {
   navigate?: (route: string, params?: Record<string, unknown>) => void;

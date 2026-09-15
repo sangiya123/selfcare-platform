@@ -1,4 +1,4 @@
-# Configuration Change — <tenant>/<env>/<change-name>
+﻿# Configuration Change — <tenant>/<env>/<change-name>
 
 | Field | Value |
 |---|---|
@@ -57,7 +57,7 @@ specs.
 
 ## Preview Evidence
 
-- **Preview URL:** `https://preview-<env>.omobio.io/<tenant>/<layout-draft>`
+- **Preview URL:** `https://preview-<env>.selfcare.io/<tenant>/<layout-draft>`
 - **Screenshots:** attach
 - **Stakeholder sign-off:** name + date for each
 

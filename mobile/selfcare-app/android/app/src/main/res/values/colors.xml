@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand colors — defaults; tenant-specific overrides loaded at runtime
-         from the manifest via theme resolver. These are the placeholders
-         displayed before the manifest is fetched. -->
-    <color name="brand_primary">#6C2DC7</color>
-    <color name="brand_primary_dark">#4A1E8A</color>
-    <color name="brand_primary_light">#A78BFA</color>
-    <color name="brand_accent">#00B900</color>
+    <!-- Dialog brand palette (mda-mobile config/styles.js). These are the
+         shell-level defaults; tenant-specific overrides are loaded at runtime
+         from the manifest via the theme resolver. -->
+    <color name="brand_primary">#65246E</color>
+    <color name="brand_primary_dark">#4A1A52</color>
+    <color name="brand_primary_light">#8C6395</color>
+    <color name="brand_accent">#EB275A</color>
 
     <!-- Status colors -->
     <color name="status_success">#388E3C</color>
-    <color name="status_warning">#FFA000</color>
-    <color name="status_error">#D32F2F</color>
-    <color name="status_info">#1976D2</color>
+    <color name="status_warning">#F88E13</color>
+    <color name="status_error">#B30000</color>
+    <color name="status_info">#178DE7</color>
 
     <!-- Neutral colors -->
     <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
+    <color name="text_secondary">#727272</color>
     <color name="text_disabled">#BDBDBD</color>
     <color name="background">#FFFFFF</color>
     <color name="surface">#F5F5F5</color>
     <color name="divider">#E0E0E0</color>
 
     <!-- Launch screen -->
-    <color name="launch_background">#6C2DC7</color>
+    <color name="launch_background">#65246E</color>
 </resources>

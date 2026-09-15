@@ -1,8 +1,8 @@
-# ADR-003: Java 25 + Spring Reactive for Backend
+﻿# ADR-003: Java 25 + Spring Reactive for Backend
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 

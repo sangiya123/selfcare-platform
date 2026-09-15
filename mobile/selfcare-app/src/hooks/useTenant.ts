@@ -1,7 +1,7 @@
-/**
+﻿/**
  * useTenant — tenant context for the Selfcare App.
  *
- * A "tenant" (also called "client") is a business using the OMOBIO platform:
+ * A "tenant" (also called "client") is a business using the selfcare platform:
  *   - dialog-lk, hutch-lk, airtel-lk (telco)
  *   - aia-lk, aia-sg, ... (insurance)
  *

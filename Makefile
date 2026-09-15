@@ -1,34 +1,62 @@
 # =====================================================================
-# OMOBIO Selfcare Platform — Makefile
+# Selfcare Platform — Makefile
 # =====================================================================
 # One-line environment switching + per-component commands.
-# Set OMOBIO_ENV=dev|stg|reg|prod (default: dev)
+# Set SELFCARE_ENV=dev|stg|reg|prod (default: dev)
 # =====================================================================
 
-OMOBIO_ENV ?= dev
-export OMOBIO_ENV
+SELFCARE_ENV ?= dev
+export SELFCARE_ENV
 
-# Sync env from .env.<OMOBIO_ENV> into the shell
+# Sync env from .env.<SELFCARE_ENV> into the shell
 .env:
 	@./env-loader.sh
 
-# ---------- High-level: start the full stack for an environment ----------
-.PHONY: dev stg reg prod
+# ---------- High-level: deploy to EKS via new scripts ----------
+# Usage:
+#   make dev                           # docker-compose local (fast inner loop)
+#   make k8s-dev TAG=dev-42            # EKS deploy (Jenkins or manual)
+#   make k8s-stg TAG=rc-42
+#   make k8s-prod TAG=v1.2.0
+#   make smoke ENV=dev
+.PHONY: dev stg reg prod k8s-dev k8s-stg k8s-reg k8s-prod smoke dev-test
 dev:
-	@echo "Starting DEV environment..."
-	@OMOBIO_ENV=dev docker-compose up -d
+	@echo "Starting DEV environment (docker-compose local)..."
+	@SELFCARE_ENV=dev docker-compose up -d
 
 stg:
-	@echo "Deploying STG environment..."
-	@OMOBIO_ENV=stg kubectl apply -k backend/deploy/helm/overlays/stg
+	@echo "Deploying STG via ArgoCD..."
+	@VERSION=$(TAG) ./scripts/argocd-sync.sh --env stg --tag "$(TAG)" --push --sync
 
 reg:
-	@echo "Deploying REG environment..."
-	@OMOBIO_ENV=reg kubectl apply -k backend/deploy/helm/overlays/reg
+	@echo "Deploying REG via ArgoCD..."
+	@VERSION=$(TAG) ./scripts/argocd-sync.sh --env reg --tag "$(TAG)" --push --sync
 
 prod:
-	@echo "Deploying PROD environment..."
-	@OMOBIO_ENV=prod kubectl apply -k backend/deploy/helm/overlays/prod
+	@echo "Deploying PROD via ArgoCD..."
+	@VERSION=$(TAG) ./scripts/argocd-sync.sh --env prod --tag "$(TAG)" --push --sync
+
+k8s-dev:
+	@./scripts/deploy-k8s.sh --env dev --tag "$(TAG)" --registry "$(REGISTRY)" --local
+
+k8s-stg:
+	@./scripts/deploy-k8s.sh --env stg --tag "$(TAG)" --registry "$(REGISTRY)"
+
+k8s-reg:
+	@./scripts/deploy-k8s.sh --env reg --tag "$(TAG)" --registry "$(REGISTRY)"
+
+k8s-prod:
+	@./scripts/deploy-k8s.sh --env prod --tag "$(TAG)" --registry "$(REGISTRY)"
+
+smoke:
+	@./scripts/smoke.sh --env "$(ENV)" --local
+
+# Build locally, deploy to docker-desktop (fast inner loop, no EKS)
+dev-test:
+	@echo "Building + deploying to docker-desktop for local testing..."
+	@cd backend && mvn -B -T 1C package -Dmaven.test.skip=true -Djacoco.skip=true
+	@VERSION=local ./scripts/build-images.sh
+	@VERSION=local ./scripts/deploy-k8s.sh --env dev --local --skip-infra
 
 # ---------- Backend (Java Spring Boot) ----------
 .PHONY: backend-build backend-run backend-test backend-stop
@@ -37,7 +65,7 @@ backend-build:
 
 backend-run:
 	@./env-loader.sh >/dev/null
-	cd backend && SPRING_PROFILES_ACTIVE=$$OMOBIO_ENV mvn spring-boot:run -pl api-gateway
+	cd backend && SPRING_PROFILES_ACTIVE=$$SELFCARE_ENV mvn spring-boot:run -pl api-gateway
 
 backend-test:
 	cd backend && mvn test
@@ -48,19 +76,19 @@ backend-stop:
 # ---------- Admin (Vite/React) ----------
 .PHONY: admin-install admin-run admin-build admin-preview
 admin-install:
-	cd admin/selfcare-studio && npm install
+	cd admin/selfcare-admin && npm install
 
 admin-run:
 	@./env-loader.sh >/dev/null
-	cd admin/selfcare-studio && npm run dev -- --mode $$OMOBIO_ENV
+	cd admin/selfcare-admin && npm run dev -- --mode $$SELFCARE_ENV
 
 admin-build:
 	@./env-loader.sh >/dev/null
-	cd admin/selfcare-studio && npm run build -- --mode $$OMOBIO_ENV
+	cd admin/selfcare-admin && npm run build -- --mode $$SELFCARE_ENV
 
 admin-preview:
 	@./env-loader.sh >/dev/null
-	cd admin/selfcare-studio && npm run preview -- --mode $$OMOBIO_ENV
+	cd admin/selfcare-admin && npm run preview -- --mode $$SELFCARE_ENV
 
 # ---------- Mobile (React Native) ----------
 .PHONY: mobile-install mobile-run mobile-build-android mobile-build-ios
@@ -70,18 +98,18 @@ mobile-install:
 
 mobile-run:
 	@./env-loader.sh >/dev/null
-	cd mobile/selfcare-app && ./scripts/load-env.sh $$OMOBIO_ENV
+	cd mobile/selfcare-app && ./scripts/load-env.sh $$SELFCARE_ENV
 	cd mobile/selfcare-app && npx react-native start
 
 mobile-build-android:
 	@./env-loader.sh >/dev/null
-	cd mobile/selfcare-app && ./scripts/load-env.sh $$OMOBIO_ENV
+	cd mobile/selfcare-app && ./scripts/load-env.sh $$SELFCARE_ENV
 	cd mobile/selfcare-app && cd android && ./gradlew assembleRelease
 
 mobile-build-ios:
 	@./env-loader.sh >/dev/null
-	cd mobile/selfcare-app && ./scripts/load-env.sh $$OMOBIO_ENV
-	cd mobile/selfcare-app && cd ios && xcodebuild -workspace SelfcareApp.xcworkspace -scheme SelfcareApp -configuration Release
+	cd mobile/selfcare-app && ./scripts/load-env.sh $$SELFCARE_ENV
+	cd mobile/selfcare-app && cd ios && xcodebuild -workspace selfcareApp.xcworkspace -scheme selfcareApp -configuration Release
 
 # ---------- Environment helpers ----------
 .PHONY: env-show env-switch env-validate
@@ -89,15 +117,15 @@ env-show:
 	@./env-loader.sh --print
 
 env-switch:
-	@echo "Current OMOBIO_ENV=$$OMOBIO_ENV"
+	@echo "Current SELFCARE_ENV=$$SELFCARE_ENV"
 	@echo "Available: dev, stg, reg, prod"
 	@echo ""
-	@echo "Switch with:  export OMOBIO_ENV=stg"
+	@echo "Switch with:  export SELFCARE_ENV=stg"
 	@echo "Then run:     make dev  (or stg/reg/prod)"
 
 env-validate:
 	@./env-loader.sh >/dev/null
-	@echo "Validating environment: $$OMOBIO_ENV"
+	@echo "Validating environment: $$SELFCARE_ENV"
 	@cd backend && mvn -q help:effective-pom >/dev/null 2>&1 || true
 	@echo "Environment OK"
 
@@ -105,9 +133,9 @@ env-validate:
 .PHONY: lint format
 lint:
 	cd backend && mvn -q checkstyle:check
-	cd admin/selfcare-studio && npm run lint
+	cd admin/selfcare-admin && npm run lint
 	cd mobile/selfcare-app && npm run lint
 
 format:
-	cd admin/selfcare-studio && npm run format
+	cd admin/selfcare-admin && npm run format
 	cd mobile/selfcare-app && npm run format

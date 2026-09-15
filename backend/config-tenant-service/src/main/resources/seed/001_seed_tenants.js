@@ -31,9 +31,9 @@ const TELCO_PACK = {
   name: 'Telco Industry Pack',
   version: '1.0.0',
   adapters: [
-    'com.omobio.telco.BalanceProvider',
-    'com.omobio.telco.RechargeProvider',
-    'com.omobio.telco.ConnectionProvider',
+    'com.selfcare.telco.BalanceProvider',
+    'com.selfcare.telco.RechargeProvider',
+    'com.selfcare.telco.ConnectionProvider',
   ],
   terminology: {
     primary: 'operator',
@@ -50,9 +50,9 @@ const INSURANCE_PACK = {
   name: 'Insurance Industry Pack',
   version: '1.0.0',
   adapters: [
-    'com.omobio.insurance.PolicyProvider',
-    'com.omobio.insurance.ClaimProvider',
-    'com.omobio.insurance.PremiumProvider',
+    'com.selfcare.insurance.PolicyProvider',
+    'com.selfcare.insurance.ClaimProvider',
+    'com.selfcare.insurance.PremiumProvider',
   ],
   terminology: {
     primary: 'insurer',

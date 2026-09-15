@@ -8,7 +8,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
       timeout: 2000ms
       lettuce:
         pool:
@@ -19,7 +19,7 @@ spring:
 server:
   port: ${SERVER_PORT:8092}
 
-omobio:
+selfcare:
   journey:
     instance-ttl-days: 30
     max-steps-per-journey: 50
@@ -31,7 +31,7 @@ omobio:
 
 logging:
   level:
-    com.omobio.journey: ${LOG_LEVEL:INFO}
+    com.selfcare.journey: ${LOG_LEVEL:INFO}
     org.springframework.data.mongodb: INFO
   pattern:
     level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"

@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 $CiRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $CiRoot
@@ -42,7 +42,7 @@ do {
 } while ((Get-Date) -lt $deadline)
 
 if ($status -ne 'UP') {
-    docker logs --tail 100 omobio-sonarqube
+    docker logs --tail 100 selfcare-sonarqube
     throw 'SonarQube did not become healthy within 10 minutes.'
 }
 

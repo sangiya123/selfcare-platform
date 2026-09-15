@@ -162,6 +162,7 @@ describe('Theme Engine', () => {
     it('returns "black" for mid-light colors', () => {
       expect(readableOn('#CCCCCC')).toBe('black');
       expect(readableOn('#FFFF00')).toBe('black'); // Yellow
+      expect(readableOn('#10B981')).toBe('black'); // Success green (luminance ~0.502)
     });
 
     it('strips # prefix from hex', () => {
@@ -172,16 +173,12 @@ describe('Theme Engine', () => {
     it('returns "white" for common brand colors', () => {
       expect(readableOn('#6D28D9')).toBe('white'); // Dialog purple
       expect(readableOn('#C026D3')).toBe('white'); // Accent
-      expect(readableOn('#10B981')).toBe('white'); // Success green
     });
 
     it('uses luminance formula (0.299R + 0.587G + 0.114B)', () => {
-      // Pure red (luminance ~0.299) -> should be 'black'
-      expect(readableOn('#FF0000')).toBe('black');
-      // Pure green (luminance ~0.587) -> should be 'white' (just above 0.5)
-      // Wait: 0.587 > 0.5, so should be 'black' (per formula)
-      // Actually re-check: luminance > 0.5 ? 'black' : 'white'
-      // 0.587 > 0.5, so 'black' is correct
+      // Pure red (luminance ~0.299) -> 'white' (0.299 <= 0.5)
+      expect(readableOn('#FF0000')).toBe('white');
+      // Pure green (luminance ~0.587) -> 'black' (0.587 > 0.5)
       expect(readableOn('#00FF00')).toBe('black');
       // Pure blue (luminance ~0.114) -> 'white'
       expect(readableOn('#0000FF')).toBe('white');
@@ -273,7 +270,7 @@ describe('Theme Engine', () => {
       const dark = resolveDarkTheme(light);
       expect(dark.mode).toBe('dark');
       expect(dark.colors.surface).toBe('#17141F');
-      expect(dark.colors.surfaceSubtle).toBe('#17141F');
+      expect(dark.colors.surfaceSubtle).toBe('#1F1B2A');
     });
 
     it('preserves non-surface colors', () => {

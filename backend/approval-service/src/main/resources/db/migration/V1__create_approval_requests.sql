@@ -1,5 +1,5 @@
 -- V1__create_approval_requests.sql
--- OMOBIO Selfcare Platform — approval-service
+-- Selfcare Platform — approval-service
 -- Table: approval_requests — durable record of four-eyes approval requests
 -- for high-risk admin actions.
 

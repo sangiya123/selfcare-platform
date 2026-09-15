@@ -5,7 +5,7 @@
 | Layer | Where it lives | What it contains |
 |-------|----------------|------------------|
 | **Platform** | `.env.<env>` files (committed as templates) | DB, Redis, Kafka, JWT secret, AI model, observability, feature-flag provider, policy thresholds |
-| **Client / Tenant** | MongoDB collections, configured via Selfcare Studio admin | Theme, layout, journeys, feature flags, **client API URLs + credentials**, AI assistants |
+| **Client / Tenant** | MongoDB collections, configured via selfcare Studio admin | Theme, layout, journeys, feature flags, **client API URLs + credentials**, AI assistants |
 
 **Client-specific config does NOT live in env files.** It lives in the database
 and is managed via the admin portal. See [docs/MULTI_TENANT_CONFIG.md](docs/MULTI_TENANT_CONFIG.md)
@@ -15,7 +15,7 @@ for the full architecture.
 
 ## Single-line environment switch
 
-Set **`OMOBIO_ENV`** to one of: `dev`, `stg`, `reg`, `prod`. That's the only knob.
+Set **`SELFCARE_ENV`** to one of: `dev`, `stg`, `reg`, `prod`. That's the only knob.
 
 The full stack — backend (Java/Spring), admin (Vite/React), mobile (React Native) — all read this variable and load the matching `.env.<env>` file.
 
@@ -41,13 +41,13 @@ The full stack — backend (Java/Spring), admin (Vite/React), mobile (React Nati
 
 ### Backend (Spring Boot)
 
-Spring auto-loads `application-{profile}.yml` based on `SPRING_PROFILES_ACTIVE` (= `OMOBIO_ENV`).
+Spring auto-loads `application-{profile}.yml` based on `SPRING_PROFILES_ACTIVE` (= `SELFCARE_ENV`).
 
 All env defaults are in `application.yml` (the base config); per-env overrides live in `application-{dev,stg,reg,prod}.yml`. Every value is a `${ENV_VAR:default}` reference — no hardcoded URLs.
 
 ### Admin (Vite / React)
 
-Vite loads `.env.<mode>` automatically based on `--mode` flag (set by `OMOBIO_ENV` via Makefile).
+Vite loads `.env.<mode>` automatically based on `--mode` flag (set by `SELFCARE_ENV` via Makefile).
 
 `src/lib/config.ts` is the central place that reads Vite env vars. `src/lib/api.ts` is the central HTTP client that uses `config.apiGatewayUrl` for all backend calls.
 
@@ -61,19 +61,19 @@ Vite loads `.env.<mode>` automatically based on `--mode` flag (set by `OMOBIO_EN
 
 ```bash
 # Set environment (once per shell)
-export OMOBIO_ENV=dev
+export SELFCARE_ENV=dev
 
 # Backend
-make backend-run    # reads $OMOBIO_ENV, runs all services with matching profile
+make backend-run    # reads $SELFCARE_ENV, runs all services with matching profile
 
 # Admin
-make admin-run      # vite --mode=$OMOBIO_ENV
+make admin-run      # vite --mode=$SELFCARE_ENV
 
 # Mobile
-make mobile-run     # loads .env.$OMOBIO_ENV, starts Metro
+make mobile-run     # loads .env.$SELFCARE_ENV, starts Metro
 
-# Switch environments — only change OMOBIO_ENV
-export OMOBIO_ENV=stg
+# Switch environments — only change SELFCARE_ENV
+export SELFCARE_ENV=stg
 make backend-run admin-run mobile-run
 ```
 

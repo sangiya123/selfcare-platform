@@ -1,4 +1,4 @@
-# Runbook: Payment Timeout or Stuck Transaction
+﻿# Runbook: Payment Timeout or Stuck Transaction
 
 ## Overview
 This runbook covers scenarios where payment transactions are stuck in PENDING
@@ -18,7 +18,7 @@ first.
 ## Quick checks
 1. **Check current PENDING transactions**
    ```bash
-   kubectl -n omobio-prod exec -it mysql-0 -- mysql -e \
+   kubectl -n selfcare-prod exec -it mysql-0 -- mysql -e \
      "SELECT id, tenant_id, amount, status, created_at FROM payment_transaction
       WHERE status='PENDING' AND created_at < NOW() - INTERVAL 5 MINUTE
       ORDER BY created_at LIMIT 50"
@@ -29,7 +29,7 @@ first.
    ```
 3. **Check callback webhook status**
    ```bash
-   kubectl -n omobio-prod logs -l app=payment-service --tail=200 | grep -E "callback|webhook"
+   kubectl -n selfcare-prod logs -l app=payment-service --tail=200 | grep -E "callback|webhook"
    ```
 4. **Check reconciliation lag**
    ```bash
@@ -57,7 +57,7 @@ curl -X POST http://api-gateway/api/v1/admin/payments/reconcile \
 **Fix**: Verify webhook URL and routing
 ```bash
 # Check ingress
-kubectl -n omobio-prod get ingress payment-callback
+kubectl -n selfcare-prod get ingress payment-callback
 curl -v -X POST http://api-gateway/api/v1/payments/callback
 ```
 
@@ -75,7 +75,7 @@ kubectl exec -it prometheus-0 -- promtool query instant \
 **Fix**: Client bug — investigate client SDK
 ```bash
 # Check conflict pattern
-kubectl -n omobio-prod logs -l app=payment-service | \
+kubectl -n selfcare-prod logs -l app=payment-service | \
   grep "Idempotency conflict" | tail -20
 ```
 
@@ -101,7 +101,7 @@ The payment-service reconciliation job runs every 30 minutes. It:
 
 ```bash
 # Trigger ad-hoc reconciliation
-kubectl -n omobio-prod exec -it payment-service-0 -- \
+kubectl -n selfcare-prod exec -it payment-service-0 -- \
   java -jar /app/app.jar --reconcile --tenant=<tenant> --older-than=PT10M
 ```
 
@@ -109,7 +109,7 @@ kubectl -n omobio-prod exec -it payment-service-0 -- \
 After reconciliation:
 ```bash
 # Verify PENDING count drops
-kubectl -n omobio-prod exec -it mysql-0 -- mysql -e \
+kubectl -n selfcare-prod exec -it mysql-0 -- mysql -e \
   "SELECT COUNT(*) FROM payment_transaction
    WHERE status='PENDING' AND created_at < NOW() - INTERVAL 10 MINUTE"
 ```

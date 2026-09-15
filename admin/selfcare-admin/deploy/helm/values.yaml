@@ -1,0 +1,39 @@
+# Selfcare Studio Admin Portal — per-environment overrides
+# Credentials and tenant header come from the shared selfcare-infra-creds Secret.
+
+nameOverride: selfcare-admin-portal
+
+# Image (built by Jenkins docker_build_push stage)
+image:
+  repository: ghcr.io/sangiya123/admin-portal
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecret: selfcare-registry-secret
+
+replicas: 1
+
+# API gateway the SPA routes /api to
+gateway:
+  url: http://api-gateway:8080
+
+# Kubernetes services the admin backend-command surface uses
+backendServices:
+  config: config-tenant-service:8081
+  identity: admin-identity-service:8083
+
+ingress:
+  enabled: true
+  className: nginx
+  host: admin.selfcare.example.com
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

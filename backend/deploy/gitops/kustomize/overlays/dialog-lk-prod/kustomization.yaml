@@ -8,18 +8,18 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: omobio-dialog-lk-prod
+  name: selfcare-dialog-lk-prod
   annotations:
-    omobio.platform/tenant-id: "dialog-lk"
-    omobio.platform/environment: "prod"
-    omobio.platform/industry: "TELCO"
-    omobio.platform/region: "LK"
-    omobio.platform/promotion-strategy: "immutable"
-    omobio.platform/build-once: "true"
-    omobio.platform/artifact-version: ""  # Pinned at deploy time
+    selfcare.platform/tenant-id: "dialog-lk"
+    selfcare.platform/environment: "prod"
+    selfcare.platform/industry: "TELCO"
+    selfcare.platform/region: "LK"
+    selfcare.platform/promotion-strategy: "immutable"
+    selfcare.platform/build-once: "true"
+    selfcare.platform/artifact-version: ""  # Pinned at deploy time
 
 # Namespace for this tenant+env combination
-namespace: omobio-dialog-lk-prod
+namespace: selfcare-dialog-lk-prod
 
 # Inherit from base
 resources:
@@ -30,92 +30,92 @@ resources:
 labels:
   - includeSelectors: false
     pairs:
-      omobio.tenant: dialog-lk
-      omobio.tenant-name: "Dialog Axiata"
-      omobio.tenant-type: OPERATOR
-      omobio.industry: TELCO
-      omobio.environment: prod
-      omobio.region: LK
-      omobio.cluster: prod-lk
-      omobio.zone: "ap-southeast-1a"
-      omobio.compliance.pdpa: "true"
-      omobio.compliance.gdpr: "true"
-      omobio.deployment.strategy: immutable
-      omobio.gitops.source: selfcare-platform
+      selfcare.tenant: dialog-lk
+      selfcare.tenant-name: "Dialog Axiata"
+      selfcare.tenant-type: OPERATOR
+      selfcare.industry: TELCO
+      selfcare.environment: prod
+      selfcare.region: LK
+      selfcare.cluster: prod-lk
+      selfcare.zone: "ap-southeast-1a"
+      selfcare.compliance.pdpa: "true"
+      selfcare.compliance.gdpr: "true"
+      selfcare.deployment.strategy: immutable
+      selfcare.gitops.source: selfcare-platform
 
 # Additional annotations
 annotations:
   - includeSelectors: false
     pairs:
-      omobio.tenant.support-email: "support@dialog.lk"
-      omobio.tenant.support-phone: "+94-77-XXX-XXXX"
-      omobio.tenant.ingress-host: "selfcare.dialog.lk"
-      omobio.tenant.brand-color-primary: "#E20000"
+      selfcare.tenant.support-email: "support@dialog.lk"
+      selfcare.tenant.support-phone: "+94-77-XXX-XXXX"
+      selfcare.tenant.ingress-host: "selfcare.dialog.lk"
+      selfcare.tenant.brand-color-primary: "#E20000"
 
 # Image pinning — IMMUTABLE for prod
 # Override mutable base with pinned version
 images:
-  - name: omobio/api-gateway
-    newName: omobio/api-gateway
+  - name: selfcare/api-gateway
+    newName: selfcare/api-gateway
     newTag: ""  # PINNED AT DEPLOY — must be set via CI/CD
     digest: ""  # SHA256 digest required for immutability
-  - name: omobio/config-tenant-service
-    newName: omobio/config-tenant-service
+  - name: selfcare/config-tenant-service
+    newName: selfcare/config-tenant-service
     newTag: ""
-  - name: omobio/customer-identity-service
-    newName: omobio/customer-identity-service
+  - name: selfcare/customer-identity-service
+    newName: selfcare/customer-identity-service
     newTag: ""
-  - name: omobio/dashboard-bff
-    newName: omobio/dashboard-bff
+  - name: selfcare/dashboard-bff
+    newName: selfcare/dashboard-bff
     newTag: ""
-  - name: omobio/account-entitlement-service
-    newName: omobio/account-entitlement-service
+  - name: selfcare/account-entitlement-service
+    newName: selfcare/account-entitlement-service
     newTag: ""
-  - name: omobio/product-service
-    newName: omobio/product-service
+  - name: selfcare/product-service
+    newName: selfcare/product-service
     newTag: ""
-  - name: omobio/usage-service
-    newName: omobio/usage-service
+  - name: selfcare/usage-service
+    newName: selfcare/usage-service
     newTag: ""
-  - name: omobio/billing-service
-    newName: omobio/billing-service
+  - name: selfcare/billing-service
+    newName: selfcare/billing-service
     newTag: ""
-  - name: omobio/payment-service
-    newName: omobio/payment-service
+  - name: selfcare/payment-service
+    newName: selfcare/payment-service
     newTag: ""
-  - name: omobio/notification-service
-    newName: omobio/notification-service
+  - name: selfcare/notification-service
+    newName: selfcare/notification-service
     newTag: ""
-  - name: omobio/content-service
-    newName: omobio/content-service
+  - name: selfcare/content-service
+    newName: selfcare/content-service
     newTag: ""
-  - name: omobio/journey-service
-    newName: omobio/journey-service
+  - name: selfcare/journey-service
+    newName: selfcare/journey-service
     newTag: ""
-  - name: omobio/reporting-service
-    newName: omobio/reporting-service
+  - name: selfcare/reporting-service
+    newName: selfcare/reporting-service
     newTag: ""
-  - name: omobio/ai-gateway
-    newName: omobio/ai-gateway
+  - name: selfcare/ai-gateway
+    newName: selfcare/ai-gateway
     newTag: ""
-  - name: omobio/audit-service
-    newName: omobio/audit-service
+  - name: selfcare/audit-service
+    newName: selfcare/audit-service
     newTag: ""
 
 # Tenant-specific ConfigMap
 configMapGenerator:
-  - name: omobio-tenant-config
+  - name: selfcare-tenant-config
     literals:
       # Tenant identity
-      - OMOBIO_TENANT_ID=dialog-lk
-      - OMOBIO_TENANT_OPERATOR=dialog
-      - OMOBIO_TENANT_INDUSTRY=TELCO
-      - OMOBIO_TENANT_TYPE=OPERATOR
-      - OMOBIO_TENANT_REGION=LK
-      - OMOBIO_TENANT_DISPLAY_NAME="Dialog Axiata"
+      - SELFCARE_TENANT_ID=dialog-lk
+      - SELFCARE_TENANT_OPERATOR=dialog
+      - SELFCARE_TENANT_INDUSTRY=TELCO
+      - SELFCARE_TENANT_TYPE=OPERATOR
+      - SELFCARE_TENANT_REGION=LK
+      - SELFCARE_TENANT_DISPLAY_NAME="Dialog Axiata"
       # Environment
-      - OMOBIO_ENVIRONMENT=prod
-      - OMOBIO_ENVIRONMENT_TIER=1
+      - SELFCARE_ENVIRONMENT=prod
+      - SELFCARE_ENVIRONMENT_TIER=1
       - SPRING_PROFILES_ACTIVE=prod,prod-dialog-lk
       # Provider endpoints (Dialog BSS)
       - DIALOG_BSS_API_URL=https://bss-api.dialog.lk/v1
@@ -124,7 +124,7 @@ configMapGenerator:
       # Branding
       - TENANT_BRAND_COLOR_PRIMARY=#E20000
       - TENANT_BRAND_COLOR_SECONDARY=#000000
-      - TENANT_BRAND_LOGO_URL=https://assets.omobio.example/brands/dialog/logo.svg
+      - TENANT_BRAND_LOGO_URL=https://assets.selfcare.example/brands/dialog/logo.svg
       # Domain
       - TENANT_INGRESS_HOST=selfcare.dialog.lk
       - TENANT_DOMAIN=dialog.lk
@@ -154,8 +154,8 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
       labels:
-        omobio.config: tenant
-        omobio.tenant: dialog-lk
+        selfcare.config: tenant
+        selfcare.tenant: dialog-lk
 
 # Patches — strategic merge patches
 patches:
@@ -231,7 +231,7 @@ patches:
 
 # Secret references — using External Secrets Operator
 secretGenerator:
-  - name: omobio-tenant-secrets
+  - name: selfcare-tenant-secrets
     literals:
       - DIALOG_BSS_API_KEY=__ESO_RESOLVED__:secret/dialog-lk/bss-api-key
       - SMSC_USER=__ESO_RESOLVED__:secret/dialog-lk/smsc-user

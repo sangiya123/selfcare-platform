@@ -5,13 +5,13 @@ spring:
       globalcors:
         corsConfigurations:
           '[/**]':
-            allowedOrigins: "https://admin.reg.omobio.io"
+            allowedOrigins: "https://admin.reg.selfcare.io"
             allowedMethods: GET,POST,PUT,DELETE,PATCH,OPTIONS
             allowedHeaders: "*"
             allowCredentials: true
             maxAge: 3600
 
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity}/.well-known/jwks.json}
@@ -25,4 +25,4 @@ omobio:
 
 logging:
   level:
-    com.omobio: INFO
+    com.selfcare: INFO

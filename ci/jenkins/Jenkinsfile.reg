@@ -1,0 +1,49 @@
+﻿// ============================================================================
+// Selfcare — REG train (wrapper)
+// ============================================================================
+// Pins DEPLOY_ENV=reg. QA + Sonar ON. Security OFF. UAT approval ON.
+// Flow: Compile → Unit Test → Admin/Mobile QA → Sonar → Quality Gate
+//       → Docker Build+Push → Deploy DEV → API Automation → SIT/Regression
+//       → UAT Approval → Deploy STG → Smoke.
+//
+// Point a Jenkins job at: ci/jenkins/Jenkinsfile.reg
+// ============================================================================
+
+def masterJob = env.SELFCARE_SELF_CARE_MASTER_JOB ?: 'selfcare-Selfcare-Platform'
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+        timeout(time: 180, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    parameters {
+        string(name: 'RELEASE_TAG', defaultValue: '', required: true,
+               description: 'Immutable release tag for regression (e.g. 1.2.0).')
+    }
+
+    stages {
+        stage('Confirm Regression') {
+            steps {
+                echo ">> REG release: v${params.RELEASE_TAG}"
+            }
+        }
+        stage('Trigger Regression') {
+            steps {
+                build job: masterJob, wait: true, propagate: true,
+                    parameters: [
+                        choice(name: 'DEPLOY_ENV', choices: ['reg']),
+                        string(name: 'RELEASE_TAG', value: params.RELEASE_TAG),
+                        booleanParam(name: 'FORCE_QA', value: false),
+                        booleanParam(name: 'FORCE_SECURITY', value: false),
+                        booleanParam(name: 'SKIP_DEPLOY', value: false)
+                    ]
+            }
+        }
+    }
+
+    post { failure { echo 'REG train failed — check selfcare-Selfcare-Platform build.' } }
+}

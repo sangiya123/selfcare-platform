@@ -1,6 +1,6 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/theme-document.schema.json",
+  "$id": "https://selfcare.example.com/schemas/theme-document.schema.json",
   "title": "ThemeDocument",
   "description": "Theme / design tokens for a tenant brand",
   "type": "object",

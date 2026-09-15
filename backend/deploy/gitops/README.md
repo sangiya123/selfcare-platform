@@ -1,8 +1,8 @@
-# OMOBIO Selfcare Platform — GitOps with ArgoCD
+# Selfcare Platform — GitOps with ArgoCD
 
 ## Overview
 
-This directory contains GitOps manifests that manage the OMOBIO Selfcare Platform lifecycle
+This directory contains GitOps manifests that manage the Selfcare Platform lifecycle
 using ArgoCD ApplicationSets. The platform is multi-tenant, multi-environment, and
 multi-industry (TELCO, INSURANCE, BANKING, TRAVEL).
 
@@ -39,14 +39,14 @@ Matrix Generator
     └── Generator: Git (environments/*.yaml) --> [dev, stg, reg, prod]
                     |
                     +--> Cross-product: tenant × environment
-                         e.g., dialog-lk + prod = omobio-dialog-lk-prod
+                         e.g., dialog-lk + prod = selfcare-dialog-lk-prod
 ```
 
 ### 2. Application Resources
 
 Each generated Application:
 - **Source**: Points to `backend/deploy/helm/` with tenant-specific `values/client-{tenant}-values.yaml`
-- **Destination**: Deploys to namespace `omobio-{tenant}-{env}`
+- **Destination**: Deploys to namespace `selfcare-{tenant}-{env}`
 - **Sync Policy**: Automated with prune/selfHeal; `CreateNamespace=true`
 
 ### 3. Promotion Model
@@ -75,9 +75,9 @@ Artifact Immutable:
 ### 4. Tenant Isolation
 
 Each tenant gets its own Kubernetes namespace:
-- `omobio-dialog-lk-dev`
-- `omobio-dialog-lk-stg`
-- `omobio-dialog-lk-prod`
+- `selfcare-dialog-lk-dev`
+- `selfcare-dialog-lk-stg`
+- `selfcare-dialog-lk-prod`
 - etc.
 
 RBAC restricts cross-namespace access. ArgoCD AppProject (`argocd-project.yaml`)
@@ -155,17 +155,17 @@ roles:
   # Tenant namespace owner — can sync their own namespace
   - name: tenant-{tenant-id}-owner
     policies:
-      - p, proj:omobio-platform:tenant-{tenant-id}-owner,applications,*,omobio-{tenant-id}-*,allow
+      - p, proj:selfcare-platform:tenant-{tenant-id}-owner,applications,*,selfcare-{tenant-id}-*,allow
 
   # Environment operator — can sync any tenant in their environment
   - name: env-{env}-operator
     policies:
-      - p, proj:omobio-platform:env-{env}-operator,applications,sync,omobio-*-{env},allow
+      - p, proj:selfcare-platform:env-{env}-operator,applications,sync,selfcare-*-{env},allow
 
   # Platform admin — full access
   - name: platform-admin
     policies:
-      - p, proj:omobio-platform:platform-admin,*,*,*,allow
+      - p, proj:selfcare-platform:platform-admin,*,*,*,allow
 ```
 
 ## Promoting a Version
@@ -178,11 +178,11 @@ git tag -a v1.2.3 -m "Release 1.2.3 for dialog-lk prod"
 git push origin v1.2.3
 
 # 2. ArgoCD automatically detects the tag and creates a rollout plan
-argocd app set omobio-dialog-lk-prod --revision v1.2.3
-argocd app sync omobio-dialog-lk-prod
+argocd app set selfcare-dialog-lk-prod --revision v1.2.3
+argocd app sync selfcare-dialog-lk-prod
 
 # 3. Wait for sync + health check
-argocd app wait omobio-dialog-lk-prod --timeout 600
+argocd app wait selfcare-dialog-lk-prod --timeout 600
 ```
 
 ### Automated Promotion (CI/CD)
@@ -200,10 +200,10 @@ CI pipeline (Jenkins/GitHub Actions) handles promotion after passing gates:
 
 ```bash
 # Rollback to previous sync
-argocd app rollback omobio-dialog-lk-prod
+argocd app rollback selfcare-dialog-lk-prod
 
 # Or sync to a specific revision
-argocd app sync omobio-dialog-lk-prod --revision v1.2.2
+argocd app sync selfcare-dialog-lk-prod --revision v1.2.2
 ```
 
 ## Adding a New Tenant

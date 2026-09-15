@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Release & Deployment
+﻿# Selfcare Platform — Release & Deployment
 #
 # Production-grade deployment pipeline:
 #   1. Tag triggers release
@@ -85,7 +85,7 @@ jobs:
         run: mvn -B -DskipTests=true compile
 
       - name: Verify admin build
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: |
           npm ci
           npm run build --if-present
@@ -190,14 +190,14 @@ jobs:
           file: selfcare-platform/backend/${{ matrix.service }}/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }}
-            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.short_sha }}
-            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/selfcare/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }}
+            ${{ env.REGISTRY }}/selfcare/${{ matrix.service }}:${{ needs.resolve-version.outputs.short_sha }}
+            ${{ env.REGISTRY }}/selfcare/${{ matrix.service }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
           sbom: true
-          outputs: type=image,name=${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }},push=true
+          outputs: type=image,name=${{ env.REGISTRY }}/selfcare/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }},push=true
 
       - name: Sign image with cosign (keyless)
         env:
@@ -209,10 +209,10 @@ jobs:
           chmod +x /usr/local/bin/cosign
           # Resolve digest from buildx output
           DIGEST=$(docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/omobio/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }} \
+            ${{ env.REGISTRY }}/selfcare/${{ matrix.service }}:${{ needs.resolve-version.outputs.version }} \
             --format '{{.digest}}')
           echo "Image digest: $DIGEST"
-          FULL_IMAGE="${{ env.REGISTRY }}/omobio/${{ matrix.service }}@$DIGEST"
+          FULL_IMAGE="${{ env.REGISTRY }}/selfcare/${{ matrix.service }}@$DIGEST"
           # Sign using GitHub OIDC (keyless)
           cosign sign --yes "$FULL_IMAGE"
           echo "Signed: $FULL_IMAGE"
@@ -220,7 +220,7 @@ jobs:
       - name: Attest SLSA provenance
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/omobio/${{ matrix.service }}
+          subject-name: ${{ env.REGISTRY }}/selfcare/${{ matrix.service }}
           subject-digest: sha256:${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
 
@@ -243,10 +243,10 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+          cache-dependency-path: selfcare-platform/admin/selfcare-admin/package-lock.json
 
       - name: Install + build
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         env:
           VITE_APP_ENV: production
           VITE_API_GATEWAY_URL: ${{ secrets.PROD_API_GATEWAY_URL }}
@@ -257,12 +257,12 @@ jobs:
       - name: Build admin Docker image
         uses: docker/build-push-action@v5
         with:
-          context: selfcare-platform/admin/selfcare-studio
+          context: selfcare-platform/admin/selfcare-admin
           push: true
           tags: |
-            ${{ env.REGISTRY }}/omobio/admin:${{ needs.resolve-version.outputs.version }}
-            ${{ env.REGISTRY }}/omobio/admin:${{ needs.resolve-version.outputs.short_sha }}
-            ${{ env.REGISTRY }}/omobio/admin:latest
+            ${{ env.REGISTRY }}/selfcare/admin:${{ needs.resolve-version.outputs.version }}
+            ${{ env.REGISTRY }}/selfcare/admin:${{ needs.resolve-version.outputs.short_sha }}
+            ${{ env.REGISTRY }}/selfcare/admin:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -273,7 +273,7 @@ jobs:
           kubectl apply -f selfcare-platform/deploy/kubernetes/secrets.yaml
           kubectl apply -f selfcare-platform/deploy/kubernetes/configmap.yaml
           kubectl apply -f selfcare-platform/deploy/kubernetes/tenant-seeding-job.yaml
-          kubectl wait --for=condition=complete --timeout=60s job/omobio-tenant-seed-dialog -n omobio
+          kubectl wait --for=condition=complete --timeout=60s job/selfcare-tenant-seed-dialog -n selfcare
 
   # ==========================================
   # Generate release notes
@@ -366,12 +366,12 @@ jobs:
           VERSION="${{ needs.resolve-version.outputs.version }}"
 
           for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
-            helm upgrade --install "omobio-${service}" \
+            helm upgrade --install "selfcare-${service}" \
               selfcare-platform/backend/deploy/helm/${service} \
-              --namespace omobio-dev \
+              --namespace selfcare-dev \
               --create-namespace \
               --set image.tag=${VERSION} \
-              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set image.repository=${REGISTRY}/selfcare/${service} \
               --set env=dev \
               --set replicaCount=1 \
               --wait \
@@ -379,9 +379,9 @@ jobs:
           done
 
           # Admin portal
-          helm upgrade --install omobio-admin \
-            selfcare-platform/admin/selfcare-studio/deploy/helm \
-            --namespace omobio-dev \
+          helm upgrade --install selfcare-admin \
+            selfcare-platform/admin/selfcare-admin/deploy/helm \
+            --namespace selfcare-dev \
             --create-namespace \
             --set image.tag=${VERSION} \
             --set env=dev \
@@ -392,7 +392,7 @@ jobs:
         run: |
           sleep 30
           for i in 1 2 3 4 5; do
-            if curl -fsSL --max-time 10 https://api.dev.omobio.io/health; then
+            if curl -fsSL --max-time 10 https://api.dev.selfcare.io/health; then
               echo "Dev deployment healthy"
               exit 0
             fi
@@ -433,12 +433,12 @@ jobs:
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
           for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
-            helm upgrade --install "omobio-${service}" \
+            helm upgrade --install "selfcare-${service}" \
               selfcare-platform/backend/deploy/helm/${service} \
-              --namespace omobio-stg \
+              --namespace selfcare-stg \
               --create-namespace \
               --set image.tag=${VERSION} \
-              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set image.repository=${REGISTRY}/selfcare/${service} \
               --set env=stg \
               --set replicaCount=2 \
               --wait \
@@ -449,7 +449,7 @@ jobs:
         run: |
           sleep 30
           for i in 1 2 3 4 5; do
-            if curl -fsSL --max-time 10 https://api.stg.omobio.io/health; then
+            if curl -fsSL --max-time 10 https://api.stg.selfcare.io/health; then
               echo "Stg deployment healthy"
               exit 0
             fi
@@ -470,7 +470,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_reg == 'true'
     environment:
       name: reg
-      url: https://api.reg.omobio.io
+      url: https://api.reg.selfcare.io
     steps:
       - uses: actions/checkout@v4
         with:
@@ -492,12 +492,12 @@ jobs:
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
           for service in api-gateway config-tenant-service customer-identity-service admin-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service; do
-            helm upgrade --install "omobio-${service}" \
+            helm upgrade --install "selfcare-${service}" \
               selfcare-platform/backend/deploy/helm/${service} \
-              --namespace omobio-reg \
+              --namespace selfcare-reg \
               --create-namespace \
               --set image.tag=${VERSION} \
-              --set image.repository=${REGISTRY}/omobio/${service} \
+              --set image.repository=${REGISTRY}/selfcare/${service} \
               --set env=reg \
               --set replicaCount=2 \
               --wait \
@@ -515,7 +515,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_prod == 'true'
     environment:
       name: prod
-      url: https://api.omobio.io
+      url: https://api.selfcare.io
     steps:
       - uses: actions/checkout@v4
         with:
@@ -536,9 +536,9 @@ jobs:
       - name: Deploy blue (10% traffic)
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
-          helm upgrade --install omobio-api-gateway-blue \
+          helm upgrade --install selfcare-api-gateway-blue \
             selfcare-platform/backend/deploy/helm/api-gateway \
-            --namespace omobio-prod \
+            --namespace selfcare-prod \
             --reuse-values \
             --set image.tag=${VERSION} \
             --set deployment.label=blue \
@@ -550,7 +550,7 @@ jobs:
         run: |
           sleep 60
           for i in 1 2 3 4 5; do
-            if curl -fsSL --max-time 10 https://api.omobio.io/health; then
+            if curl -fsSL --max-time 10 https://api.selfcare.io/health; then
               echo "Blue deployment healthy"
               break
             fi
@@ -559,26 +559,26 @@ jobs:
 
       - name: Shift 50% traffic
         run: |
-          helm upgrade --install omobio-api-gateway-blue \
+          helm upgrade --install selfcare-api-gateway-blue \
             selfcare-platform/backend/deploy/helm/api-gateway \
-            --namespace omobio-prod \
+            --namespace selfcare-prod \
             --reuse-values \
             --set traffic.weight=50 \
             --wait --timeout 5m
           sleep 120
           # Check error rate
-          ERROR_RATE=$(curl -fsSL --max-time 10 https://api.omobio.io/actuator/metrics/http.server.requests?tag=uri:/health 2>/dev/null | jq -r '.measurements[0].value // 0')
+          ERROR_RATE=$(curl -fsSL --max-time 10 https://api.selfcare.io/actuator/metrics/http.server.requests?tag=uri:/health 2>/dev/null | jq -r '.measurements[0].value // 0')
           if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
             echo "::error::Error rate $ERROR_RATE > 1% — rolling back"
-            helm rollback omobio-api-gateway-blue
+            helm rollback selfcare-api-gateway-blue
             exit 1
           fi
 
       - name: Shift 100% traffic
         run: |
-          helm upgrade --install omobio-api-gateway-blue \
+          helm upgrade --install selfcare-api-gateway-blue \
             selfcare-platform/backend/deploy/helm/api-gateway \
-            --namespace omobio-prod \
+            --namespace selfcare-prod \
             --reuse-values \
             --set traffic.weight=100 \
             --wait --timeout 5m

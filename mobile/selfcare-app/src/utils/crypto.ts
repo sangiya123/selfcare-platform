@@ -1,5 +1,5 @@
-/**
- * crypto — Lightweight cryptography helpers for the OMOBIO mobile app.
+﻿/**
+ * crypto — Lightweight cryptography helpers for the selfcare mobile app.
  *
  * Use cases:
  *   - Hashing values for analytics (SHA-256)
@@ -69,7 +69,7 @@ export function uuidv4(): string {
  *
  * @param secret    The high-entropy shared secret (e.g. 32 bytes)
  * @param salt      Salt to bind the derived key to a context
- * @param info      Info string identifying the use (e.g. "omobio-local-cache-v1")
+ * @param info      Info string identifying the use (e.g. "selfcare-local-cache-v1")
  * @param length    Output key length in bytes (default 32)
  */
 export async function deriveKey(

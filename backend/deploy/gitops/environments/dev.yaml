@@ -23,8 +23,8 @@ env:
   DEFAULT_IMAGE_TAG: "latest"  # Always pull latest
   DEFAULT_TARGET_REVISION: "main"  # Track main branch
   IMAGE_PULL_POLICY: Always
-  IMAGE_REGISTRY: ghcr.io/omobio
-  IMAGE_REPOSITORY: omobio/selfcare-platform
+  IMAGE_REGISTRY: ghcr.io/sangiya123
+  IMAGE_REPOSITORY: sangiya123/selfcare-platform
 
   # Auto-sync
   AUTO_SYNC_ENABLED: "true"  # Fully automated

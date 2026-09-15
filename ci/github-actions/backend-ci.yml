@@ -136,10 +136,10 @@ jobs:
         image: mysql:8
         ports: ['3306:3306']
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: Selfcare_My5ql_R00t_Pa55w0rd!2026
           MYSQL_DATABASE: selfcare_test
         options: >-
-          --health-cmd "mysqladmin ping -h localhost -u root -proot"
+          --health-cmd "mysqladmin ping -h localhost -u root -pSelfcare_My5ql_R00t_Pa55w0rd!2026"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -161,10 +161,10 @@ jobs:
         working-directory: selfcare-platform/tests/conformance
         run: mvn -B test
         env:
-          OMOBIO_TEST_GATEWAY_URL: http://localhost:8080
-          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
-          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
-          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          SELFCARE_TEST_GATEWAY_URL: http://localhost:8080
+          SELFCARE_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          SELFCARE_TEST_REDIS_URL: redis://localhost:6379
+          SELFCARE_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
 
   # ==========================================
   # SBOM (Software Bill of Materials)
@@ -224,7 +224,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: vulnerabilities.json
-          category: omobio-sbom
+          category: selfcare-sbom
 
   # ==========================================
   # License compliance check
@@ -303,7 +303,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.24.0
         with:
-          image-ref: '${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:${{ github.sha }}'
+          image-ref: '${{ secrets.DOCKER_REGISTRY }}/selfcare/${{ matrix.service }}:${{ github.sha }}'
           format: 'sarif'
           output: 'trivy-${{ matrix.service }}.sarif'
           severity: 'CRITICAL,HIGH'
@@ -314,7 +314,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-${{ matrix.service }}.sarif'
-          category: 'omobio-container-${{ matrix.service }}'
+          category: 'selfcare-container-${{ matrix.service }}'
 
   # ==========================================
   # Secret scanning
@@ -477,7 +477,7 @@ jobs:
           context: selfcare-platform/backend/${{ matrix.service }}
           push: true
           tags: |
-            ${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:latest
-            ${{ secrets.DOCKER_REGISTRY }}/omobio/${{ matrix.service }}:${{ github.sha }}
+            ${{ secrets.DOCKER_REGISTRY }}/selfcare/${{ matrix.service }}:latest
+            ${{ secrets.DOCKER_REGISTRY }}/selfcare/${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

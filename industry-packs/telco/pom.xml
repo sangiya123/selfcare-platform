@@ -5,17 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
-    <groupId>com.omobio.industry</groupId>
+    <groupId>com.selfcare.industry</groupId>
     <artifactId>telco-industry-pack</artifactId>
     <packaging>pom</packaging>
 
-    <name>OMOBIO Telco Industry Pack</name>
+    <name>selfcare Telco Industry Pack</name>
     <description>
         Telco-vertical provider implementations (Dialog, Hutch, Airtel, future operators).
         Each telecom operator is a client/tenant using this industry pack.

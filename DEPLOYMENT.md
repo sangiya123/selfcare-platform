@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Build & Deploy Commands
+# Selfcare Platform — Build & Deploy Commands
 
 Complete reference for building, deploying, and operating the platform on
 Docker Desktop (docker-compose or Kubernetes) plus the local CI stack
@@ -31,14 +31,14 @@ kubectl get nodes
 ### Option A — Build all 18 services (shell)
 
 ```bash
-scripts/build-images.sh              # tags: omobio/<service>:1.0.0
+scripts/build-images.sh              # tags: selfcare/<service>:1.0.0
 scripts/build-images.sh --no-cache   # full rebuild
 ```
 
 ### Option B — Build all 18 services (Windows batch)
 
 ```bat
-scripts\build-images.bat             # tags: localhost:5000/omobio/<service>:1.0.0
+scripts\build-images.bat             # tags: localhost:5000/selfcare/<service>:1.0.0
 ```
 
 ### Option C — Via docker-compose
@@ -51,7 +51,7 @@ docker compose build --no-cache
 ### Option D — Single service
 
 ```bash
-docker build -t omobio/approval-service:1.0.0 \
+docker build -t selfcare/approval-service:1.0.0 \
   -f backend/approval-service/Dockerfile \
   --build-arg MODULE=approval-service .
 ```
@@ -61,8 +61,8 @@ docker build -t omobio/approval-service:1.0.0 \
 The Kubernetes manifests reference the `:local-v2` / `:local-v4` tags:
 
 ```bash
-docker tag omobio/approval-service:1.0.0  omobio/approval-service:local-v2
-docker tag omobio/api-gateway:1.0.0       omobio/api-gateway:local-v4
+docker tag selfcare/approval-service:1.0.0  selfcare/approval-service:local-v2
+docker tag selfcare/api-gateway:1.0.0       selfcare/api-gateway:local-v4
 ```
 
 ---
@@ -82,7 +82,7 @@ docker compose down -v                 # stop + delete volumes
 
 Access:
 - API Gateway  http://localhost:8080  (Swagger: /swagger-ui.html)
-- Grafana      http://localhost:3000  (admin/admin)
+- Grafana      http://localhost:3000  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)
 - Prometheus   http://localhost:9090
 
 Smoke test:
@@ -98,13 +98,13 @@ scripts/verify.sh
 Apply the manifests in order:
 
 ```bash
-kubectl apply -f deploy/kubernetes/namespace.yaml            # ns: omobio
+kubectl apply -f deploy/kubernetes/namespace.yaml            # ns: selfcare
 kubectl apply -f deploy/kubernetes/secrets.yaml
 kubectl apply -f deploy/kubernetes/configmap.yaml
 kubectl apply -f deploy/kubernetes/infra.yaml                # mongo/redis/mysql/kafka/zk
 kubectl apply -f deploy/kubernetes/tenant-seeding-job.yaml   # seed dialog-lk
 kubectl apply -f deploy/kubernetes/services.yaml             # 18 microservices
-kubectl apply -f deploy/kubernetes/admin-portal.yaml         # selfcare-studio
+kubectl apply -f deploy/kubernetes/admin-portal.yaml         # selfcare-admin
 ```
 
 Or use the all-in-one script (bash):
@@ -117,12 +117,12 @@ scripts/deploy-k8s.sh --build    # build images first, then apply
 Monitor / debug:
 
 ```bash
-kubectl get pods -n omobio
-kubectl get svc -n omobio
-kubectl logs -n omobio deployment/api-gateway --tail=100
-kubectl rollout status deployment/api-gateway -n omobio --timeout=180s
-kubectl describe pod -n omobio -l app=api-gateway
-kubectl port-forward -n omobio svc/api-gateway 8080:8080
+kubectl get pods -n selfcare
+kubectl get svc -n selfcare
+kubectl logs -n selfcare deployment/api-gateway --tail=100
+kubectl rollout status deployment/api-gateway -n selfcare --timeout=180s
+kubectl describe pod -n selfcare -l app=api-gateway
+kubectl port-forward -n selfcare svc/api-gateway 8080:8080
 ```
 
 ### Build & deploy a single service (Docker Desktop K8s — recommended)
@@ -133,11 +133,11 @@ per rebuild:
 
 ```bash
 # Build from the fat jar in <service>/target (run `mvn install` first)
-docker build -t omobio/<service>:k8s-N -f C:\Users\sangiya\AppData\Local\Temp\opencode\generic.Dockerfile backend\<service>\target
+docker build -t selfcare/<service>:k8s-N -f C:\Users\sangiya\AppData\Local\Temp\opencode\generic.Dockerfile backend\<service>\target
 
 # Roll the deployment onto the new image
-kubectl set image deployment/<service> <service>=omobio/<service>:k8s-N -n omobio
-kubectl rollout status deployment/<service> -n omobio --timeout=180s
+kubectl set image deployment/<service> <service>=selfcare/<service>:k8s-N -n selfcare
+kubectl rollout status deployment/<service> -n selfcare --timeout=180s
 ```
 
 Build one service from Maven (no tests / jacoco):
@@ -159,12 +159,12 @@ Access (NodePort):
 - API Gateway  http://localhost:30080
 - Studio       http://localhost:30081
 - Prometheus   http://localhost:30090
-- Grafana      http://localhost:30300  (admin/admin)
+- Grafana      http://localhost:30300  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)
 
 Tear down:
 
 ```bash
-kubectl delete ns omobio
+kubectl delete ns selfcare
 ```
 
 ---
@@ -187,7 +187,7 @@ docker compose --env-file ci/.env.ci -f ci/docker-compose.ci.yml up -d
 ```
 
 Access:
-- SonarQube  http://localhost:9000  (first login admin/admin → create token)
+- SonarQube  http://localhost:9000  (first login admin/Selfcare_S0n4r_Adm1n_Pa55w0rd!2026 → create token)
 - Jenkins    http://localhost:8080  (admin / your JENKINS_ADMIN_PASSWORD)
 
 Jenkins job: create a Pipeline job from the GitHub repo with script path
@@ -230,7 +230,7 @@ docker images --format "{{.Repository}}:{{.Tag}}"
 Keep the images referenced by `deploy/kubernetes/*.yaml`:
 
 ```bash
-kubectl get deployments -n omobio -o jsonpath="{.items[*].spec.template.spec.containers[*].image}"
+kubectl get deployments -n selfcare -o jsonpath="{.items[*].spec.template.spec.containers[*].image}"
 ```
 
 ---
@@ -238,6 +238,6 @@ kubectl get deployments -n omobio -o jsonpath="{.items[*].spec.template.spec.con
 ## 9. Useful aliases
 
 ```bash
-alias k='kubectl -n omobio'
-alias kl='kubectl -n omobio logs --tail=50'
+alias k='kubectl -n selfcare'
+alias kl='kubectl -n selfcare logs --tail=50'
 ```

@@ -11,30 +11,31 @@
  * - Pull-to-refresh
  * - Industry-specific suggested prompts
  *
- * The screen is industry-aware: telco customers see "Check balance" first,
- * insurance customers see "My policies" first.
+ * Fully token-driven: every color, font size and margin comes from the
+ * resolved manifest theme (admin-authored in Selfcare Studio). Nothing
+ * hardcoded (v6 rule #1).
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, KeyboardAvoidingView, Platform,
   ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
-// Icons replaced with text-based equivalents for React Native compatibility
-// TODO: Install @expo/vector-icons or react-native-vector-icons for real icons
-const SendIcon = () => <Text style={{color:'#fff',fontSize:16}}>→</Text>;
-const PlusIcon = () => <Text style={{color:'#6C2DC7',fontSize:18}}>+</Text>;
-const MicIcon = () => <Text style={{color:'#6C2DC7',fontSize:18}}>🎤</Text>;
-const StopIcon = () => <Text style={{color:'#fff',fontSize:16}}>■</Text>;
-const BotIcon = () => <Text style={{color:'#fff',fontSize:14}}>AI</Text>;
-const SparkleIcon = () => <Text style={{color:'#FF6B00',fontSize:12}}>✨</Text>;
-const AlertIcon = () => <Text style={{color:'#D32F2F',fontSize:12}}>⚠</Text>;
-const RefreshIcon = () => <Text style={{color:'#6C2DC7',fontSize:14}}>↻</Text>;
 import { useAIChat } from '../hooks/useAIChat';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useTenant } from '../hooks/useTenant';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../hooks/useAuth';
 import { ChatBubble } from '../components/ChatBubble';
+import {
+  ThemeProvider,
+  useTheme,
+  useThemeColors,
+  fontSizePx,
+  readableOn,
+  ResolvedTheme,
+} from '../manifest/ThemeEngine';
+import { ExperienceManifest, ManifestTheme } from '../manifest/types';
+import { SelfcareSDK } from '../config/ConfigSDK';
 
 const TELCO_QUICK_PROMPTS = [
   'Check my balance',
@@ -52,10 +53,63 @@ const INSURANCE_QUICK_PROMPTS = [
   'How do I add a beneficiary?',
 ];
 
+function getSdk(): SelfcareSDK | undefined {
+  return (globalThis as any).__SELFCARE_SDK__ as SelfcareSDK | undefined;
+}
+
+// Icon glyphs — components so they resolve theme colors from context. The AI
+// chat lives inside a ThemeProvider (manifest theme), so these are always
+// admin-configurable. No hardcoded colors.
+function SendIcon() {
+  const c = useThemeColors();
+  const onPrimary = c.textOnPrimary ?? (readableOn(c.primary500) === 'white' ? '#FFFFFF' : '#111111');
+  return <Text style={{ color: onPrimary, fontSize: 16 }}>→</Text>;
+}
+function PlusIcon() {
+  const c = useThemeColors();
+  return <Text style={{ color: c.primary500, fontSize: 18 }}>+</Text>;
+}
+function MicIcon() {
+  const c = useThemeColors();
+  return <Text style={{ color: c.primary500, fontSize: 18 }}>🎤</Text>;
+}
+function StopIcon() {
+  const onError = readableOn(useThemeColors().error) === 'white' ? '#FFFFFF' : '#111111';
+  return <Text style={{ color: onError, fontSize: 16 }}>■</Text>;
+}
+function BotIcon() {
+  const c = useThemeColors();
+  const onPrimary = c.textOnPrimary ?? (readableOn(c.primary500) === 'white' ? '#FFFFFF' : '#111111');
+  return <Text style={{ color: onPrimary, fontSize: 14 }}>AI</Text>;
+}
+function SparkleIcon() {
+  const c = useThemeColors();
+  return <Text style={{ color: c.accent500, fontSize: 12 }}>✨</Text>;
+}
+function AlertIcon() {
+  const c = useThemeColors();
+  return <Text style={{ color: c.error, fontSize: 12 }}>⚠</Text>;
+}
+function RefreshIcon() {
+  const c = useThemeColors();
+  return <Text style={{ color: c.primary500, fontSize: 14 }}>↻</Text>;
+}
+
 export default function AIChatScreen() {
+  const sdk = getSdk();
+  return (
+    <ThemeProvider theme={(sdk?.getManifest()?.theme as ManifestTheme | undefined) ?? null}>
+      <AIChatScreenInner />
+    </ThemeProvider>
+  );
+}
+
+function AIChatScreenInner() {
   const { industryPack } = useTenant();
-  const auth = useAuth();
+  const auth = useAuthStore();
   const connectionId = (auth as any).connectionId ?? 'acc-1';
+  const colors = useThemeColors();
+  const styles = useChatStyles();
 
   const {
     messages, input, setInput, send, isStreaming, stop,
@@ -157,11 +211,11 @@ export default function AIChatScreen() {
         renderItem={({ item }) => <ChatBubble message={item} />}
         contentContainerStyle={styles.messageList}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C2DC7" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary500} />
         }
         ListEmptyComponent={() => (
           <View style={styles.welcomeContainer}>
-            <Text style={{fontSize: 48}}>🤖</Text>
+            <Text style={styles.welcomeEmoji}>🤖</Text>
             <Text style={styles.welcomeTitle}>Hi! How can I help you today?</Text>
             <Text style={styles.welcomeSubtitle}>
               I can help you with your account, plans, bills, and more.
@@ -171,7 +225,7 @@ export default function AIChatScreen() {
         ListFooterComponent={() => (
           isStreaming ? (
             <View style={styles.typingIndicator}>
-              <ActivityIndicator size="small" color="#6C2DC7" />
+              <ActivityIndicator size="small" color={colors.primary500} />
               <Text style={styles.typingText}>AI is thinking...</Text>
             </View>
           ) : null
@@ -232,7 +286,7 @@ export default function AIChatScreen() {
           value={input}
           onChangeText={setInput}
           placeholder="Ask me anything..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.border}
           multiline
           maxLength={500}
           editable={!isStreaming}
@@ -255,74 +309,85 @@ export default function AIChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  aiAvatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#6C2DC7',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 16, fontWeight: '600', color: '#212121' },
-  headerSubtitle: { fontSize: 11, color: '#757575' },
-  headerButton: { padding: 8 },
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FFEBEE', paddingHorizontal: 16, paddingVertical: 8,
-  },
-  errorText: { color: '#D32F2F', fontSize: 12, flex: 1 },
-  urgentBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 8,
-  },
-  urgentText: { color: '#FF6B00', fontSize: 12, flex: 1 },
-  messageList: { paddingVertical: 8 },
-  welcomeContainer: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
-  welcomeTitle: { fontSize: 20, fontWeight: '600', color: '#212121', marginTop: 16 },
-  welcomeSubtitle: { fontSize: 14, color: '#757575', textAlign: 'center', marginTop: 8 },
-  typingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingLeft: 50 },
-  typingText: { color: '#757575', fontSize: 13 },
-  promptsContainer: {
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
-    borderTopWidth: 1, borderTopColor: '#F0F0F0',
-  },
-  promptsTitle: { fontSize: 12, fontWeight: '600', color: '#757575', marginBottom: 8, textTransform: 'uppercase' },
-  promptsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  promptChip: {
-    backgroundColor: '#F0E6FF',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  promptText: { fontSize: 13, color: '#6C2DC7' },
-  recommendationsSection: { marginTop: 16 },
-  recCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F9F9F9', borderRadius: 12, padding: 12, marginBottom: 8,
-  },
-  recName: { fontSize: 14, fontWeight: '600', color: '#212121' },
-  recReason: { fontSize: 12, color: '#757575', marginTop: 2 },
-  recPrice: { fontSize: 14, fontWeight: '600', color: '#6C2DC7' },
-  inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1, borderTopColor: '#F0F0F0',
-  },
-  iconButton: { padding: 10 },
-  input: {
-    flex: 1, maxHeight: 100, paddingHorizontal: 12, paddingVertical: 8,
-    backgroundColor: '#F5F5F5', borderRadius: 20, fontSize: 15, color: '#212121',
-  },
-  sendButton: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#6C2DC7',
-    alignItems: 'center', justifyContent: 'center', marginLeft: 6,
-  },
-  sendButtonDisabled: { backgroundColor: '#B0B0B0' },
-  stopButton: { backgroundColor: '#D32F2F' },
-});
+/** Chat chrome styles — resolved from the manifest theme (admin-authored). */
+function createChatStyles(t: ResolvedTheme): ReturnType<typeof StyleSheet.create> {
+  const colors = t.colors;
+  const l = t.layout;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.surface },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: l.pagePadding, paddingVertical: Math.round(l.sectionGap / 2),
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    aiAvatar: {
+      width: 36, height: 36, borderRadius: 18,
+      backgroundColor: colors.primary500,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    headerTitle: { fontSize: fontSizePx(t, 'base'), fontWeight: '600', color: colors.textPrimary },
+    headerSubtitle: { fontSize: fontSizePx(t, 'xs'), color: colors.textSecondary },
+    headerButton: { padding: 8 },
+    errorBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: colors.surfaceSubtle, paddingHorizontal: l.pagePadding, paddingVertical: 8,
+    },
+    errorText: { color: colors.error, fontSize: fontSizePx(t, 'xs'), flex: 1 },
+    urgentBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: colors.surfaceSubtle, paddingHorizontal: l.pagePadding, paddingVertical: 8,
+    },
+    urgentText: { color: colors.accent500, fontSize: fontSizePx(t, 'xs'), flex: 1 },
+    messageList: { paddingVertical: 8 },
+    welcomeContainer: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
+    welcomeEmoji: { fontSize: fontSizePx(t, '4xl') * 1.33 },
+    welcomeTitle: { fontSize: fontSizePx(t, 'xl'), fontWeight: '600', color: colors.textPrimary, marginTop: l.sectionGap },
+    welcomeSubtitle: { fontSize: fontSizePx(t, 'sm'), color: colors.textSecondary, textAlign: 'center', marginTop: 8 },
+    typingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingLeft: 50 },
+    typingText: { color: colors.textSecondary, fontSize: fontSizePx(t, 'sm') },
+    promptsContainer: {
+      paddingHorizontal: l.pagePadding, paddingTop: 8, paddingBottom: 12,
+      borderTopWidth: 1, borderTopColor: colors.border,
+    },
+    promptsTitle: { fontSize: fontSizePx(t, 'xs'), fontWeight: '600', color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase' },
+    promptsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    promptChip: {
+      backgroundColor: colors.primary300,
+      borderRadius: l.radius ?? 16,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    promptText: { fontSize: fontSizePx(t, 'sm'), color: colors.primary700 },
+    recommendationsSection: { marginTop: l.sectionGap },
+    recCard: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: colors.surface, borderRadius: l.radius ?? 12, padding: 12, marginBottom: 8,
+    },
+    recName: { fontSize: fontSizePx(t, 'sm'), fontWeight: '600', color: colors.textPrimary },
+    recReason: { fontSize: fontSizePx(t, 'xs'), color: colors.textSecondary, marginTop: 2 },
+    recPrice: { fontSize: fontSizePx(t, 'sm'), fontWeight: '600', color: colors.primary500 },
+    inputBar: {
+      flexDirection: 'row', alignItems: 'flex-end', padding: 8,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1, borderTopColor: colors.border,
+    },
+    iconButton: { padding: 10 },
+    input: {
+      flex: 1, maxHeight: 100, paddingHorizontal: 12, paddingVertical: 8,
+      backgroundColor: colors.surfaceSubtle, borderRadius: l.radius ?? 20, fontSize: fontSizePx(t, 'base'), color: colors.textPrimary,
+    },
+    sendButton: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: colors.primary500,
+      alignItems: 'center', justifyContent: 'center', marginLeft: 6,
+    },
+    sendButtonDisabled: { backgroundColor: colors.border },
+    stopButton: { backgroundColor: colors.error },
+  });
+}
+
+function useChatStyles() {
+  const theme = useTheme();
+  return useMemo(() => createChatStyles(theme), [theme]);
+}

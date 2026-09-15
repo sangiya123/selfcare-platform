@@ -19,6 +19,10 @@
  *   if (Component) {
  *     <Component {...props} />
  *   }
+ *
+ * Catalog resolution: catalog entries with a `primitive` (e.g. "UniversalBox")
+ * resolve to the primitive wrapped with the immutable config recipe. Features
+ * compose existing primitives — no app code per feature (ADR-009).
  */
 
 import React, { ComponentType, ReactElement } from 'react';
@@ -38,6 +42,14 @@ export interface WidgetProps {
   onRetry?: () => void;
 }
 
+/**
+ * Props accepted by universal primitives. Identical to WidgetProps but without
+ * the id/componentId requirement — primitives are composable as nested children
+ * (data + props + onAction only) AND as top-level registered widgets.
+ */
+export type PrimitiveProps = Omit<WidgetProps, 'id' | 'componentId'> &
+  Partial<Pick<WidgetProps, 'id' | 'componentId'>>;
+
 export interface RegisteredComponent {
   componentId: string;
   component: ComponentType<WidgetProps>;
@@ -46,6 +58,7 @@ export interface RegisteredComponent {
   minAppVersion?: string;
   security: 'display' | 'read' | 'write';
   analyticsEvents: string[];
+  isPrimitive?: boolean;
 }
 
 export interface Action {
@@ -58,9 +71,24 @@ export interface Action {
   analyticsEvent?: string;
 }
 
+/** Component catalog entry from manifest */
+export interface CatalogComponent {
+  componentId: string;
+  /** Universal primitive (e.g. "UniversalBox"). Absent = availability-gate only, no resolve. */
+  primitive?: string;
+  config?: Record<string, unknown>;
+  description?: string;
+  platforms?: string[];
+  minAppVersion?: string;
+  security?: 'display' | 'read' | 'write';
+  analyticsEvents?: string[];
+}
+
 export class ComponentRegistry {
   private registry: Map<string, RegisteredComponent> = new Map();
   private aliases: Map<string, string> = new Map();
+  private catalog: Map<string, CatalogComponent> = new Map();
+  private resolvedCache: Map<string, ComponentType<WidgetProps>> = new Map();
 
   /**
    * Register a widget component.
@@ -119,19 +147,26 @@ export class ComponentRegistry {
 
   /**
    * Check if a component is available for a given platform/version.
+   * Checks direct registrations AND catalog-resolved components.
    */
   isAvailable(componentId: string, platform: string, appVersion: string): boolean {
-    const entry = this.getEntry(componentId);
-    if (!entry) return false;
+    const resolved = this.resolve(componentId);
+    const entry = resolved ? this.registry.get(resolved) : undefined;
+    const catalogEntry = this.catalog.get(componentId);
+
+    if (!entry && !catalogEntry) return false;
+
+    const platforms = entry?.platforms ?? catalogEntry?.platforms;
+    const minAppVersion = entry?.minAppVersion ?? catalogEntry?.minAppVersion;
 
     // Check platform
-    if (entry.platforms && entry.platforms.length > 0 && !entry.platforms.includes(platform)) {
+    if (platforms && platforms.length > 0 && !platforms.includes(platform)) {
       return false;
     }
 
     // Check minimum app version
-    if (entry.minAppVersion) {
-      const satisfies = satisfiesMinVersion(appVersion, entry.minAppVersion);
+    if (minAppVersion) {
+      const satisfies = satisfiesMinVersion(appVersion, minAppVersion);
       if (!satisfies) return false;
     }
 
@@ -157,13 +192,75 @@ export class ComponentRegistry {
     }
     return resolved;
   }
+
+  /**
+   * Load component catalog from manifest.
+   * Called when manifest is refreshed.
+   */
+  loadCatalog(components: CatalogComponent[]): void {
+    this.catalog.clear();
+    this.resolvedCache.clear();
+    for (const comp of components) {
+      this.catalog.set(comp.componentId, comp);
+    }
+  }
+
+  /**
+   * Get a component, resolving from catalog if not directly registered.
+   * This is the main entry point for LayoutRenderer.
+   */
+  getOrResolve(componentId: string): ComponentType<WidgetProps> | null {
+    // First check direct registration
+    const direct = this.get(componentId);
+    if (direct) return direct;
+
+    // Check cache
+    if (this.resolvedCache.has(componentId)) {
+      return this.resolvedCache.get(componentId)!;
+    }
+
+    // Resolve from catalog
+    const catalogEntry = this.catalog.get(componentId);
+    if (catalogEntry && catalogEntry.primitive) {
+      const Primitive = this.getPrimitiveComponent(catalogEntry.primitive);
+      if (Primitive) {
+        const ResolvedComponent = (function ResolvedComponent(props: WidgetProps) {
+          return React.createElement(Primitive, {
+            ...props,
+            props: { ...(catalogEntry.config || {}), ...props.props },
+          });
+        }) as ComponentType<WidgetProps>;
+        this.resolvedCache.set(componentId, ResolvedComponent);
+        return ResolvedComponent;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get primitive component by name.
+   */
+  private getPrimitiveComponent(primitive: string): ComponentType<any> | null {
+    // This will be populated by widgetLibrary
+    return (globalThis as any).__SELFCARE_PRIMITIVES__?.[primitive] ?? null;
+  }
+
+  /**
+   * Register a primitive component for catalog resolution. Universal
+   * primitives register here from the widget library
+   * (src/components/widgetLibrary.ts).
+   */
+  registerPrimitive(name: string, component: ComponentType<any>): void {
+    if (!(globalThis as any).__SELFCARE_PRIMITIVES__) {
+      (globalThis as any).__SELFCARE_PRIMITIVES__ = {};
+    }
+    (globalThis as any).__SELFCARE_PRIMITIVES__[name] = component;
+  }
 }
 
-/**
- * Compare semantic versions.
- * Returns true if version >= minVersion.
- */
-function satisfiesMinVersion(version: string, minVersion: string): boolean {
+/** Compare semver strings: true when version >= minVersion. */
+export function satisfiesMinVersion(version: string, minVersion: string): boolean {
   const vParts = version.split('.').map(Number);
   const mParts = minVersion.split('.').map(Number);
 
@@ -176,19 +273,5 @@ function satisfiesMinVersion(version: string, minVersion: string): boolean {
   return true;
 }
 
-// ============================================================
-// BUILT-IN WIDGET COMPONENTS
-// ============================================================
-
-// Import actual widgets in the app entry point
-// This file exports the registry class and the widget interface
-
-export function createWidgetLibrary(): Map<string, RegisteredComponent> {
-  const widgets = new Map<string, RegisteredComponent>();
-
-  // Telco Selfcare Widgets (registered at app startup)
-  // Balance, Usage, Bills, Packages, Offers, Notifications, Support, etc.
-  // See src/components/widgets/ for implementations
-
-  return widgets;
-}
+// Universal primitives are registered via registerPrimitive() from the widget
+// library (src/components/widgetLibrary.ts).

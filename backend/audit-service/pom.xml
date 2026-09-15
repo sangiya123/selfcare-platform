@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>audit-service</artifactId>
@@ -12,7 +12,7 @@
     <description>Immutable audit trail for login, config publish, role changes, payment state, high-risk AI actions.</description>
     <dependencies>
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
         </dependency>
         <dependency>
@@ -51,6 +51,11 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>

@@ -1,10 +1,10 @@
-/**
- * OMOBIO Selfcare App — Entry point.
+﻿/**
+ * Selfcare App — Entry point.
  *
  * Registers the App component with the React Native AppRegistry.
  *
- *   - Android: appName in AndroidManifest.xml is "OmobioSelfcare"
- *   - iOS:     appName in AppDelegate.mm is "OmobioSelfcare"
+ *   - Android: appName in AndroidManifest.xml is "selfcareSelfcare"
+ *   - iOS:     appName in AppDelegate.mm is "selfcareSelfcare"
  */
 
 import { AppRegistry } from 'react-native';

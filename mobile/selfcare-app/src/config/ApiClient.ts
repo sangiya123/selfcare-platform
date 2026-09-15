@@ -1,14 +1,15 @@
-/**
- * ApiClient — HTTP client for OMOBIO API Gateway.
+﻿/**
+ * ApiClient — HTTP client for selfcare API Gateway.
  *
  * All requests carry X-Tenant-Id and, when authenticated, Authorization Bearer token.
- * Responses are unwrapped to data payload. Errors throw OmobioError.
+ * Responses are unwrapped to data payload. Errors throw selfcareError.
  *
  * Built on axios. In production, replace with tRPC or GraphQL client if preferred.
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { OmobioError, ErrorCodes } from './errors';
+import { selfcareError, ErrorCodes } from './errors';
+import { requestContextHeaders } from '../services/RequestContext';
 
 export interface ApiClientOptions {
   tenantId: string;
@@ -44,6 +45,17 @@ export class ApiClient {
       },
     });
 
+    // Request interceptor: attach the canonical RequestContext headers
+    this.client.interceptors.request.use((config) => {
+      const existing: Record<string, string> =
+        config.headers && typeof config.headers.toJSON === 'function'
+          ? (config.headers.toJSON() as Record<string, string>)
+          : ((config.headers as Record<string, string>) ?? {});
+      // Context headers first; explicit request headers win on collision.
+      config.headers = { ...requestContextHeaders(), ...existing } as typeof config.headers;
+      return config;
+    });
+
     // Response interceptor: unwrap { data: { ... } } wrapper
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
@@ -57,28 +69,32 @@ export class ApiClient {
         const status = error.response?.status;
         const code = error.response?.data?.code;
         const message = error.response?.data?.message ?? error.message;
+        const details = error.response?.data;
 
         if (status === 401) {
           this.onUnauthorized?.();
-          throw new OmobioError(ErrorCodes.UNAUTHORIZED, message);
+          return Promise.reject(
+            new selfcareError(ErrorCodes.UNAUTHORIZED, message, details)
+          );
         }
-        if (status === 403) {
-          throw new OmobioError(ErrorCodes.FORBIDDEN, message);
+        switch (status) {
+          case 403:
+            return Promise.reject(new selfcareError(ErrorCodes.FORBIDDEN, message, details));
+          case 404:
+            return Promise.reject(new selfcareError(ErrorCodes.NOT_FOUND, message, details));
+          case 409:
+            return Promise.reject(new selfcareError(ErrorCodes.CONFLICT, message, details));
+          case 429:
+            return Promise.reject(new selfcareError(ErrorCodes.RATE_LIMITED, message, details));
+          case 503:
+            return Promise.reject(
+              new selfcareError(ErrorCodes.SERVICE_UNAVAILABLE, message, details)
+            );
+          default:
+            return Promise.reject(
+              new selfcareError(code ?? 'API_ERROR', message, details)
+            );
         }
-        if (status === 404) {
-          throw new OmobioError(ErrorCodes.NOT_FOUND, message);
-        }
-        if (status === 409) {
-          throw new OmobioError(ErrorCodes.CONFLICT, message);
-        }
-        if (status === 429) {
-          throw new OmobioError(ErrorCodes.RATE_LIMITED, message);
-        }
-        if (status === 503) {
-          throw new OmobioError(ErrorCodes.SERVICE_UNAVAILABLE, message);
-        }
-
-        throw new OmobioError(code ?? 'API_ERROR', message, error.response?.data);
       }
     );
   }

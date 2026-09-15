@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConfigSDK Tests
  *
  * Tests config fetching, ETag caching, and last-known-good behavior.
@@ -43,7 +43,7 @@ describe('ConfigSDK', () => {
 
   beforeEach(() => {
     // Clear MMKV storage between tests
-    const mmkv = new MMKV({ id: 'omobio-config' });
+    const mmkv = new MMKV({ id: 'selfcare-config' });
     mmkv.clearAll();
 
     // Reset axios mock
@@ -66,12 +66,14 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"abc123"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
 
       expect(getMock).toHaveBeenCalledTimes(1);
       const [path, options] = getMock.mock.calls[0];
-      expect(path).toBe('/config/manifest');
+      expect(path).toBe('/api/v1/config/manifest');
       expect(options.headers['X-Tenant-Id']).toBe(TENANT_ID);
     });
 
@@ -81,6 +83,8 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"abc123"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
 
@@ -95,10 +99,12 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"abc123"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
 
-      const mmkv = new MMKV({ id: 'omobio-config' });
+      const mmkv = new MMKV({ id: 'selfcare-config' });
       const cached = mmkv.getString(`manifest:${TENANT_ID}`);
       expect(cached).toBeTruthy();
       const parsed = JSON.parse(cached!);
@@ -111,6 +117,8 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"abc123"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       const before = Date.now();
       await sdk.refresh();
@@ -131,6 +139,8 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"abc123"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       // First fetch stores ETag
       await sdk.refresh();
@@ -149,18 +159,22 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"persisted-etag"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       // First instance fetches and stores ETag
       await sdk.refresh();
 
-      // New instance loads ETag from storage
-      const sdk2 = new ConfigSDK(TENANT_ID, BASE_URL);
+      // Second refresh should send If-None-Match
       const headers2: Record<string, string> = {};
       const getMock2 = jest.fn().mockImplementation((_path, opts) => {
         Object.assign(headers2, opts.headers);
         return Promise.resolve({ data: MOCK_MANIFEST, headers: { etag: 'W/"new-etag"' } });
       });
       mockedAxios.create.mockReturnValue({ get: getMock2 } as any);
+
+      // New instance loads ETag from storage
+      const sdk2 = new ConfigSDK(TENANT_ID, BASE_URL);
 
       await sdk2.refresh();
 
@@ -181,6 +195,8 @@ describe('ConfigSDK', () => {
         });
 
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
       const manifestBefore = sdk.getManifest();
@@ -204,6 +220,8 @@ describe('ConfigSDK', () => {
         .mockRejectedValueOnce(new Error('Network error'));
 
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
       const cachedManifest = sdk.getManifest();
@@ -219,6 +237,8 @@ describe('ConfigSDK', () => {
     it('throws error when no cached manifest and network fails', async () => {
       const getMock = jest.fn().mockRejectedValue(new Error('Network error'));
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       const sdkNoCache = new ConfigSDK('unknown-tenant', BASE_URL);
       await expect(sdkNoCache.refresh()).rejects.toThrow('Network error');
@@ -241,13 +261,20 @@ describe('ConfigSDK', () => {
         .mockResolvedValueOnce({
           data: { ...MOCK_MANIFEST, version: '1.0.1' },
           headers: { etag: 'W/"def456"' },
+        })
+        .mockResolvedValueOnce({
+          data: { ...MOCK_MANIFEST, version: '1.0.2' },
+          headers: { etag: 'W/"ghi789"' },
         });
 
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       await sdk.refresh();
 
-      // Force refresh should NOT include If-None-Match
+      // Second refresh should send If-None-Match
+      await sdk.refresh();
       const secondCallHeaders = getMock.mock.calls[1][1].headers;
       expect(secondCallHeaders['If-None-Match']).toBe('W/"abc123"');
 
@@ -257,7 +284,7 @@ describe('ConfigSDK', () => {
       const thirdCallHeaders = getMock.mock.calls[2][1].headers;
       expect(thirdCallHeaders['If-None-Match']).toBeUndefined();
 
-      expect(sdk.getManifest()?.version).toBe('1.0.1');
+      expect(sdk.getManifest()?.version).toBe('1.0.2');
     });
   });
 
@@ -269,6 +296,8 @@ describe('ConfigSDK', () => {
         headers: { etag: 'W/"cached"' },
       });
       mockedAxios.create.mockReturnValue({ get: getMock } as any);
+      // beforeEach-sdk captured its axios client at construction; patch it too
+      (sdk as any).client.get = getMock;
 
       const sdk1 = new ConfigSDK(TENANT_ID, BASE_URL);
       await sdk1.refresh();
@@ -280,7 +309,7 @@ describe('ConfigSDK', () => {
     });
 
     it('handles corrupted cache gracefully', () => {
-      const mmkv = new MMKV({ id: 'omobio-config' });
+      const mmkv = new MMKV({ id: 'selfcare-config' });
       mmkv.set(`manifest:${TENANT_ID}`, 'invalid{json');
 
       // Should not throw, should return null

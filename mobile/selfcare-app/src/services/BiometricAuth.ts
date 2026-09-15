@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BiometricAuth — Biometric / device-credential authentication.
  *
  * Wraps `react-native-biometrics` for Face ID / Touch ID / fingerprint.
@@ -18,7 +18,7 @@
 import { Alert, Platform } from 'react-native';
 import ReactNativeBiometrics, { BiometryType } from 'react-native-biometrics';
 
-const SERVICE = 'omobio-biometric';
+const SERVICE = 'selfcare-biometric';
 
 export type BiometricCapability =
   | 'AVAILABLE'

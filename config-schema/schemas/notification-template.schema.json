@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/notification-template.schema.json",
+  "$id": "https://selfcare.example.com/schemas/notification-template.schema.json",
   "title": "NotificationTemplate",
-  "description": "Notification template definition for the OMOBIO Selfcare Platform. Supports multi-channel delivery (PUSH, SMS, EMAIL, IN_APP) with full i18n and mustache-style {{placeholders}}.",
+  "description": "Notification template definition for the Selfcare Platform. Supports multi-channel delivery (PUSH, SMS, EMAIL, IN_APP) with full i18n and mustache-style {{placeholders}}.",
   "type": "object",
   "required": [
     "schemaVersion",

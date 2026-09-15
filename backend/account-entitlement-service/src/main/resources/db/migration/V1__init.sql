@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — account-entitlement-service
+-- Selfcare Platform — account-entitlement-service
 -- Tables: accounts, connections
 --
 -- One account per primary identity (e.g. Dialog primary MSISDN).

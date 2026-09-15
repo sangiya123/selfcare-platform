@@ -23,8 +23,8 @@ env:
   DEFAULT_IMAGE_TAG: "rc-stable"  # Specific RC tag
   DEFAULT_TARGET_REVISION: "release/*"  # Track release branches
   IMAGE_PULL_POLICY: IfNotPresent
-  IMAGE_REGISTRY: ghcr.io/omobio
-  IMAGE_REPOSITORY: omobio/selfcare-platform
+  IMAGE_REGISTRY: ghcr.io/sangiya123
+  IMAGE_REPOSITORY: sangiya123/selfcare-platform
 
   # Auto-sync
   AUTO_SYNC_ENABLED: "true"

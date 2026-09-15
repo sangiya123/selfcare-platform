@@ -1,69 +1,69 @@
-# argocd-project.yaml — ArgoCD AppProject for OMOBIO Selfcare Platform
+# argocd-project.yaml — ArgoCD AppProject for Selfcare Platform
 # Defines project scope, source repos, destinations, and multi-tenant RBAC
 # Each tenant namespace has an owner role; each environment has an operator role
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: omobio-platform
+  name: selfcare-platform
   namespace: argocd
   labels:
-    app.kubernetes.io/name: omobio-platform
+    app.kubernetes.io/name: selfcare-platform
     app.kubernetes.io/component: gitops
-    app.kubernetes.io/part-of: omobio-platform
+    app.kubernetes.io/part-of: selfcare-platform
     app.kubernetes.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-options: "Validate=true"
-    omobio.gitops.project: "omobio-platform"
-    omobio.gitops.tenant-model: "multi-tenant"
+    selfcare.gitops.project: "selfcare-platform"
+    selfcare.gitops.tenant-model: "multi-tenant"
 spec:
   # Description and metadata
   description: |
-    OMOBIO Selfcare Platform — multi-tenant multi-environment deployment.
+    Selfcare Platform — multi-tenant multi-environment deployment.
     Manages deployments for all tenants (Dialog, Hutch, Airtel, AIA) across
     all environments (dev, stg, reg, prod).
 
   # Source repositories allowed in this project
   sourceRepos:
-    - https://github.com/omobio/selfcare-platform
-    - https://github.com/omobio/selfcare-platform.git
-    - ssh://git@github.com/omobio/selfcare-platform
+    - https://github.com/sangiya123/selfcare-platform
+    - https://github.com/sangiya123/selfcare-platform.git
+    - ssh://git@github.com/sangiya123/selfcare-platform
     # Allow Helm repos if used in future
-    - https://omobio.github.io/helm-charts
+    - https://selfcare.github.io/helm-charts
     - https://charts.bitnami.com/bitnami
     # OCI registry for Helm charts
-    - oci://ghcr.io/omobio/helm-charts
+    - oci://ghcr.io/sangiya123/helm-charts
 
   # Allowed destinations (clusters and namespaces)
   destinations:
     # Local cluster — primary deployment target
     - server: https://kubernetes.default.svc
       namespace: argocd
-      # Allow all omobio-* namespaces on local cluster
+      # Allow all selfcare-* namespaces on local cluster
     - server: https://kubernetes.default.svc
-      namespace: omobio-*
-      description: All OMOBIO tenant namespaces
+      namespace: selfcare-*
+      description: All selfcare tenant namespaces
     # Staging cluster (for integration testing)
-    - server: https://stg-cluster.omobio.example.com
-      namespace: omobio-*
+    - server: https://stg-cluster.selfcare.example.com
+      namespace: selfcare-*
       description: Staging cluster namespaces
     # Production clusters (per region)
-    - server: https://prod-lk.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-lk.selfcare.example.com
+      namespace: selfcare-*
       description: Sri Lanka production cluster
-    - server: https://prod-sg.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-sg.selfcare.example.com
+      namespace: selfcare-*
       description: Singapore production cluster
-    - server: https://prod-th.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-th.selfcare.example.com
+      namespace: selfcare-*
       description: Thailand production cluster
-    - server: https://prod-my.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-my.selfcare.example.com
+      namespace: selfcare-*
       description: Malaysia production cluster
-    - server: https://prod-hk.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-hk.selfcare.example.com
+      namespace: selfcare-*
       description: Hong Kong production cluster
-    - server: https://prod-in.omobio.example.com
-      namespace: omobio-*
+    - server: https://prod-in.selfcare.example.com
+      namespace: selfcare-*
       description: India production cluster
 
   # Cluster Resource Allow List
@@ -91,16 +91,16 @@ spec:
     - name: platform-admin
       description: Platform administrator with full access
       policies:
-        - p, proj:omobio-platform:platform-admin,applications,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,applicationsets,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,clusters,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,repositories,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,projects,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,exec,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,logs,*,*,* allow
-        - p, proj:omobio-platform:platform-admin,events,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,applications,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,applicationsets,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,clusters,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,repositories,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,projects,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,exec,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,logs,*,*,* allow
+        - p, proj:selfcare-platform:platform-admin,events,*,*,* allow
       groups:
-        - omobio-platform-admins@example.com
+        - selfcare-platform-admins@example.com
 
     # -------------------------------------------------------------------------
     # DevOps Engineer — deploy any tenant to dev/stg/reg
@@ -108,16 +108,16 @@ spec:
     - name: devops-engineer
       description: Deploy to dev/stg/reg environments, approve reg promotions
       policies:
-        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-dev,allow
-        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-stg,allow
-        - p, proj:omobio-platform:devops-engineer,applications,*,omobio-*-reg,allow
-        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-dev,allow
-        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-stg,allow
-        - p, proj:omobio-platform:devops-engineer,applications,sync,omobio-*-reg,allow
-        - p, proj:omobio-platform:devops-engineer,applications,get,omobio-*-prod,allow
-        - p, proj:omobio-platform:devops-engineer,applicationsets,*,*,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,*,selfcare-*-dev,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,*,selfcare-*-stg,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,*,selfcare-*-reg,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,sync,selfcare-*-dev,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,sync,selfcare-*-stg,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,sync,selfcare-*-reg,allow
+        - p, proj:selfcare-platform:devops-engineer,applications,get,selfcare-*-prod,allow
+        - p, proj:selfcare-platform:devops-engineer,applicationsets,*,*,allow
       groups:
-        - omobio-devops@example.com
+        - selfcare-devops@example.com
 
     # -------------------------------------------------------------------------
     # Release Manager — manage prod deployments, sync windows
@@ -125,14 +125,14 @@ spec:
     - name: release-manager
       description: Approve and execute production deployments
       policies:
-        - p, proj:omobio-platform:release-manager,applications,*,*,* allow
-        - p, proj:omobio-platform:release-manager,applications,sync,omobio-*-prod,allow
-        - p, proj:omobio-platform:release-manager,applications,rollback,omobio-*-prod,allow
-        - p, proj:omobio-platform:release-manager,sync-windows,*,*,allow
-        - p, proj:omobio-platform:release-manager,events,*,*,allow
-        - p, proj:omobio-platform:release-manager,logs,*,*,allow
+        - p, proj:selfcare-platform:release-manager,applications,*,*,* allow
+        - p, proj:selfcare-platform:release-manager,applications,sync,selfcare-*-prod,allow
+        - p, proj:selfcare-platform:release-manager,applications,rollback,selfcare-*-prod,allow
+        - p, proj:selfcare-platform:release-manager,sync-windows,*,*,allow
+        - p, proj:selfcare-platform:release-manager,events,*,*,allow
+        - p, proj:selfcare-platform:release-manager,logs,*,*,allow
       groups:
-        - omobio-release-managers@example.com
+        - selfcare-release-managers@example.com
 
     # -------------------------------------------------------------------------
     # Tenant Namespace Owner — manage their own tenant namespace only
@@ -142,15 +142,15 @@ spec:
       description: Manage their own tenant namespace (all environments)
       policies:
         # Can view all apps
-        - p, proj:omobio-platform:tenant-owner,applications,get,omobio-*,allow
-        - p, proj:omobio-platform:tenant-owner,applications,list,omobio-*,allow
+        - p, proj:selfcare-platform:tenant-owner,applications,get,selfcare-*,allow
+        - p, proj:selfcare-platform:tenant-owner,applications,list,selfcare-*,allow
         # Can only sync their own tenant's dev/stg
-        - p, proj:omobio-platform:tenant-owner,applications,sync,omobio-{{ name }}-dev,allow
-        - p, proj:omobio-platform:tenant-owner,applications,sync,omobio-{{ name }}-stg,allow
+        - p, proj:selfcare-platform:tenant-owner,applications,sync,selfcare-{{ name }}-dev,allow
+        - p, proj:selfcare-platform:tenant-owner,applications,sync,selfcare-{{ name }}-stg,allow
         # Cannot sync prod without approval (enforced by sync window)
-        - p, proj:omobio-platform:tenant-owner,applications,get,omobio-{{ name }}-prod,allow
+        - p, proj:selfcare-platform:tenant-owner,applications,get,selfcare-{{ name }}-prod,allow
       groups:
-        - omobio-tenant-owners@example.com
+        - selfcare-tenant-owners@example.com
 
     # -------------------------------------------------------------------------
     # Environment Operators — manage all tenants in a specific environment
@@ -158,43 +158,43 @@ spec:
     - name: env-dev-operator
       description: Operate dev environment for all tenants
       policies:
-        - p, proj:omobio-platform:env-dev-operator,applications,*,omobio-*-dev,allow
-        - p, proj:omobio-platform:env-dev-operator,applications,sync,omobio-*-dev,allow
-        - p, proj:omobio-platform:env-dev-operator,applications,rollback,omobio-*-dev,allow
+        - p, proj:selfcare-platform:env-dev-operator,applications,*,selfcare-*-dev,allow
+        - p, proj:selfcare-platform:env-dev-operator,applications,sync,selfcare-*-dev,allow
+        - p, proj:selfcare-platform:env-dev-operator,applications,rollback,selfcare-*-dev,allow
       groups:
-        - omobio-devops@example.com
+        - selfcare-devops@example.com
 
     - name: env-stg-operator
       description: Operate staging environment for all tenants
       policies:
-        - p, proj:omobio-platform:env-stg-operator,applications,*,omobio-*-stg,allow
-        - p, proj:omobio-platform:env-stg-operator,applications,sync,omobio-*-stg,allow
-        - p, proj:omobio-platform:env-stg-operator,applications,rollback,omobio-*-stg,allow
-        - p, proj:omobio-platform:env-stg-operator,applications,get,omobio-*-stg,allow
+        - p, proj:selfcare-platform:env-stg-operator,applications,*,selfcare-*-stg,allow
+        - p, proj:selfcare-platform:env-stg-operator,applications,sync,selfcare-*-stg,allow
+        - p, proj:selfcare-platform:env-stg-operator,applications,rollback,selfcare-*-stg,allow
+        - p, proj:selfcare-platform:env-stg-operator,applications,get,selfcare-*-stg,allow
       groups:
-        - omobio-devops@example.com
+        - selfcare-devops@example.com
 
     - name: env-reg-operator
       description: Operate regression environment for all tenants
       policies:
-        - p, proj:omobio-platform:env-reg-operator,applications,*,omobio-*-reg,allow
-        - p, proj:omobio-platform:env-reg-operator,applications,sync,omobio-*-reg,allow
-        - p, proj:omobio-platform:env-reg-operator,applications,rollback,omobio-*-reg,allow
-        - p, proj:omobio-platform:env-reg-operator,applications,get,omobio-*-reg,allow
+        - p, proj:selfcare-platform:env-reg-operator,applications,*,selfcare-*-reg,allow
+        - p, proj:selfcare-platform:env-reg-operator,applications,sync,selfcare-*-reg,allow
+        - p, proj:selfcare-platform:env-reg-operator,applications,rollback,selfcare-*-reg,allow
+        - p, proj:selfcare-platform:env-reg-operator,applications,get,selfcare-*-reg,allow
       groups:
-        - omobio-qa@example.com
-        - omobio-devops@example.com
+        - selfcare-qa@example.com
+        - selfcare-devops@example.com
 
     - name: env-prod-operator
       description: Operate production environment — requires explicit approval
       policies:
-        - p, proj:omobio-platform:env-prod-operator,applications,get,omobio-*-prod,allow
-        - p, proj:omobio-platform:env-prod-operator,applications,list,omobio-*-prod,allow
+        - p, proj:selfcare-platform:env-prod-operator,applications,get,selfcare-*-prod,allow
+        - p, proj:selfcare-platform:env-prod-operator,applications,list,selfcare-*-prod,allow
         # Sync only via manual trigger with approval gate
-        - p, proj:omobio-platform:env-prod-operator,applications,sync,omobio-*-prod,allow
-        - p, proj:omobio-platform:env-prod-operator,applications,rollback,omobio-*-prod,allow
+        - p, proj:selfcare-platform:env-prod-operator,applications,sync,selfcare-*-prod,allow
+        - p, proj:selfcare-platform:env-prod-operator,applications,rollback,selfcare-*-prod,allow
       groups:
-        - omobio-release-managers@example.com
+        - selfcare-release-managers@example.com
 
     # -------------------------------------------------------------------------
     # Read-Only Observer — view-only access for auditors
@@ -202,13 +202,13 @@ spec:
     - name: observer
       description: Read-only access to all resources
       policies:
-        - p, proj:omobio-platform:observer,applications,get,*,* allow
-        - p, proj:omobio-platform:observer,applications,list,*,* allow
-        - p, proj:omobio-platform:observer,applications,watch,*,* allow
-        - p, proj:omobio-platform:observer,logs,get,*,* allow
-        - p, proj:omobio-platform:observer,events,get,*,* allow
+        - p, proj:selfcare-platform:observer,applications,get,*,* allow
+        - p, proj:selfcare-platform:observer,applications,list,*,* allow
+        - p, proj:selfcare-platform:observer,applications,watch,*,* allow
+        - p, proj:selfcare-platform:observer,logs,get,*,* allow
+        - p, proj:selfcare-platform:observer,events,get,*,* allow
       groups:
-        - omobio-observers@example.com
+        - selfcare-observers@example.com
         - security-auditors@example.com
 
   # Sync windows — restrict when automated syncs can run
@@ -218,11 +218,11 @@ spec:
       schedule: "* * * * *"  # Every minute (effectively always)
       duration: 1h
       applications:
-        - "omobio-*-dev"
+        - "selfcare-*-dev"
       clusters:
         - https://kubernetes.default.svc
       namespaces:
-        - omobio-*-dev
+        - selfcare-*-dev
       manualSync: false
 
     # Staging: business hours (Mon-Fri 08:00-18:00 SGT)
@@ -230,12 +230,12 @@ spec:
       schedule: "0 8-18 * * MON-FRI"
       duration: 10h
       applications:
-        - "omobio-*-stg"
+        - "selfcare-*-stg"
       clusters:
         - https://kubernetes.default.svc
-        - https://stg-cluster.omobio.example.com
+        - https://stg-cluster.selfcare.example.com
       namespaces:
-        - omobio-*-stg
+        - selfcare-*-stg
       manualSync: false
 
     # Regression: business hours (Mon-Fri 09:00-17:00 SGT)
@@ -243,11 +243,11 @@ spec:
       schedule: "0 9-17 * * MON-FRI"
       duration: 8h
       applications:
-        - "omobio-*-reg"
+        - "selfcare-*-reg"
       clusters:
         - https://kubernetes.default.svc
       namespaces:
-        - omobio-*-reg
+        - selfcare-*-reg
       manualSync: false
 
     # Production: maintenance windows only
@@ -255,11 +255,11 @@ spec:
       schedule: "0 2-4 * * SUN"  # Sunday 02:00-04:00 UTC
       duration: 2h
       applications:
-        - "omobio-*-prod"
+        - "selfcare-*-prod"
       clusters:
-        - "https://prod-*.omobio.example.com"
+        - "https://prod-*.selfcare.example.com"
       namespaces:
-        - omobio-*-prod
+        - selfcare-*-prod
       manualSync: false
 
     # Production secondary: Wednesday maintenance window
@@ -267,11 +267,11 @@ spec:
       schedule: "0 2-4 * * WED"  # Wednesday 02:00-04:00 UTC
       duration: 2h
       applications:
-        - "omobio-*-prod"
+        - "selfcare-*-prod"
       clusters:
-        - "https://prod-*.omobio.example.com"
+        - "https://prod-*.selfcare.example.com"
       namespaces:
-        - omobio-*-prod
+        - selfcare-*-prod
       manualSync: false
 
     # Block production syncs outside maintenance windows
@@ -279,18 +279,18 @@ spec:
       schedule: "* * * * *"
       duration: 1h
       applications:
-        - "omobio-*-prod"
+        - "selfcare-*-prod"
       clusters:
-        - "https://prod-*.omobio.example.com"
+        - "https://prod-*.selfcare.example.com"
       namespaces:
-        - omobio-*-prod
+        - selfcare-*-prod
       manualSync: false
 
   # Network policy for ArgCD's ingress
   # Permitted source namespaces for application webhooks
   sourceNamespaces:
     - argocd
-    - omobio-*
+    - selfcare-*
 
   # Resource tracking
   orphanedResources:
@@ -299,4 +299,4 @@ spec:
       - kinds:
           - Event
         namespaces:
-          - omobio-*
+          - selfcare-*

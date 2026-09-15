@@ -1,17 +1,17 @@
-/**
+﻿/**
  * ApiClient tests.
  *
  * Verifies:
  * - X-Tenant-Id header is always present
  * - Authorization Bearer header is added when an access token is available
  * - The { data: ... } envelope is unwrapped from successful responses
- * - 401 triggers the onUnauthorized callback and throws OmobioError(UNAUTHORIZED)
- * - 403, 404, 409, 429, 503 each throw the correct OmobioError code
- * - Other HTTP errors throw OmobioError(API_ERROR)
+ * - 401 triggers the onUnauthorized callback and throws selfcareError(UNAUTHORIZED)
+ * - 403, 404, 409, 429, 503 each throw the correct selfcareError code
+ * - Other HTTP errors throw selfcareError(API_ERROR)
  */
 import axios from 'axios';
 import { ApiClient } from '../../src/config/ApiClient';
-import { OmobioError, ErrorCodes } from '../../src/config/errors';
+import { selfcareError, ErrorCodes } from '../../src/config/errors';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -98,38 +98,38 @@ describe('ApiClient', () => {
       return onRejected(error);
     }
 
-    it('401 triggers onUnauthorized and throws OmobioError(UNAUTHORIZED)', async () => {
+    it('401 triggers onUnauthorized and throws selfcareError(UNAUTHORIZED)', async () => {
       const promise = dispatchError(401, 'AUTH_INVALID', 'Token expired');
-      await expect(promise).rejects.toBeInstanceOf(OmobioError);
+      await expect(promise).rejects.toBeInstanceOf(selfcareError);
       expect(onUnauthorized).toHaveBeenCalled();
     });
 
-    it('403 throws OmobioError(FORBIDDEN)', async () => {
+    it('403 throws selfcareError(FORBIDDEN)', async () => {
       await expect(dispatchError(403, 'FORBIDDEN', 'No access'))
           .rejects.toMatchObject({ code: ErrorCodes.FORBIDDEN });
     });
 
-    it('404 throws OmobioError(NOT_FOUND)', async () => {
+    it('404 throws selfcareError(NOT_FOUND)', async () => {
       await expect(dispatchError(404, 'NOT_FOUND', 'Not found'))
           .rejects.toMatchObject({ code: ErrorCodes.NOT_FOUND });
     });
 
-    it('409 throws OmobioError(CONFLICT)', async () => {
+    it('409 throws selfcareError(CONFLICT)', async () => {
       await expect(dispatchError(409, 'CONFLICT', 'Already exists'))
           .rejects.toMatchObject({ code: ErrorCodes.CONFLICT });
     });
 
-    it('429 throws OmobioError(RATE_LIMITED)', async () => {
+    it('429 throws selfcareError(RATE_LIMITED)', async () => {
       await expect(dispatchError(429, 'RATE_LIMITED', 'Too many requests'))
           .rejects.toMatchObject({ code: ErrorCodes.RATE_LIMITED });
     });
 
-    it('503 throws OmobioError(SERVICE_UNAVAILABLE)', async () => {
+    it('503 throws selfcareError(SERVICE_UNAVAILABLE)', async () => {
       await expect(dispatchError(503, 'UNAVAILABLE', 'Down'))
           .rejects.toMatchObject({ code: ErrorCodes.SERVICE_UNAVAILABLE });
     });
 
-    it('500 throws OmobioError(API_ERROR) with the response code', async () => {
+    it('500 throws selfcareError(API_ERROR) with the response code', async () => {
       await expect(dispatchError(500, 'INTERNAL', 'Boom'))
           .rejects.toMatchObject({ code: 'INTERNAL' });
     });
@@ -151,8 +151,7 @@ describe('ApiClient', () => {
       const result = await client.post<{ ok: boolean }>('/api/v1/foo', { x: 1 });
       expect(mockAxiosInstance.post).toHaveBeenCalledWith(
         '/api/v1/foo',
-        { x: 1 },
-        expect.any(Object)
+        { x: 1 }
       );
       expect(result).toEqual({ ok: true });
     });

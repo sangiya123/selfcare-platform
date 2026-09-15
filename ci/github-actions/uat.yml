@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — UAT (User Acceptance Testing)
+﻿# Selfcare Platform — UAT (User Acceptance Testing)
 #
 # Runs the UAT suite against a deployed reg (or stg) environment.
 # UAT includes:
@@ -67,8 +67,8 @@ jobs:
           ENV="${{ github.event.inputs.environment }}"
           CYCLE="${{ github.event.inputs.cycle }}"
           case "$ENV" in
-            stg) URL="https://stg-api.omobio.io" ;;
-            reg) URL="https://reg-api.omobio.io" ;;
+            stg) URL="https://stg-api.selfcare.io" ;;
+            reg) URL="https://reg-api.selfcare.io" ;;
             *) URL="http://localhost:8080" ;;
           esac
           echo "gateway_url=$URL" >> "$GITHUB_OUTPUT"
@@ -77,7 +77,7 @@ jobs:
 
       - name: Tag UAT environment
         env:
-          OMOBIO_CYCLE: ${{ steps.env.outputs.cycle }}
+          SELFCARE_CYCLE: ${{ steps.env.outputs.cycle }}
         run: |
           mkdir -p uat-output
           cat > uat-output/metadata.json << EOF
@@ -121,10 +121,10 @@ jobs:
       - name: Run E2E journeys
         working-directory: selfcare-platform/tests/conformance
         env:
-          OMOBIO_TEST_GATEWAY_URL: ${{ needs.setup.outputs.gateway_url }}
-          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
-          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
-          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          SELFCARE_TEST_GATEWAY_URL: ${{ needs.setup.outputs.gateway_url }}
+          SELFCARE_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          SELFCARE_TEST_REDIS_URL: redis://localhost:6379
+          SELFCARE_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
         run: |
           mvn -B -e -fae \
             -Dgroups="e2e-journey,e2e-telco,e2e-insurance" \
@@ -204,25 +204,25 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+          cache-dependency-path: selfcare-platform/admin/selfcare-admin/package-lock.json
 
       - name: Install
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npm ci
 
       - name: Type + lint
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: |
           npx tsc --noEmit
           npx eslint . --ext .ts,.tsx --max-warnings 0
         continue-on-error: true
 
       - name: Vitest
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npx vitest run --coverage
 
       - name: Playwright e2e
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         env:
           PLAYWRIGHT_BASE_URL: ${{ needs.setup.outputs.gateway_url }}/admin
         run: |
@@ -235,7 +235,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: admin-e2e-report
-          path: selfcare-platform/admin/selfcare-studio/playwright-report/
+          path: selfcare-platform/admin/selfcare-admin/playwright-report/
 
   # ======================================================================
   # Accessibility audit (axe-core)
@@ -299,7 +299,7 @@ jobs:
     if: always()
     environment:
       name: production
-      url: https://reg.omobio.io/uat/${{ github.event.inputs.cycle }}
+      url: https://reg.selfcare.io/uat/${{ github.event.inputs.cycle }}
     steps:
       - name: Build sign-off report
         run: |

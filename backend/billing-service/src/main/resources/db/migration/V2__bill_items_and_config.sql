@@ -1,5 +1,5 @@
 -- V2__bill_items_and_config.sql
--- OMOBIO Selfcare Platform — billing-service
+-- Selfcare Platform — billing-service
 -- Tables: bill_items, billing_cycle_configs
 --
 -- bill_items: line-item breakdown of each bill for itemized invoice display

@@ -12,24 +12,28 @@ import { useAIChat } from '../../src/hooks/useAIChat';
 
 // Mock the underlying AI client so we don't need a real server
 jest.mock('../../src/config/AIClient', () => ({
-  AIClient: jest.fn().mockImplementation(() => ({
-    getOrCreateSession: jest.fn().mockResolvedValue({
+  AIClient: class {
+    getOrCreateSession = async () => ({
       id: 'sess-1',
       tenantId: 'dialog-lk',
       title: 'New Conversation',
       messages: [],
       active: true,
-    }),
-    setLastSessionId: jest.fn(),
-    getLastSessionId: jest.fn().mockReturnValue(null),
-    classifyIntent: jest.fn().mockResolvedValue({
+    });
+    setLastSessionId = () => {};
+    getLastSessionId = () => null;
+    classifyIntent = async () => ({
       intent: 'GENERAL', confidence: 0.5, suggestedAction: 'general_assist', autoActEligible: false,
-    }),
-  })),
+    });
+  },
+}));
+
+jest.mock('../../src/config/ApiClient', () => ({
+  ApiClient: class {},
 }));
 
 jest.mock('../../src/hooks/useAuth', () => ({
-  useAuth: () => ({ accessToken: null }),
+  useAuthStore: () => ({ accessToken: null }),
 }));
 
 describe('useAIChat', () => {

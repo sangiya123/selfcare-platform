@@ -1,14 +1,14 @@
-# OMOBIO Selfcare Platform — Release Notes
+﻿# Selfcare Platform — Release Notes
 
 ## v1.0.0 (2026-09-03) — Initial Production Release
 
 ### Highlights
-First production-ready release of the OMOBIO Selfcare Platform.
+First production-ready release of the Selfcare Platform.
 Supports multi-industry, multi-tenant selfcare experiences for
 Dialog, Hutch, Airtel (telco) and AIA (insurance) — all from a
 single codebase, configured by data.
 
-### Backend (17 services)
+### Backend (18 services)
 - ✅ api-gateway — single entry point, tenant routing, rate limiting
 - ✅ platform-common — tenant context, adapter registry, security, observability
 - ✅ config-tenant-service — theme/layout/feature-flag resolution, Mongo + Redis
@@ -18,6 +18,7 @@ single codebase, configured by data.
 - ✅ dashboard-bff — resilient widget orchestrator, partial response (ADR-008)
 - ✅ product-service — product catalog
 - ✅ usage-service — balance/usage/allowance
+- ✅ support-service — service requests / support tickets
 - ✅ billing-service — bills, documents
 - ✅ payment-service — payments, idempotency, step-up auth
 - ✅ notification-service — push/SMS/email with adapter pattern

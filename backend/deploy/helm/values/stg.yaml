@@ -1,0 +1,35 @@
+# stg environment overrides
+environment:
+  name: stg
+  profiles: staging
+
+image:
+  tag: rc-latest
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  host: stg.selfcare.example.com
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+observability:
+  logLevel: INFO
+  tracing:
+    enabled: true
+    endpoint: http://otel-collector:4317
+  prometheus:
+    enabled: true
+    podMonitorSelector: app.kubernetes.io/name

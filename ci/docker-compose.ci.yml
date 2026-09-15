@@ -1,9 +1,9 @@
-name: omobio-ci
+﻿name: selfcare-ci
 
 services:
   sonarqube:
     image: sonarqube:community
-    container_name: omobio-sonarqube
+    container_name: selfcare-sonarqube
     restart: unless-stopped
     ports:
       - "9000:9000"
@@ -14,12 +14,12 @@ services:
       - sonarqube-extensions:/opt/sonarqube/extensions
       - sonarqube-logs:/opt/sonarqube/logs
     networks:
-      - omobio-ci
+      - selfcare-ci
 
   jenkins:
     build:
       context: ./jenkins
-    container_name: omobio-jenkins
+    container_name: selfcare-jenkins
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -43,25 +43,25 @@ services:
     depends_on:
       - sonarqube
     networks:
-      - omobio-ci
-      - omobio-net
+      - selfcare-ci
+      - selfcare-net
 
 volumes:
   sonarqube-data:
-    name: omobio-sonarqube-data
+    name: selfcare-sonarqube-data
   sonarqube-extensions:
-    name: omobio-sonarqube-extensions
+    name: selfcare-sonarqube-extensions
   sonarqube-logs:
-    name: omobio-sonarqube-logs
+    name: selfcare-sonarqube-logs
   jenkins-home:
-    name: omobio-jenkins-home
+    name: selfcare-jenkins-home
   jenkins-workspace:
-    name: omobio_jenkins_workspace
+    name: selfcare_jenkins_workspace
   maven-cache:
-    name: omobio_maven_cache
+    name: selfcare_maven_cache
 
 networks:
-  omobio-ci:
-    name: omobio-ci
-  omobio-net:
+  selfcare-ci:
+    name: selfcare-ci
+  selfcare-net:
     external: true

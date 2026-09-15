@@ -1,0 +1,65 @@
+# Multi-stage Dockerfile for selfcare microservices
+# Build context: repository root (selfcare-platform)
+# Strategy:
+#   1. Install Maven 3.9.9 (Java 25 compatible — no Alpine package version skew)
+#   2. Copy entire project tree (parent pom.xml needs industry-packs to exist)
+#   3. Install parent pom (non-recursive) so child modules can find it
+#   4. Install platform-common to local .m2 repo
+#   5. Install the telco industry packs (support-service depends on dialog-providers)
+#   6. Build only the target service module
+#
+# Usage (from selfcare-platform/):
+#   docker build -t selfcare/support-service:1.0.0 -f backend/support-service/Dockerfile .
+
+FROM eclipse-temurin:25-jdk-alpine AS builder
+WORKDIR /build
+
+# Install Maven 3.9.9 from Apache archive
+ARG MAVEN_VERSION=3.9.9
+RUN wget -q https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz -O /tmp/mvn.tgz && \
+    tar -xzf /tmp/mvn.tgz -C /opt && \
+    ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn && \
+    rm /tmp/mvn.tgz && \
+    mvn --version
+
+# Copy project tree. The .dockerignore at the project root excludes
+# node_modules, target/, IDE files, and docs to keep the context small.
+COPY . .
+
+ARG MODULE=support-service
+
+# Install parent pom (no modules) so child modules can find it
+RUN mvn -s backend/settings.xml -f backend/pom.xml -N install -DskipTests -B \
+  -Dmaven.repo.local=/build/.m2
+
+# Install platform-common to the local .m2 repo (backend service dependency)
+RUN mvn -s backend/settings.xml -f backend/pom.xml -pl platform-common install -DskipTests \
+  -Djacoco.skip=true -B -Dmaven.repo.local=/build/.m2
+
+# Install the telco industry packs to the local .m2 repo (backend services
+# depend on the pack jars: dialog-providers, hutch-providers, airtel-providers)
+RUN mvn -s backend/settings.xml -f industry-packs/telco/pom.xml install \
+  -Dmaven.test.skip=true -Djacoco.skip=true -B -Dmaven.repo.local=/build/.m2
+
+# Build ONLY the target service module
+RUN mvn -s backend/settings.xml -f backend/pom.xml -pl ${MODULE} package -Dmaven.test.skip=true -B \
+  -Dmaven.repo.local=/build/.m2
+
+# ─── Stage 2: Runtime ──────────────────────────────────────────────────
+FROM eclipse-temurin:25-jre-alpine
+WORKDIR /app
+
+RUN addgroup -g 1000 -S selfcare && adduser -u 1000 -S selfcare -G selfcare
+
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+ARG MODULE=support-service
+COPY --from=builder /build/backend/${MODULE}/target/${MODULE}-*-SNAPSHOT.jar app.jar
+
+USER selfcare
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

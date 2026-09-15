@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # setup-k8s.sh — Enable Kubernetes in Docker Desktop + install kubectl
 # Run this ONCE to configure your local K8s cluster.
 #
@@ -7,7 +7,7 @@
 set -euo pipefail
 
 echo "=============================================="
-echo " OMOBIO — Docker Desktop K8s Setup"
+echo " selfcare — Docker Desktop K8s Setup"
 echo "=============================================="
 
 # Check if running on Windows (Git Bash / MSYS2)

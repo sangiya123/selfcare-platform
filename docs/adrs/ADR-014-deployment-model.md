@@ -1,4 +1,4 @@
-# ADR-014: Tenant Deployment Model — Namespace per Tenant
+﻿# ADR-014: Tenant Deployment Model — Namespace per Tenant
 
 ## Status
 Accepted — 2026-09-04
@@ -22,7 +22,7 @@ We implement a **namespace-per-tenant** model as the baseline, with
 (insurance underwriters, financial-services clients). The application
 layer is unaware of which model is in use — isolation is enforced by:
 
-1. **Kubernetes namespace per tenant** (e.g. `omobio-dialog-lk-prod`)
+1. **Kubernetes namespace per tenant** (e.g. `selfcare-dialog-lk-prod`)
 2. **Per-tenant secrets** referenced as Kubernetes `Secret` or external secret manager
 3. **Per-tenant ConfigMap** for non-secret config (read by config-tenant-service at startup)
 4. **Per-tenant Redis namespace** (logical DB index + key prefix)
@@ -44,7 +44,7 @@ Positive:
 Negative:
 - Two deployment topologies to test
 - Tenant data migration is non-trivial if isolation requirements change
-- Per-tenant cluster operators must follow OMOBIO EKS baseline
+- Per-tenant cluster operators must follow selfcare EKS baseline
 
 ## Compliance
 - Per-tenant data plane isolation (NFR-PRIVACY)

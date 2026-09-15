@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AIClient — client for the AI Gateway.
  *
  * Handles:
@@ -15,8 +15,9 @@
  */
 import { MMKV } from 'react-native-mmkv';
 import { ApiClient } from './ApiClient';
+import { servicePath } from './serviceEndpoints';
 
-const storage = new MMKV({ id: 'omobio-ai' });
+const storage = new MMKV({ id: 'selfcare-ai' });
 
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
 
@@ -109,7 +110,7 @@ export class AIClient {
    * Send a chat request and get a complete response.
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const resp = await this.api.post<any>('/api/v1/ai/chat', {
+    const resp = await this.api.post<any>(servicePath('ai', 'chat', '/api/v1/ai/chat'), {
       ...request,
       tenantId: this.tenantId,
     });
@@ -132,7 +133,7 @@ export class AIClient {
    * Start a streaming chat. Returns a streamId that can be used to listen for chunks.
    */
   async startStream(request: ChatRequest): Promise<string> {
-    const resp = await this.api.post<{ streamId: string }>('/api/v1/ai/chat/stream', {
+    const resp = await this.api.post<{ streamId: string }>(servicePath('ai', 'chatStream', '/api/v1/ai/chat/stream'), {
       ...request,
       tenantId: this.tenantId,
     });
@@ -147,7 +148,12 @@ export class AIClient {
     baseUrl: string,
     accessToken: string | null
   ): AsyncGenerator<StreamEvent> {
-    const url = `${baseUrl}/api/v1/ai/chat/stream/${streamId}/events`;
+    const eventsPath = servicePath('ai', 'chatStreamEvents', '/api/v1/ai/chat/stream/{streamId}/events', {
+      streamId,
+    });
+    const url = eventsPath.startsWith('http')
+      ? eventsPath
+      : `${baseUrl}${eventsPath}`;
     const headers: Record<string, string> = {
       Accept: 'text/event-stream',
       'X-Tenant-Id': this.tenantId,
@@ -219,7 +225,7 @@ export class AIClient {
   // -------------------------------------------------------------------------
 
   async classifyIntent(message: string): Promise<Intent> {
-    const resp = await this.api.post<any>('/api/v1/ai/classify', { message });
+    const resp = await this.api.post<any>(servicePath('ai', 'classify', '/api/v1/ai/classify'), { message });
     return {
       intent: resp.intent ?? 'GENERAL',
       confidence: resp.confidence ?? 0,
@@ -234,7 +240,10 @@ export class AIClient {
 
   async getBundleRecommendations(connectionId: string, limit = 3): Promise<BundleRec[]> {
     const resp = await this.api.get<any[]>(
-      `/api/v1/ai/recommendations/${connectionId}?limit=${limit}`
+      servicePath('ai', 'recommendations', '/api/v1/ai/recommendations/{connectionId}?limit={limit}', {
+        connectionId,
+        limit,
+      })
     );
     return (Array.isArray(resp) ? resp : []).map(r => ({
       productId: r.productId ?? '',
@@ -249,7 +258,9 @@ export class AIClient {
   }
 
   async getChurnScore(connectionId: string): Promise<ChurnScore> {
-    const resp = await this.api.get<ChurnScore>(`/api/v1/ai/churn/${connectionId}`);
+    const resp = await this.api.get<ChurnScore>(
+      servicePath('ai', 'churn', '/api/v1/ai/churn/{connectionId}', { connectionId })
+    );
     return {
       connectionId: resp.connectionId ?? connectionId,
       score: resp.score ?? 0,
@@ -264,21 +275,25 @@ export class AIClient {
   // -------------------------------------------------------------------------
 
   async listSessions(): Promise<ChatSession[]> {
-    const resp = await this.api.get<any[]>('/api/v1/ai/sessions');
+    const resp = await this.api.get<any[]>(servicePath('ai', 'sessions', '/api/v1/ai/sessions'));
     return Array.isArray(resp) ? resp : [];
   }
 
   async getOrCreateSession(sessionId?: string): Promise<ChatSession> {
-    const resp = await this.api.post<any>('/api/v1/ai/sessions', { sessionId });
+    const resp = await this.api.post<any>(servicePath('ai', 'sessions', '/api/v1/ai/sessions'), { sessionId });
     return resp;
   }
 
   async getSessionHistory(sessionId: string): Promise<ChatSession> {
-    return this.api.get<any>(`/api/v1/ai/sessions/${sessionId}/history`);
+    return this.api.get<any>(
+      servicePath('ai', 'sessionHistory', '/api/v1/ai/sessions/{sessionId}/history', { sessionId })
+    );
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    await this.api.delete(`/api/v1/ai/sessions/${sessionId}`);
+    await this.api.delete(
+      servicePath('ai', 'sessionHistory', '/api/v1/ai/sessions/{sessionId}', { sessionId })
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -294,7 +309,7 @@ export class AIClient {
     confidence: number;
     triggers: string[];
   }> {
-    const resp = await this.api.post<any>('/api/v1/ai/sentiment', { text });
+    const resp = await this.api.post<any>(servicePath('ai', 'sentiment', '/api/v1/ai/sentiment'), { text });
     return {
       score: resp.score ?? 0,
       label: resp.label ?? 'NEUTRAL',
@@ -320,7 +335,7 @@ export class AIClient {
     userMessageCount: number;
     assistantMessageCount: number;
   }> {
-    const resp = await this.api.post<any>('/api/v1/ai/summarize', {
+    const resp = await this.api.post<any>(servicePath('ai', 'summarize', '/api/v1/ai/summarize'), {
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     });
     return {
@@ -347,7 +362,7 @@ export class AIClient {
     results: Array<{ chunkId: string; text: string; similarity: number }>;
     total: number;
   }> {
-    const resp = await this.api.get<any>('/api/v1/ai/search', { query, topK });
+    const resp = await this.api.get<any>(servicePath('ai', 'search', '/api/v1/ai/search'), { query, topK });
     return {
       query: resp.query ?? query,
       results: (resp.results ?? []).map((r: any) => ({
@@ -367,7 +382,7 @@ export class AIClient {
    * Get a response without using the LLM (used when AI is unavailable).
    */
   async fallbackChat(request: ChatRequest): Promise<ChatResponse> {
-    const resp = await this.api.post<any>('/api/v1/ai/chat/fallback', {
+    const resp = await this.api.post<any>(servicePath('ai', 'chatFallback', '/api/v1/ai/chat/fallback'), {
       ...request,
       tenantId: this.tenantId,
     });
@@ -387,7 +402,7 @@ export class AIClient {
    * Health check for AI subsystems.
    */
   async health(): Promise<Record<string, any>> {
-    return this.api.get<any>('/api/v1/ai/health');
+    return this.api.get<any>(servicePath('ai', 'health', '/api/v1/ai/health'));
   }
 
   // -------------------------------------------------------------------------

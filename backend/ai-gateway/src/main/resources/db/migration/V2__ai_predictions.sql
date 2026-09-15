@@ -1,5 +1,5 @@
 -- V2__ai_predictions.sql
--- OMOBIO Selfcare Platform — ai-gateway
+-- Selfcare Platform — ai-gateway
 -- Table: ai_predictions
 --
 -- Predictive ML read model. Async precomputed scores per the AI scope spec

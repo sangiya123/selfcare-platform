@@ -1,0 +1,22 @@
+{{- range $name, $svc := .Values.services }}
+{{- $render := include "selfcare.renderService" (dict "name" $name "Values" $.Values) }}
+{{- if and (eq $render "true") (or $svc.podDisruptionBudget $.Values.podDisruptionBudget.enabled) }}
+{{- $min := (or $svc.podDisruptionBudget $.Values.podDisruptionBudget).minAvailable | default 1 }}
+{{- if and $min (not $.Values.deploy.isolated) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "selfcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  minAvailable: {{ $min }}
+  selector:
+    matchLabels:
+      {{- include "selfcare.selectorLabels" (dict "name" $name) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,50 +1,53 @@
-# OMOBIO API Gateway — Bootstrap Configuration
+# selfcare API Gateway — Bootstrap Configuration
 # Loaded before application.yml by spring-cloud-config-client.
 # Used to connect to the config server and (optionally) the service registry.
 
 spring:
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-          # Routes auto-generated for every service registered with Eureka/Consul/K8s.
-          # Predictable routes are still preferred; discovery is the fallback.
-          predicates:
-            - name: Path
-              args:
-                pattern: "/${service.id.lower-case}/**"
-          filters:
-            - name: RewritePath
-              args:
-                regexp: "/${service.id.lower-case}/(?<segment>.*)"
-                replacement: "/$\\{segment}"
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOriginPatterns: "*"
-            allowedMethods: "*"
-            allowedHeaders: "*"
-            exposedHeaders:
-              - X-Correlation-Id
-              - X-Tenant-Id
-              - X-Config-Version
-            allowCredentials: true
-            maxAge: 3600
+      # NOTE: Spring Cloud Gateway 5.x binds under spring.cloud.gateway.server.webflux.*
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+              # Routes auto-generated for every service registered with Eureka/Consul/K8s.
+              # Predictable routes are still preferred; discovery is the fallback.
+              predicates:
+                - name: Path
+                  args:
+                    pattern: "/${service.id.lower-case}/**"
+              filters:
+                - name: RewritePath
+                  args:
+                    regexp: "/${service.id.lower-case}/(?<segment>.*)"
+                    replacement: "/$\\{segment}"
+          globalcors:
+            corsConfigurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods: "*"
+                allowedHeaders: "*"
+                exposedHeaders:
+                  - X-Correlation-Id
+                  - X-Tenant-Id
+                  - X-Config-Version
+                allowCredentials: true
+                maxAge: 3600
 
   # Service registry (Eureka / Consul / K8s)
-  # The actual discovery backend is selected by OMOBIO_DISCOVERY_PROVIDER.
+  # The actual discovery backend is selected by SELFCARE_DISCOVERY_PROVIDER.
   application:
     name: api-gateway
 
 # Service discovery abstraction — concrete implementation injected at runtime
 # based on the active profile (dev → Eureka, prod → Kubernetes).
-omobio:
+selfcare:
   discovery:
-    provider: ${OMOBIO_DISCOVERY_PROVIDER:eureka}
+    provider: ${SELFCARE_DISCOVERY_PROVIDER:eureka}
   security:
     jwt:
       jwks-uri: ${JWT_JWKS_URI:${CUSTOMER_IDENTITY_URL:http://localhost:8081}/.well-known/jwks.json}
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}

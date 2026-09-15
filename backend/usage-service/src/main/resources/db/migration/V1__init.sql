@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — usage-service
+-- Selfcare Platform — usage-service
 -- Table: usage_records
 --
 -- usage-service currently fetches balance/usage live from per-tenant
@@ -11,7 +11,7 @@
 --   - support the cache-fallback path when the upstream provider is down.
 --
 -- The schema mirrors the canonical fields on
--- com.omobio.usage.adapter.BalanceProvider.{Balance, UsageSummary}.
+-- com.selfcare.usage.adapter.BalanceProvider.{Balance, UsageSummary}.
 
 -- ============================================================================
 -- usage_records

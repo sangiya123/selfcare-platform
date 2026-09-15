@@ -1,4 +1,4 @@
-# ADR-007: Tenant Isolation Strategy
+﻿# ADR-007: Tenant Isolation Strategy
 
 ## Status
 Accepted — 2026-09-03
@@ -29,7 +29,7 @@ We implement **defense in depth** with five isolation layers:
 - Database users are service-specific; cross-service reads are blocked at the DB level
 
 ### 4. Cache layer
-- Every Redis key is prefixed: `omobio:{tenantId}:{key}`
+- Every Redis key is prefixed: `selfcare:{tenantId}:{key}`
 - `TenantAwareRedisTemplate` enforces prefix on all operations
 
 ### 5. Event/Kafka layer

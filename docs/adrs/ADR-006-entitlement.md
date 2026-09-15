@@ -1,8 +1,8 @@
-# ADR-006: Dialog Primary-Number Linked-List Entitlement
+﻿# ADR-006: Dialog Primary-Number Linked-List Entitlement
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council, Dialog Architecture Team
+**Deciders**: selfcare Architecture Council, Dialog Architecture Team
 
 ## Context
 
@@ -56,7 +56,7 @@ if (and only if) it's in the current session's primary number's linked list.
 public void authorizeConnectionAction(String accountId, String targetConnectionId, String action) {
     // 1. Check Redis cache
     Boolean isMember = redisTemplate.opsForSet().isMember(
-        "omobio:linked:" + accountId, targetConnectionId);
+        "selfcare:linked:" + accountId, targetConnectionId);
     if (isMember) return;
 
     // 2. Fallback to DB
@@ -67,7 +67,7 @@ public void authorizeConnectionAction(String accountId, String targetConnectionI
     }
 
     // 3. Cache for next time
-    redisTemplate.opsForSet().add("omobio:linked:" + accountId, targetConnectionId);
+    redisTemplate.opsForSet().add("selfcare:linked:" + accountId, targetConnectionId);
 }
 ```
 

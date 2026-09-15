@@ -1,0 +1,16 @@
+{{- if .Values.deploy.isolated }}
+Selfcare Platform — single-service promote
+  Service : {{ .Values.deploy.service }}
+  Image   : {{ .Values.deploy.image.repository | default .Values.image.repository }}/{{ .Values.deploy.service }}:{{ .Values.deploy.image.tag | default .Values.image.tag }}
+  Namespace: {{ .Release.Namespace }}
+  Check   : kubectl rollout status deployment/{{ .Values.deploy.service }} -n {{ .Release.Namespace }}
+{{- else }}
+Selfcare Platform deployed to {{ .Release.Namespace }} — {{ len .Values.services }} services
+  Gateway : kubectl get svc api-gateway -n {{ .Release.Namespace }}
+  Ingress : {{ .Values.ingress.host | default "(disabled)" }}
+  Admin   : {{ .Values.ingress.adminHost | default "(disabled)" }}
+  Check   : kubectl get pods -n {{ .Release.Namespace }}
+{{- end }}
+{{- if .Values.observability.prometheus.enabled }}
+Metrics scraped by Prometheus at /actuator/prometheus ({{ .Values.observability.prometheus.scrapeInterval }})
+{{- end }}

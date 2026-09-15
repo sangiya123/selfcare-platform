@@ -1,144 +1,77 @@
-# OMOBIO Selfcare Platform - Full local stack for Docker Desktop
+# Selfcare Platform - APPLICATION STACK (microservices + observability)
 #
-# Usage:
-#   docker compose up -d                              # start everything
-#   docker compose up -d mongodb redis kafka          # infra only
-#   docker compose logs -f api-gateway                # tail logs
-#   docker compose down -v                            # tear down (incl. volumes)
+# LOCAL DEVELOPMENT ONLY. The application deploys to Kubernetes in dev/stg/reg/prod.
+# Infrastructure (MongoDB, MySQL, Redis, Kafka, admin UIs) lives in
+# docker-compose.infra.yml - start it first:
 #
-# Tenant: dialog-lk (Sri Lanka telco)
-# Schema is automatically seeded into MongoDB on first boot.
+#   docker compose -f docker-compose.infra.yml up -d
+#   docker compose up -d                 # this file - application services
+#   docker compose logs -f api-gateway   # tail a service
+#   docker compose down                  # stop application (infra survives)
+#
+# Tenant: dialog-lk (Sri Lanka telco). Schema is seeded by the infra compose.
 
-version: "3.9"
-
-x-omobio-common: &omobio-common
+x-selfcare-common: &selfcare-common
   restart: unless-stopped
-  environment: &omobio-env
+  environment: &selfcare-env
     # Tenant header that all services require
     X_DEFAULT_TENANT_ID: "dialog-lk"
-    OMOBIO_TENANT_DEFAULT_ID: "dialog-lk"
-    # JVM settings
-    JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+    SELFCARE_TENANT_DEFAULT_ID: "dialog-lk"
+    # SSRF allow list: extend with dev/mock/private hosts that must keep working
+    # (operator BSS/SMSC hosts are baked-in defaults; these are the mock + in-cluster)
+    SELFCARE_SECURITY_URL_ALLOWLIST_HOSTS: "localhost,host.docker.internal,mock,bss-dialog.svc,smsc-dialog.svc,bss-hutch.svc,smsc-hutch.svc,bss-airtel.svc,smsc-airtel.svc,aia-api.svc"
+    # JVM settings (capped heap: 19 services x unrestricted MaxRAMPercentage
+    # overcommits the Docker VM and makes every boot thrash for 20+ min)
+    JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
     SPRING_PROFILES_ACTIVE: docker
+    # MySQL hostnames (infra compose network)
+    DB_HOST: mysql
+    DB_PORT: "3306"
+    DB_USER: selfcare
+    DB_USERNAME: selfcare
+    DB_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
+    SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    JPA_DDL_AUTO: update
+    SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+    # MongoDB hostnames (infra compose network)
+    MONGO_HOST: mongodb
+    MONGO_PORT: "27017"
+    MONGO_USERNAME: selfcare
+    MONGO_PASSWORD: Selfcare_M0ng0_Db_Pa55w0rd!2026
+    MONGO_DATABASE: selfcare_config
+    MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+    SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
+    # Redis connectivity (infra compose network)
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
+    SPRING_DATA_REDIS_HOST: redis
+    SPRING_DATA_REDIS_PORT: 6379
+    SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
   networks:
-    - omobio-net
+    - selfcare-app-net
 
 services:
   # ─────────────────────────────────────────────────────────────
-  # INFRASTRUCTURE LAYER
-  # ─────────────────────────────────────────────────────────────
-
-  mongodb:
-    image: mongo:7.0
-    container_name: omobio-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: omobio
-      MONGO_INITDB_ROOT_PASSWORD: omobio_pw
-      MONGO_INITDB_DATABASE: omobio_config
-    volumes:
-      - mongodb-data:/data/db
-      - ./deploy/local/mongo-init:/docker-entrypoint-initdb.d:ro
-    networks:
-      - omobio-net
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  redis:
-    image: redis:7.2-alpine
-    container_name: omobio-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "omobio_pw"]
-    volumes:
-      - redis-data:/data
-    networks:
-      - omobio-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "omobio_pw", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: omobio-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - omobio-net
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: omobio-kafka
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks:
-      - omobio-net
-
-  mysql:
-    image: mysql:8.0
-    container_name: omobio-mysql
-    restart: unless-stopped
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: root_pw
-      MYSQL_DATABASE: omobio_identity
-      MYSQL_USER: omobio
-      MYSQL_PASSWORD: omobio_pw
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./deploy/local/mysql-init:/docker-entrypoint-initdb.d:ro
-    networks:
-      - omobio-net
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pw"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # ─────────────────────────────────────────────────────────────
-  # OMOBIO MICROSERVICES
+  # SELF-CARE MICROSERVICES (deploy to Kubernetes in prod)
   # ─────────────────────────────────────────────────────────────
 
   api-gateway:
     build:
       context: .
-      dockerfile: backend/api-gateway/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: api-gateway
-    container_name: omobio-api-gateway
-    <<: *omobio-common
+    container_name: selfcare-api-gateway
+    <<: *selfcare-common
     ports:
       - "8080:8080"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8080
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      SPRING_CONFIG_IMPORT: "optional:configserver:"
     depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       config-tenant-service:
         condition: service_started
     healthcheck:
@@ -151,103 +84,90 @@ services:
   config-tenant-service:
     build:
       context: .
-      dockerfile: backend/config-tenant-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: config-tenant-service
-    container_name: omobio-config-tenant
-    <<: *omobio-common
+    container_name: selfcare-config-tenant
+    <<: *selfcare-common
     ports:
       - "8081:8081"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8081
-      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   customer-identity-service:
     build:
       context: .
-      dockerfile: backend/customer-identity-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: customer-identity-service
-    container_name: omobio-customer-identity
-    <<: *omobio-common
+    container_name: selfcare-customer-identity
+    <<: *selfcare-common
     ports:
       - "8082:8082"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8082
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: omobio
-      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      DB_NAME: selfcare_identity
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: omobio_pw
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
 
   admin-identity-service:
     build:
       context: .
-      dockerfile: backend/admin-identity-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: admin-identity-service
-    container_name: omobio-admin-identity
-    <<: *omobio-common
+    container_name: selfcare-admin-identity
+    <<: *selfcare-common
     ports:
       - "8083:8083"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8083
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: omobio
-      SPRING_DATASOURCE_PASSWORD: omobio_pw
-    depends_on:
-      mysql:
-        condition: service_healthy
+      DB_NAME: selfcare_admin
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_admin?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
 
   account-entitlement-service:
     build:
       context: .
-      dockerfile: backend/account-entitlement-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: account-entitlement-service
-    container_name: omobio-account-entitlement
-    <<: *omobio-common
+    container_name: selfcare-account-entitlement
+    <<: *selfcare-common
     ports:
       - "8084:8084"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8084
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: omobio
-      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      DB_NAME: selfcare_core
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_core?useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: omobio_pw
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
 
   dashboard-bff:
     build:
       context: .
-      dockerfile: backend/dashboard-bff/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: dashboard-bff
-    container_name: omobio-dashboard-bff
-    <<: *omobio-common
+    container_name: selfcare-dashboard-bff
+    <<: *selfcare-common
     ports:
       - "8085:8085"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8085
     depends_on:
       - config-tenant-service
@@ -256,243 +176,238 @@ services:
   product-service:
     build:
       context: .
-      dockerfile: backend/product-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: product-service
-    container_name: omobio-product
-    <<: *omobio-common
+    container_name: selfcare-product
+    <<: *selfcare-common
     ports:
       - "8086:8086"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8086
 
   usage-service:
     build:
       context: .
-      dockerfile: backend/usage-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: usage-service
-    container_name: omobio-usage
-    <<: *omobio-common
+    container_name: selfcare-usage
+    <<: *selfcare-common
     ports:
       - "8087:8087"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8087
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  support-service:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.jarbuild
+      args:
+        MODULE: support-service
+    container_name: selfcare-support
+    <<: *selfcare-common
+    ports:
+      - "8098:8098"
+    environment:
+      <<: *selfcare-env
+      SERVER_PORT: 8098
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   billing-service:
     build:
       context: .
-      dockerfile: backend/billing-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: billing-service
-    container_name: omobio-billing
-    <<: *omobio-common
+    container_name: selfcare-billing
+    <<: *selfcare-common
     ports:
       - "8088:8088"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8088
 
   payment-service:
     build:
       context: .
-      dockerfile: backend/payment-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: payment-service
-    container_name: omobio-payment
-    <<: *omobio-common
+    container_name: selfcare-payment
+    <<: *selfcare-common
     ports:
       - "8089:8089"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8089
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: omobio
-      SPRING_DATASOURCE_PASSWORD: omobio_pw
+      DB_NAME: selfcare_payment
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_payment?useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: selfcare
+      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   notification-service:
     build:
       context: .
-      dockerfile: backend/notification-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: notification-service
-    container_name: omobio-notification
-    <<: *omobio-common
+    container_name: selfcare-notification
+    <<: *selfcare-common
     ports:
       - "8090:8090"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8090
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
   content-service:
     build:
       context: .
-      dockerfile: backend/content-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: content-service
-    container_name: omobio-content
-    <<: *omobio-common
+    container_name: selfcare-content
+    <<: *selfcare-common
     ports:
       - "8091:8091"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8091
-      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   journey-service:
     build:
       context: .
-      dockerfile: backend/journey-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: journey-service
-    container_name: omobio-journey
-    <<: *omobio-common
+    container_name: selfcare-journey
+    <<: *selfcare-common
     ports:
       - "8092:8092"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8092
-      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   reporting-service:
     build:
       context: .
-      dockerfile: backend/reporting-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: reporting-service
-    container_name: omobio-reporting
-    <<: *omobio-common
+    container_name: selfcare-reporting
+    <<: *selfcare-common
     ports:
       - "8093:8093"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8093
 
   ai-gateway:
     build:
       context: .
-      dockerfile: backend/ai-gateway/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: ai-gateway
-    container_name: omobio-ai-gateway
-    <<: *omobio-common
+    container_name: selfcare-ai-gateway
+    <<: *selfcare-common
     ports:
       - "8094:8094"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8094
-      # Local AI stub — replace with real API key in production
-      OMOBIO_AI_PROVIDER: stub
-      OMOBIO_AI_STUB_ENABLED: "true"
-      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      # Local AI stub - replace with real API key in production
+      SELFCARE_AI_PROVIDER: stub
+      SELFCARE_AI_STUB_ENABLED: "true"
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   audit-service:
     build:
       context: .
-      dockerfile: backend/audit-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: audit-service
-    container_name: omobio-audit
-    <<: *omobio-common
+    container_name: selfcare-audit
+    <<: *selfcare-common
     ports:
       - "8095:8095"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8095
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
   insurance-service:
     build:
       context: .
-      dockerfile: backend/insurance-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: insurance-service
-    container_name: omobio-insurance
-    <<: *omobio-common
+    container_name: selfcare-insurance
+    <<: *selfcare-common
     ports:
       - "8096:8096"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8096
-      SPRING_DATA_MONGODB_URI: mongodb://omobio:omobio_pw@mongodb:27017/omobio_config?authSource=admin
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
 
   approval-service:
     build:
       context: .
-      dockerfile: backend/approval-service/Dockerfile
+      dockerfile: backend/Dockerfile.jarbuild
       args:
         MODULE: approval-service
-    container_name: omobio-approval
-    <<: *omobio-common
+    container_name: selfcare-approval
+    <<: *selfcare-common
     ports:
       - "8097:8097"
     environment:
-      <<: *omobio-env
+      <<: *selfcare-env
       SERVER_PORT: 8097
 
   # ─────────────────────────────────────────────────────────────
-  # OBSERVABILITY
+  # OBSERVABILITY (local; in prod these are deployed in-cluster)
   # ─────────────────────────────────────────────────────────────
 
   prometheus:
     image: prom/prometheus:v2.55.0
-    container_name: omobio-prometheus
+    container_name: selfcare-prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
-      - ./observability/prometheus-scrape.yaml:/etc/prometheus/prometheus.yml:ro
-      - ./observability/prometheus-alerts.yaml:/etc/prometheus/alerts.yml:ro
+      - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/local/prometheus-alerts.yaml:/etc/prometheus/alerts/prometheus-alerts.yaml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=7d"
     networks:
-      - omobio-net
+      - selfcare-app-net
 
   grafana:
     image: grafana/grafana:11.2.0
-    container_name: omobio-grafana
+    container_name: selfcare-grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026
       GF_AUTH_ANONYMOUS_ENABLED: "true"
     volumes:
-      - grafana-data:/var/lib/grafana
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - omobio-net
+      - selfcare-app-net
     depends_on:
       - prometheus
 
 networks:
-  omobio-net:
+  selfcare-app-net:
     driver: bridge
-    name: omobio-net
-
-volumes:
-  mongodb-data:
-  redis-data:
-  mysql-data:
-  grafana-data:
+    name: selfcare-app-net
+    external: false

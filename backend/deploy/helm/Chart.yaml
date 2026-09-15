@@ -1,17 +1,33 @@
 apiVersion: v2
-name: omobio-microservice
-description: OMOBIO Selfcare Platform — single microservice Helm chart
+name: selfcare-platform
+description: "Selfcare Platform — EKS-ready umbrella chart. Renders all 19 microservices (ArgoCD GitOps fan-out) OR exactly one service when deploy.isolated=true (Jenkins one-by-one promotion)."
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
+kubeVersion: ">=1.26.0-0"
+home: https://github.com/sangiya123/selfcare-platform
+sources:
+  - https://github.com/sangiya123/selfcare-platform
 keywords:
-  - omobio
   - selfcare
   - telecom
-  - platform
-home: https://omobio.example.com
-sources:
-  - https://github.com/omobio/selfcare-platform
+  - insurance
+  - multi-tenant
+  - microservices
 maintainers:
-  - name: OMOBIO Platform Team
-    email: platform@omobio.example.com
+  - name: Selfcare Platform
+    email: platform@selfcare.example.com
+
+# Chart metadata is deliberately lightweight: every service is expressed as an
+# entry in values.yaml `services:` and rendered by the templates directory, so
+# adding a microservice is NOT a chart release — it is a values change.
+#
+# Usage:
+#   Full stack (ArgoCD per tenant/env):
+#     helm upgrade --install selfcare-platform ./helm -f helm/values/dev.yaml -f helm/values/client-dialog-lk-values.yaml
+#
+#   Single service (Jenkins one-by-one promotion):
+#     helm upgrade --install selfcare-api-gateway ./helm -n selfcare-dev \
+#       -f helm/values/dev.yaml -f helm/values/client-dialog-lk-values.yaml \
+#       --set deploy.isolated=true --set deploy.service=api-gateway \
+#       --set image.tag=<TAG> --set image.repository=<REG>/api-gateway

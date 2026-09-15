@@ -1,0 +1,21 @@
+﻿{
+    "description": "Selfcare CI/CD flow matrix. Edit this file to change defaults. Jenkins reads it at build-time.",
+    "flows": {
+        "compile":            {"dev": true,  "stg": true,  "reg": true,  "prod": true },
+        "unit_test":          {"dev": false, "stg": true,  "reg": true,  "prod": true },
+        "admin_qa":           {"dev": false, "stg": true,  "reg": true,  "prod": true },
+        "mobile_qa":          {"dev": false, "stg": true,  "reg": true,  "prod": true },
+        "sonar":              {"dev": false, "stg": false, "reg": true,  "prod": true },
+        "security_scan":      {"dev": false, "stg": false, "reg": false, "prod": true },
+        "docker_build_push":  {"dev": true,  "stg": true,  "reg": true,  "prod": true },
+        "deploy_dev":         {"dev": true,  "stg": true,  "reg": true,  "prod": true },
+        "deploy_stg":         {"dev": false, "stg": true,  "reg": false, "prod": false},
+        "deploy_prod":        {"dev": false, "stg": false, "reg": false, "prod": true },
+        "api_automation":     {"dev": false, "stg": true,  "reg": true,  "prod": true },
+        "zap_dast":           {"dev": false, "stg": false, "reg": false, "prod": true },
+        "sit_regression":     {"dev": false, "stg": true,  "reg": true,  "prod": true },
+        "uat_approval":       {"dev": false, "stg": false, "reg": true,  "prod": true },
+        "canary":             {"dev": false, "stg": false, "reg": false, "prod": true },
+        "monitoring":         {"dev": false, "stg": false, "reg": false, "prod": true }
+    }
+}

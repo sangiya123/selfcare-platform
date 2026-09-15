@@ -1,0 +1,60 @@
+﻿// ============================================================================
+// Selfcare — PROD release train (wrapper)
+// ============================================================================
+// Pins DEPLOY_ENV=prod. ALL flows ON (full gated release).
+// Flow: Compile → Unit Test (verify+JaCoCo) → Admin/Mobile QA → Sonar
+//       → Quality Gate → Security Scan (Semgrep/Gitleaks/Trivy/OWASP)
+//       → Docker Build+Push → Trivy image scan → Deploy DEV
+//       → API Automation → ZAP DAST → SIT/Regression → UAT Approval
+//       → Canary PROD via ArgoCD → Monitoring Verification.
+//
+// Image tag: IMMUTABLE (v1.2.0). Never re-tagged.
+//
+// Point a Jenkins job at: ci/jenkins/Jenkinsfile.prod
+// ============================================================================
+
+def masterJob = env.SELFCARE_SELF_CARE_MASTER_JOB ?: 'selfcare-Selfcare-Platform'
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+        timeout(time: 240, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+    }
+
+    parameters {
+        string(name: 'RELEASE_TAG', defaultValue: '', required: true,
+               description: 'Immutable semantic version (e.g. 1.2.0 → image tag v1.2.0).')
+    }
+
+    stages {
+        stage('Confirm Release') {
+            steps {
+                echo ">> PROD release v${params.RELEASE_TAG} — all flows enabled"
+            }
+        }
+        stage('Trigger Production Release') {
+            steps {
+                script {
+                    if (!params.RELEASE_TAG?.trim()) {
+                        error 'RELEASE_TAG is required for PROD.'
+                    }
+                    build job: masterJob, wait: true, propagate: true,
+                        parameters: [
+                            choice(name: 'DEPLOY_ENV', choices: ['prod']),
+                            string(name: 'RELEASE_TAG', value: params.RELEASE_TAG),
+                            booleanParam(name: 'FORCE_QA', value: false),
+                            booleanParam(name: 'FORCE_SECURITY', value: false),
+                            booleanParam(name: 'SKIP_DEPLOY', value: false)
+                        ]
+                }
+            }
+        }
+    }
+
+    post {
+        failure { echo 'PROD release FAILED — rollback and review. Check selfcare-Selfcare-Platform.' }
+    }
+}

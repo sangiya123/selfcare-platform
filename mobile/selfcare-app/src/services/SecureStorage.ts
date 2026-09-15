@@ -1,5 +1,5 @@
-/**
- * SecureStorage — Unified secure-storage abstraction for the OMOBIO mobile app.
+﻿/**
+ * SecureStorage — Unified secure-storage abstraction for the selfcare mobile app.
  *
  * Wraps platform-specific secure stores:
  *   - iOS: Keychain (kSecAttrAccessibleAfterFirstUnlock)
@@ -42,11 +42,23 @@ export interface SecureStorageOptions {
   biometricBound?: boolean;
 }
 
-const DEFAULT_SERVICE = 'omobio-selfcare';
+const DEFAULT_SERVICE = 'selfcare';
 
 class SecureStorageImpl {
   private namespace(service?: string): string {
-    return service ? `omobio:${service}` : DEFAULT_SERVICE;
+    return service ? `selfcare:${service}` : DEFAULT_SERVICE;
+  }
+
+  /**
+   * Enumerate keys when the backing store supports it. Older
+   * react-native-encrypted-storage builds have no `getAllKeys`; fall back to an
+   * empty list so wipe/export degrade gracefully instead of throwing.
+   */
+  private async getAllKeys(): Promise<string[]> {
+    const store = EncryptedStorage as typeof EncryptedStorage & {
+      getAllKeys?: () => Promise<string[]>;
+    };
+    return store.getAllKeys ? store.getAllKeys() : Promise.resolve([]);
   }
 
   /**
@@ -146,29 +158,11 @@ class SecureStorageImpl {
   async clear(options: SecureStorageOptions = {}): Promise<void> {
     const service = this.namespace(options.service);
     try {
-      // iOS: walk the known service names
-      if (Platform.OS === 'ios') {
-        // EncryptedStorage is the simpler path on iOS too — we use it for
-        // most keys, and only Keychain for biometric-bound keys.
-        // The simplest robust approach: invoke a server-side wipe
-        // of the key index, since keychain on iOS does not expose a
-        // "delete all" primitive for arbitrary services.
-        // For the (typical) EncryptedStorage keys, we use the underlying
-        // MMKV/AsyncStorage:
-        const keys = await EncryptedStorage.getAllKeys();
-        for (const k of keys) {
-          if (k.startsWith(service)) {
-            await EncryptedStorage.removeItem(k);
-          }
-        }
-      } else {
-        // Android: EncryptedStorage uses SharedPreferences. We delete the
-        // whole prefs file scoped by service.
-        const keys = await EncryptedStorage.getAllKeys();
-        for (const k of keys) {
-          if (k.startsWith(service)) {
-            await EncryptedStorage.removeItem(k);
-          }
+      // iOS/Android: both paths enumerate + filter by the tenant service name.
+      const keys = await this.getAllKeys();
+      for (const k of keys) {
+        if (k.startsWith(service)) {
+          await EncryptedStorage.removeItem(k);
         }
       }
     } catch (e) {
@@ -185,7 +179,7 @@ class SecureStorageImpl {
   async listKeys(options: SecureStorageOptions = {}): Promise<string[]> {
     const service = this.namespace(options.service);
     try {
-      const all = await EncryptedStorage.getAllKeys();
+      const all = await this.getAllKeys();
       return all.filter((k) => k.startsWith(service)).map((k) => k.slice(service.length + 1));
     } catch (e) {
       if (__DEV__) {

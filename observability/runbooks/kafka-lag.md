@@ -1,4 +1,4 @@
-# Runbook: Kafka Consumer Lag
+﻿# Runbook: Kafka Consumer Lag
 
 ## Overview
 This runbook covers scenarios where Kafka consumer groups fall behind, causing
@@ -16,17 +16,17 @@ stale read models, late notifications, or missed domain events.
    ```bash
    kubectl exec -it kafka-0 -- kafka-consumer-groups \
      --bootstrap-server kafka:9092 \
-     --list | grep omobio
+     --list | grep selfcare
    ```
 2. **What's the lag?**
    ```bash
    kubectl exec -it kafka-0 -- kafka-consumer-groups \
      --bootstrap-server kafka:9092 \
-     --describe --group omobio-account-entitlement-consumer
+     --describe --group selfcare-account-entitlement-consumer
    ```
 3. **Are consumers running?**
    ```bash
-   kubectl -n omobio-prod get pods -l app=account-entitlement-service
+   kubectl -n selfcare-prod get pods -l app=account-entitlement-service
    ```
 4. **Check broker health**
    ```bash
@@ -40,8 +40,8 @@ stale read models, late notifications, or missed domain events.
 **Symptom**: Pod restart count increasing, lag is increasing
 **Fix**: Restart consumer and scale up
 ```bash
-kubectl -n omobio-prod rollout restart deploy/account-entitlement-service
-kubectl -n omobio-prod scale deploy/account-entitlement-service --replicas=5
+kubectl -n selfcare-prod rollout restart deploy/account-entitlement-service
+kubectl -n selfcare-prod scale deploy/account-entitlement-service --replicas=5
 ```
 
 ### B. Downstream sink (database/Redis) is slow
@@ -52,7 +52,7 @@ kubectl -n omobio-prod scale deploy/account-entitlement-service --replicas=5
 redis-cli --latency -h redis-auth
 
 # Check MySQL slow query log
-kubectl -n omobio-prod exec -it mysql-0 -- \
+kubectl -n selfcare-prod exec -it mysql-0 -- \
   mysql -e "SHOW FULL PROCESSLIST"
 ```
 
@@ -61,7 +61,7 @@ kubectl -n omobio-prod exec -it mysql-0 -- \
 **Fix**: Increase session timeout, scale consumers
 ```bash
 # Increase session timeout
-kubectl -n omobio-prod set env deploy/account-entitlement-service \
+kubectl -n selfcare-prod set env deploy/account-entitlement-service \
   SPRING_KAFKA_CONSUMER_PROPERTIES_SESSION_TIMEOUT_MS=45000
 ```
 
@@ -71,7 +71,7 @@ kubectl -n omobio-prod set env deploy/account-entitlement-service \
 ```bash
 # Inspect consumer code for idempotency
 grep -r "isIdempotent\|deduplicationKey" \
-  /app/src/main/java/com/omobio/account/
+  /app/src/main/java/com/selfcare/account/
 ```
 
 ### E. Topic is undersized (too few partitions)
@@ -80,7 +80,7 @@ grep -r "isIdempotent\|deduplicationKey" \
 ```bash
 kubectl exec -it kafka-0 -- kafka-topics \
   --bootstrap-server kafka:9092 \
-  --alter --topic omobio.profile.events \
+  --alter --topic selfcare.profile.events \
   --partitions 12
 ```
 
@@ -89,7 +89,7 @@ After mitigation, verify the lag is draining:
 ```bash
 watch -n 5 "kubectl exec -it kafka-0 -- kafka-consumer-groups \
   --bootstrap-server kafka:9092 \
-  --describe --group omobio-account-entitlement-consumer"
+  --describe --group selfcare-account-entitlement-consumer"
 ```
 
 ## Post-incident

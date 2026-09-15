@@ -1,10 +1,10 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — product-service
+-- Selfcare Platform — product-service
 -- Tables: products, product_tags
 --
 -- product-service runs on MySQL (JPA) and uses the products table as the
 -- canonical, materialized read model of operator catalogs. Tags are kept in
--- a side table (ElementCollection mapping on com.omobio.product.domain.Product).
+-- a side table (ElementCollection mapping on com.selfcare.product.domain.Product).
 
 -- ============================================================================
 -- products

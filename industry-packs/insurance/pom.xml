@@ -5,17 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
-    <groupId>com.omobio.industry</groupId>
+    <groupId>com.selfcare.industry</groupId>
     <artifactId>insurance-industry-pack</artifactId>
     <packaging>pom</packaging>
 
-    <name>OMOBIO Insurance Industry Pack</name>
+    <name>selfcare Insurance Industry Pack</name>
     <description>
         Insurance-vertical provider implementations (AIA, etc.).
         Each insurer is a client/tenant using this industry pack.

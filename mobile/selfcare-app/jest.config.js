@@ -1,5 +1,5 @@
 /**
- * Jest configuration for OMOBIO Selfcare App.
+ * Jest configuration for Selfcare App.
  *
  * Usage:
  *   npm test                    # Run all tests
@@ -8,8 +8,8 @@
  *   npm test -- --testPathPattern=ConfigSDK  # Filter by file
  */
 module.exports = {
-  // Use ts-jest preset for TypeScript + React Native
-  preset: 'react-native',
+  // RN >= 0.87 split the jest preset into its own package.
+  preset: '@react-native/jest-preset',
 
   // Test environment
   testEnvironment: 'node',
@@ -45,7 +45,7 @@ module.exports = {
   },
 
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
   // Test location
   roots: ['<rootDir>'],
@@ -66,11 +66,6 @@ module.exports = {
       statements: 60,
     },
   },
-
-  // Snapshot serializers
-  snapshotSerializers: [
-    '@testing-library/react-native/cleanup-after-each',
-  ],
 
   // Test timeout (30 seconds for async operations)
   testTimeout: 30000,

@@ -1,8 +1,8 @@
-package com.omobio.providers.dialog.balance;
+﻿package com.selfcare.providers.dialog.balance;
 
-import com.omobio.platform.common.adapter.ApiAdapter;
-import com.omobio.platform.common.adapter.RegisterAdapter;
-import com.omobio.platform.common.web.ServiceUnavailableException;
+import com.selfcare.platform.common.adapter.ApiAdapter;
+import com.selfcare.platform.common.adapter.RegisterAdapter;
+import com.selfcare.platform.common.web.ServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,10 +27,10 @@ public class DialogBalanceProvider implements ApiAdapter {
         return "dialog-lk";
     }
 
-    @Value("${omobio.providers.dialog.mife.base-url:https://mife.dialog.lk}")
+    @Value("${selfcare.providers.dialog.mife.base-url:https://mife.dialog.lk}")
     private String mifeBaseUrl;
 
-    @Value("${omobio.providers.dialog.mife.timeout-ms:5000}")
+    @Value("${selfcare.providers.dialog.mife.timeout-ms:5000}")
     private long timeoutMs;
 
     private final WebClient webClient;

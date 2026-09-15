@@ -1,4 +1,4 @@
-# Provider Contract — <operator>/<industry>/<capability>
+﻿# Provider Contract — <operator>/<industry>/<capability>
 
 | Field | Value |
 |---|---|
@@ -50,7 +50,7 @@ public interface BalanceProvider extends ApiAdapter {
 - **Transport:** REST / SOAP / gRPC / JDBC / Mongo / SFTP / Kafka
 - **Auth:** OAuth2 client credentials / mTLS / API key / certificate
 - **Base URL:** `https://bss.<operator>.com/...` (configurable per tenant)
-- **Credentials location:** Kubernetes secret `omobio-<tenant>-<env>-<capability>`
+- **Credentials location:** Kubernetes secret `selfcare-<tenant>-<env>-<capability>`
 - **TLS version:** 1.2 minimum
 - **Versioning rules:** semver, breaking changes require new major version
 

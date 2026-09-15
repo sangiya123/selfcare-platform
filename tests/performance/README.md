@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — k6 Performance Test Suite
+﻿# Selfcare Platform — k6 Performance Test Suite
 
 This directory contains k6 performance test scripts that validate the platform's
 non-functional requirements (NFRs).
@@ -28,7 +28,7 @@ k6 run tests/performance/04_resilience_provider_outage.js
 k6 run tests/performance/05_auth_otp_throughput.js
 
 # Custom target
-API_GATEWAY=https://api.stg.omobio.io \
+API_GATEWAY=https://api.stg.selfcare.io \
 TENANT_ID=dialog-lk \
 k6 run --vus 100 --duration 5m tests/performance/01_dashboard_load.js
 ```

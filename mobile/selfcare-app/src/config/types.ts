@@ -1,5 +1,5 @@
-/**
- * OMOBIO SDK — TypeScript type definitions
+﻿/**
+ * selfcare SDK — TypeScript type definitions
  */
 
 export interface Manifest {

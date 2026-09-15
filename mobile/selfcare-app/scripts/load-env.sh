@@ -23,7 +23,7 @@ ENV="${1:-}"
 
 if [[ -z "$ENV" ]]; then
   echo "Usage: $0 <env>  (dev | stg | reg | prod)"
-  echo "Current OMOBIO_ENV=${OMOBIO_ENV:-not set}"
+  echo "Current SELFCARE_ENV=${SELFCARE_ENV:-not set}"
   echo ""
   echo "Select environment:"
   select ENV in dev stg reg prod; do

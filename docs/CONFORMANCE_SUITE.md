@@ -30,8 +30,8 @@ mvn test
 
 ### Against a deployed environment
 ```bash
-export OMOBIO_BASE_URL=https://staging.omobio.io
-export OMOBIO_TENANT=dialog-lk
+export SELFCARE_BASE_URL=https://staging.selfcare.io
+export SELFCARE_TENANT=dialog-lk
 mvn test -Denv=stg
 ```
 
@@ -41,8 +41,8 @@ mvn test -Denv=stg
 - name: Run conformance suite
   run: |
     mvn -B -f tests/conformance/pom.xml test \
-        -Domobio.base-url=${{ secrets.STAGING_URL }} \
-        -Domobio.tenant=${{ secrets.STAGING_TENANT }}
+        -Dselfcare.base-url=${{ secrets.STAGING_URL }} \
+        -Dselfcare.tenant=${{ secrets.STAGING_TENANT }}
 ```
 
 ## Test cases

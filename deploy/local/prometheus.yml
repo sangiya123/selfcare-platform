@@ -10,7 +10,7 @@ global:
   evaluation_interval: 15s
   external_labels:
     env: dev
-    platform: omobio-selfcare
+    platform: selfcare
 
 rule_files:
   - /etc/prometheus/alerts/*.yaml
@@ -25,7 +25,7 @@ scrape_configs:
     scrape_interval: 15s
 
   # Direct scrape fallback for select services
-  - job_name: 'omobio-services'
+  - job_name: 'selfcare-services'
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
@@ -46,8 +46,3 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets: ['alertmanager:9093']
-
-storage:
-  tsdb:
-    retention.time: 15d
-    retention.size: 10GB

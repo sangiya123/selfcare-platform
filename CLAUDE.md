@@ -2,9 +2,63 @@
 
 This file provides context for AI assistants working on this codebase.
 
+## Master Planning Document (READ FIRST)
+
+The consolidated, authoritative planning document is:
+
+`Planning doc/MASTER_v7.md` (v7 master)
+
+It supersedes v6 (and `selfcare_SC_FLOW_BY_FLOW_TARGET_ARCHITECTURE_v6.md`) and
+carries the v6 feature inventory plus the DBA/DB-backed config decisions. Before
+any development, read v7. When a development step completes, update v7 (bump
+the version marker and mark the step done) — the "update the last versioned
+file" convention.
+
+Key v7 rules that override older conventions:
+
+1. **Nothing is hardcoded.** All URLs, credentials, tenant details, feature rules,
+   themes, layouts, journeys, provider mappings, and service endpoints come from
+   DB-backed configuration (Mongo `tenant_configs` + `client_integrations` +
+   Redis cache). No tenant registry in `application.yml`/properties/ConfigMap.
+   Dev-only seed data lives in `deploy/local/{mysql,mongo}-init/` and the
+   dev-profile `ClientIntegrationSeeder` (mock endpoints, never real prod creds).
+   Mobile screens are `ExperienceScreen` (manifest-driven); layout `sections`
+   bind data through `dataSources` maps (service/endpoint/params in the manifest),
+   and `component_catalog` entries carry a `primitive` + `config` rendering recipe.
+   Adding a screen/section/data endpoint is a DB-level change — never an app release.
+2. **`client_integrations` use a FLAT schema.** Fields: `tenantId`, `industry`,
+   `integrationType`, `providerClass`, `baseUrl`, `authType`, `credentials` (map),
+   `fieldMapping`, `advanced`, `metadata`, `status`, `health`. Do NOT use the old
+   nested `type`/`endpoint`/`capabilities` shape — `findByTenantIdAndIntegrationType`
+   will never match it. Credential keys used by providers: `clientId`,
+   `clientSecret`, `apiKey`, `senderId`; AI providers also read `defaultModel`.
+3. **Tenant validation is DB-backed.** `TenantResolverFilter` must not resolve
+   tenants from an in-memory `selfcare.tenants` map (this caused the masked admin
+   login 401). The canonical validator is platform-common `MongoTenantValidator`
+   (reads Mongo `tenant_configs` directly with a short TTL cache). Services that
+   bundle BOTH `spring-boot-starter-web` and `spring-boot-starter-webflux` must set
+   `spring.main.web-application-type: servlet` (otherwise Boot defaults to reactive,
+   the `@ConditionalOnWebApplication(SERVLET)` guard fails, and the validator bean
+   never exists — 401 again). `api-gateway` stays reactive on purpose.
+4. **No runtime Mongo interpretation.** Author in Mongo → publish → compile →
+   immutable signed Experience Manifest → apps/services consume the manifest.
+5. **Parity is a contract.** Dialog/Hutch/Airtel features in v6/v7 §2 are the parity
+   baseline. Function stays, implementation is replaceable.
+6. **~18 backend logical domains**, not one service per legacy controller.
+7. **AI provider config is DB-driven.** `AnthropicProvider`, `OpenAiProvider`,
+   `GoogleAiProvider` and `ContentModerationService` resolve their API key, base
+   URL and default model from the tenant's `client_integrations` (`ANTHROPIC`,
+   `OPENAI`, `GOOGLE_AI` types). Keys use `env:VAR` (read from environment) or
+   `secret:` (deployment layer only, resolves to null). Models default to free
+   tiers (claude-sonnet-4-5, gpt-4o-mini, gemini-1.5-flash). AI routing across
+   tenants uses the `AI_PROVIDER` integration (`metadata.provider`).
+8. **Boot 4.1 specifics:** Mongo config is `spring.mongodb.*` (env
+   `SPRING_MONGODB_URI`) — `spring.data.mongodb.*` is dead config. Redis stays
+   `spring.data.redis`. Boot 4.1 has no Kafka auto-config; wired per service.
+
 ## Project Overview
 
-OMOBIO Selfcare Platform is a configurable, multi-tenant, **multi-industry** selfcare product.
+Selfcare Platform is a configurable, multi-tenant, **multi-industry** selfcare product.
 One codebase renders industry-specific experiences for clients (telecom operators,
 insurance companies, travel companies, banks, ...) from versioned configuration —
 no source forks.
@@ -13,7 +67,7 @@ no source forks.
 
 | Term | Meaning |
 |---|---|
-| **Tenant** / **Client** | A business using the OMOBIO platform (Dialog, AIA, ...) |
+| **Tenant** / **Client** | A business using the selfcare platform (Dialog, AIA, ...) |
 | **Industry** | The vertical: TELCO, INSURANCE, TRAVEL, BANKING, ... |
 | **Tenant type** | The role within the industry: OPERATOR, INSURER, MVNO, AIRLINE, ... |
 | **Industry pack** | The per-vertical provider implementation (telco pack, insurance pack) |
@@ -56,10 +110,11 @@ selfcare-platform/
 │   ├── reporting-service/     # Report catalog + async generation
 │   ├── ai-gateway/           # AI model gateway + tool permissions + RAG
 │   ├── audit-service/        # Immutable audit trail
-│   └── insurance-service/    # Insurance BFF — policy, claims, beneficiaries, premiums
-├── admin/                    # Selfcare Studio (React + TypeScript)
-│   └── selfcare-studio/     # Page builder, journey builder, integration builder, RBAC
-├── mobile/                  # Selfcare App (React Native + TypeScript)
+│   ├── insurance-service/    # Insurance BFF — policy, claims, beneficiaries, premiums
+│   └── approval-service/     # Config change approval workflow (maker/checker, publish gate)
+├── admin/                    # selfcare Studio (React + TypeScript)
+│   └── selfcare-admin/      # Page builder, journey builder, integration builder, RBAC
+├── mobile/                  # selfcare App (React Native + TypeScript)
 │   └── selfcare-app/        # Config SDK, component registry, layout renderer, action engine
 ├── industry-packs/          # Per-industry provider implementations
 │   ├── telco/               # Telco industry pack (connection-centric)
@@ -82,7 +137,7 @@ selfcare-platform/
 ```
 service/
 ├── pom.xml                  # Maven module, depends on platform-common
-├── src/main/java/com/omobio/{service}/
+├── src/main/java/com/selfcare/{service}/
 │   ├── {Service}Application.java
 │   ├── config/             # Spring configuration
 │   ├── domain/             # Entities, value objects
@@ -115,7 +170,7 @@ Every external system call follows the **adapter pattern**, with a
 **canonical interface** per industry. Telco and insurance are different
 domains — they have different interfaces.
 
-The platform has 21 canonical provider interfaces in `platform-common/src/main/java/com/omobio/platform/common/adapter/`:
+The platform has 21 canonical provider interfaces in `platform-common/src/main/java/com/selfcare/platform/common/adapter/`:
 
 **Identity & auth (per industry)**
 - `AuthProvider` — login / refresh / logout (telco + insurance)
@@ -157,7 +212,7 @@ public interface InsuranceProvider extends ApiAdapter {  // INSURANCE
 
 // 2. Implement for a specific client (Dialog, AIA, ...)
 @Component
-@RegisterAdapter("${omobio.tenant.default-id:dialog-lk}")
+@RegisterAdapter("${selfcare.tenant.default-id:dialog-lk}")
 public class DialogBalanceProvider implements BalanceProvider {
     // Calls Dialog's real BSS API
     // Reads URL/credentials from TenantConfigurationService at runtime
@@ -199,6 +254,12 @@ return widgets.collectList();
 - **Config SDK**: fetches compiled manifest from Config Service; caches locally
 - **Component Registry**: maps `componentId` to actual React Native component
 - **Layout Renderer**: recursively renders sections/widgets from manifest
+- **Experience Screen**: ALL feature screens (home/bills/usage/profile/support)
+  share one generic `ExperienceScreen` — sections + component catalog recipes +
+  `dataSources` all come from the compiled manifest; no feature-specific screens
+- **Data Source Resolver**: manifest-driven — `manifest.dataSources[id]` →
+  `ApiHandle[service][endpoint]` (auth/bills/usage/payments/catalog/content/notifications/profile).
+  No hardcoded endpoint mapping in app code.
 - **Action Engine**: executes `NAVIGATE`, `CALL_API`, `START_JOURNEY`, etc.
 - **Theme Engine**: resolves design tokens from tenant config
 
@@ -227,6 +288,16 @@ return widgets.collectList();
 
 Every request carries `X-Tenant-Id` header. `TenantResolverFilter` in platform-common extracts it.
 All services are tenant-aware. No cross-tenant data access.
+
+**Tenant resolution is DB-backed (not config-file bound).** `TenantResolverFilter` depends on a
+`TenantValidator` abstraction (`isTenantActive`, `getAdapterPackage`). The canonical validator is
+platform-common's `MongoTenantValidator` (`@Primary`) — it reads the Mongo `tenant_configs` collection
+directly (the config source of truth, written by config-tenant-service / selfcare Studio) with a short
+in-process TTL cache, so every service validates live tenant state without an HTTP round-trip to
+config-tenant-service. `TenantProperties` (from compiled `selfcare.tenants` config) remains only as a
+fallback bean for services without Mongo. Unknown/inactive tenants get a clear 400 — never a masked 401
+from an un-ordered catch-all OAuth2 chain (the `/error` dispatch must be permitted). Empty/Mongo-unreachable
+state must never be seeded via `SPRING_APPLICATION_JSON` in the ConfigMap (v6: nothing hardcoded).
 
 ## Important Rules
 
@@ -313,7 +384,7 @@ Per-service values: `backend/deploy/helm/values/{dev,stg,reg,prod}.yaml`
 ### Unit Test Coverage
 
 All under-tested services have been extended with comprehensive JUnit 5 + Mockito
-test classes. See `backend/*/src/test/java/com/omobio/*/` for tests covering:
+test classes. See `backend/*/src/test/java/com/selfcare/*/` for tests covering:
 
 - `api-gateway`: 6 test classes — WAF, tenant routing, JWT relay, error handler, key resolver, rate-limit exclusion
 - `audit-service`: 2 test classes — record / search / CSV export
@@ -372,6 +443,11 @@ obligation.
 ## Planning Documents
 
 All planning docs are in the parent `Planning doc/` folder. Key files:
-- `OMOBIO_Global_Selfcare_ALL_MARKDOWN_DOCUMENTS/03_architecture/` — architecture docs
-- `OMOBIO_Global_Selfcare_ALL_MARKDOWN_DOCUMENTS/09_roadmap_migration/` — implementation roadmap
-- `OMOBIO_SC_FINAL_v2/docs/` — consolidated implementation pack (short filenames)
+- `selfcare_SC_FLOW_BY_FLOW_TARGET_ARCHITECTURE_v6.md` — **v6 MASTER** (consolidated; read first; update on step completion)
+- `selfcare_SC_FLOW_BY_FLOW_TARGET_ARCHITECTURE_v5.md` — prior version (v6 supersedes)
+- `selfcare_SC_ACTIVE_API_SCOPE_DECISION_v4.md` — active API scope decision
+- `selfcare_SC_SOURCE_CODE_GAP_REVIEW_v3.md` — source gap review
+- `00_MASTER_INDEX.md` — index of the broader `ALL_MARKDOWN_DOCUMENTS` pack
+- `selfcare_Global_selfcare_ALL_MARKDOWN_DOCUMENTS/03_architecture/` — architecture docs
+- `selfcare_Global_selfcare_ALL_MARKDOWN_DOCUMENTS/09_roadmap_migration/` — implementation roadmap
+- `selfcare_SC_FINAL_v2/docs/` — consolidated implementation pack (short filenames)

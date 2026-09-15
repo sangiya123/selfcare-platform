@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Tenant Isolation",
-  "uid": "omobio-tenant-isolation",
+﻿{
+  "title": "selfcare Tenant Isolation",
+  "uid": "selfcare-tenant-isolation",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Cross-tenant access attempts, traffic distribution, error rates, latency by tenant, and suspicious access pattern detection. CRITICAL: Any cross-tenant access > 0 must be investigated immediately. Runbook: https://runbooks.omobio.local/tenant-isolation",
-  "tags": ["omobio", "tenant", "isolation", "security", "multi-tenant"],
+  "description": "Cross-tenant access attempts, traffic distribution, error rates, latency by tenant, and suspicious access pattern detection. CRITICAL: Any cross-tenant access > 0 must be investigated immediately. Runbook: https://runbooks.selfcare.local/tenant-isolation",
+  "tags": ["selfcare", "tenant", "isolation", "security", "multi-tenant"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -217,7 +217,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Cross-Tenant Access Attempts Over Time",
-      "description": "CRITICAL: Any non-zero value indicates a potential data breach or misconfiguration. Runbook: https://runbooks.omobio.local/tenant-isolation-incident",
+      "description": "CRITICAL: Any non-zero value indicates a potential data breach or misconfiguration. Runbook: https://runbooks.selfcare.local/tenant-isolation-incident",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

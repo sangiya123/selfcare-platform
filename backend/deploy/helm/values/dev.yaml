@@ -1,0 +1,35 @@
+# dev environment overrides
+environment:
+  name: dev
+  profiles: dev
+
+image:
+  tag: dev-latest
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+
+podDisruptionBudget:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+ingress:
+  enabled: true
+  host: dev.selfcare.example.com
+  tls:
+    enabled: false
+
+observability:
+  logLevel: DEBUG
+  tracing:
+    enabled: false
+  prometheus:
+    enabled: true
+    podMonitorSelector: app.kubernetes.io/name
+
+# dev runs AI in stub mode (no real provider keys)
+deploy_ai_stub: true

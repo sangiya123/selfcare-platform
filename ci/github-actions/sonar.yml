@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — SonarQube Quality Gate
+﻿# Selfcare Platform — SonarQube Quality Gate
 #
 # Scans backend (Java/Maven), admin (TypeScript/React), and mobile
 # (TypeScript/React Native) code, then publishes results to SonarQube
@@ -87,8 +87,8 @@ jobs:
         with:
           projectBaseDir: selfcare-platform/backend
           args: >
-            -Dsonar.projectKey=omobio-selfcare-backend
-            -Dsonar.projectName=OMOBIO Selfcare Platform - Backend
+            -Dsonar.projectKey=selfcare-backend
+            -Dsonar.projectName=Selfcare Platform - Backend
             -Dsonar.projectVersion=${{ github.sha }}
             -Dsonar.sources=.
             -Dsonar.tests=.
@@ -129,14 +129,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+          cache-dependency-path: selfcare-platform/admin/selfcare-admin/package-lock.json
 
       - name: Install dependencies
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npm ci
 
       - name: Run tests with coverage
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: |
           npx vitest run --coverage --reporter=verbose
 
@@ -146,10 +146,10 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
-          projectBaseDir: selfcare-platform/admin/selfcare-studio
+          projectBaseDir: selfcare-platform/admin/selfcare-admin
           args: >
-            -Dsonar.projectKey=omobio-selfcare-admin
-            -Dsonar.projectName=OMOBIO Selfcare Platform - Admin
+            -Dsonar.projectKey=selfcare-admin
+            -Dsonar.projectName=Selfcare Platform - Admin
             -Dsonar.projectVersion=${{ github.sha }}
             -Dsonar.sources=src
             -Dsonar.tests=src/__tests__
@@ -165,7 +165,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         continue-on-error: true
         with:
-          sarif_file: selfcare-platform/admin/selfcare-studio/.scannerwork/sonar-report.sarif
+          sarif_file: selfcare-platform/admin/selfcare-admin/.scannerwork/sonar-report.sarif
           category: sonar-admin
 
   # ==========================================
@@ -204,8 +204,8 @@ jobs:
         with:
           projectBaseDir: selfcare-platform/mobile/selfcare-app
           args: >
-            -Dsonar.projectKey=omobio-selfcare-mobile
-            -Dsonar.projectName=OMOBIO Selfcare Platform - Mobile
+            -Dsonar.projectKey=selfcare-mobile
+            -Dsonar.projectName=Selfcare Platform - Mobile
             -Dsonar.projectVersion=${{ github.sha }}
             -Dsonar.sources=src
             -Dsonar.tests=__tests__

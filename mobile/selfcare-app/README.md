@@ -1,4 +1,4 @@
-# OMOBIO Selfcare App — Mobile Kernel
+﻿# Selfcare App — Mobile Kernel
 
 React Native + TypeScript mobile application kernel.
 Renders operator experiences from server-driven configuration.
@@ -40,7 +40,7 @@ Mobile App Shell
 import { ConfigSDK } from './config/ConfigSDK';
 
 const configSDK = new ConfigSDK({
-  baseUrl: 'https://api.omobio.example.com',
+  baseUrl: 'https://api.selfcare.example.com',
   tenantId: 'dialog-lk',
 });
 

@@ -1,9 +1,9 @@
-{
-  "title": "OMOBIO Mobile App — Crash & Performance",
-  "uid": "omobio-mobile-performance",
+﻿{
+  "title": "selfcare Mobile App — Crash & Performance",
+  "uid": "selfcare-mobile-performance",
   "schemaVersion": 39,
   "version": 1,
-  "tags": ["omobio", "mobile", "performance", "crash"],
+  "tags": ["selfcare", "mobile", "performance", "crash"],
   "timezone": "browser",
   "refresh": "1m",
   "time": {

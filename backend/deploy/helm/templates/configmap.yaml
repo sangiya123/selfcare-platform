@@ -1,18 +1,65 @@
-{{- if .Values.enabled | default true }}
+{{- range $name, $svc := .Values.services }}
+{{- $render := include "selfcare.renderService" (dict "name" $name "Values" $.Values) }}
+{{- if eq $render "true" }}
+{{- $svcObj := merge (deepCopy $.Values.defaultService) $svc }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "omobio.fullname" . }}-env
-  namespace: {{ include "omobio.namespace" . }}
+  name: {{ $name }}-config
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "omobio.labels" . | nindent 4 }}
+    {{- include "selfcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
 data:
-  SPRING_PROFILES_ACTIVE: "{{ .Values.env.SPRING_PROFILES_ACTIVE | default "prod" }}"
-  JAVA_TOOL_OPTIONS: "{{ .Values.env.JAVA_TOOL_OPTIONS | default "-Xmx768m -XX:MaxRAMPercentage=75.0" }}"
-  OTEL_SERVICE_NAME: "{{ include "omobio.name" . }}"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "{{ .Values.env.OTEL_EXPORTER_OTLP_ENDPOINT | default "http://otel-collector:4317" }}"
-  OTEL_RESOURCE_ATTRIBUTES: "service.version={{ include "omobio.imageTag" . }},deployment.environment={{ .Values.env.SPRING_PROFILES_ACTIVE | default "prod" }}"
-  {{- if .Values.env.EXTRA_CONFIG }}
-  {{- toYaml .Values.env.EXTRA_CONFIG | nindent 2 }}
+  SERVER_PORT: {{ $svcObj.port | quote }}
+  {{- range $ek, $ev := $svcObj.env }}
+  {{ $ek }}: {{ $ev | quote }}
   {{- end }}
 {{- end }}
+{{- end }}
+---
+# Shared config applied to all services via envFrom
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: selfcare-config-behavior
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "selfcare.labels" . | nindent 4 }}
+    app.kubernetes.io/name: selfcare-config-behavior
+data:
+  {{- if .Values.tenant.id }}
+  SELFCARE_TENANT_DEFAULT_ID: {{ .Values.tenant.id | quote }}
+  X_DEFAULT_TENANT_ID: {{ .Values.tenant.id | quote }}
+  {{- end }}
+  SELFCARE_SECURITY_URL_ALLOWLIST_HOSTS: {{ .Values.allowlist | default "localhost,mock,bss-dialog.svc,smsc-dialog.svc,bss-hutch.svc,smsc-hutch.svc,bss-airtel.svc,smsc-airtel.svc,aia-api.svc" | quote }}
+  {{- if .Values.jvm }}
+  JAVA_TOOL_OPTIONS: {{ .Values.jvm.options | default "-Xmx768m -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" | quote }}
+  {{- end }}
+  {{- if .Values.environment.profiles }}
+  SPRING_PROFILES_ACTIVE: {{ .Values.environment.profiles | quote }}
+  {{- else if .Values.environment.name }}
+  SPRING_PROFILES_ACTIVE: {{ .Values.environment.name | quote }}
+  {{- end }}
+  {{- if .Values.db }}
+  DB_HOST: {{ .Values.db.host | quote }}
+  DB_PORT: {{ .Values.db.port | default "3306" | quote }}
+  {{- end }}
+  {{- if .Values.mongo }}
+  MONGO_HOST: {{ .Values.mongo.host | quote }}
+  MONGO_PORT: {{ .Values.mongo.port | default "27017" | quote }}
+  {{- end }}
+  {{- if .Values.redis }}
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | default "6379" | quote }}
+  {{- end }}
+  {{- if .Values.kafka }}
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: {{ .Values.kafka.bootstrapServers | quote }}
+  {{- end }}
+  {{- if .Values.observability }}
+  OTEL_ENABLED: {{ .Values.observability.tracing.enabled | default "false" | quote }}
+  {{- if .Values.observability.tracing.endpoint }}
+  OTEL_ENDPOINT: {{ .Values.observability.tracing.endpoint | quote }}
+  {{- end }}
+  {{- end }}

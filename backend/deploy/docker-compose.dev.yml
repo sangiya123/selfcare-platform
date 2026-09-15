@@ -1,34 +1,34 @@
 version: '3.8'
 
-# OMOBIO Selfcare Platform — local development infrastructure
+# Selfcare Platform — local development infrastructure
 # Starts MySQL, MongoDB, Redis, Kafka, Prometheus, Grafana, Zipkin.
 # Backend services are started separately via `mvn spring-boot:run`.
 
 services:
   mysql:
     image: mysql:8.0
-    container_name: omobio-mysql
+    container_name: selfcare-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: omobio
-      MYSQL_DATABASE: omobio_selfcare
+      MYSQL_ROOT_PASSWORD: Selfcare_My5ql_R00t_Pa55w0rd!2026
+      MYSQL_DATABASE: selfcare
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pomobio"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pSelfcare_My5ql_R00t_Pa55w0rd!2026"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   mongodb:
     image: mongo:7
-    container_name: omobio-mongo
+    container_name: selfcare-mongo
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: omobio
-      MONGO_INITDB_ROOT_PASSWORD: omobio
+      MONGO_INITDB_ROOT_USERNAME: selfcare
+      MONGO_INITDB_ROOT_PASSWORD: Selfcare_M0ng0_Db_Pa55w0rd!2026
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -39,21 +39,21 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: omobio-redis
-    command: redis-server --requirepass omobio
+    container_name: selfcare-redis
+    command: redis-server --requirepass Selfcare_R3d1s_Pa55w0rd!2026
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "omobio", "ping"]
+      test: ["CMD", "redis-cli", "-a", "Selfcare_R3d1s_Pa55w0rd!2026", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: omobio-kafka
+    container_name: selfcare-kafka
     depends_on:
       - zookeeper
     environment:
@@ -67,14 +67,14 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: omobio-zookeeper
+    container_name: selfcare-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
   prometheus:
     image: prom/prometheus:v2.48.0
-    container_name: omobio-prometheus
+    container_name: selfcare-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -87,11 +87,11 @@ services:
 
   grafana:
     image: grafana/grafana:10.2.0
-    container_name: omobio-grafana
+    container_name: selfcare-grafana
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: omobio
+      GF_SECURITY_ADMIN_PASSWORD: Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026
     volumes:
       - grafana-data:/var/lib/grafana
       - ../observability/grafana/dashboards:/var/lib/grafana/dashboards
@@ -100,7 +100,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.52
-    container_name: omobio-jaeger
+    container_name: selfcare-jaeger
     ports:
       - "16686:16686"
       - "4317:4317"

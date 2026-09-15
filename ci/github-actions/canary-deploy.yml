@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Canary Deployment
+﻿# Selfcare Platform — Canary Deployment
 #
 # Progressive traffic shift for production:
 #   5% → 25% → 50% → 100%
@@ -59,7 +59,7 @@ permissions:
 
 env:
   KUBECONFIG: ${{ secrets.PROD_KUBECONFIG }}
-  NAMESPACE: omobio-prod
+  NAMESPACE: selfcare-prod
   REGION: prod
   PROM_URL: ${{ secrets.PROMETHEUS_URL }}
   GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
@@ -100,10 +100,10 @@ jobs:
         run: |
           SERVICES="${{ steps.svc.outputs.list }}"
           for svc in $SERVICES; do
-            IMG="ghcr.io/omobio/$svc:${{ env.IMAGE_TAG }}"
+            IMG="ghcr.io/sangiya123/$svc:${{ env.IMAGE_TAG }}"
             echo "Verifying $IMG ..."
             cosign verify "$IMG" \
-              --certificate-identity-regexp 'https://github.com/omobio/selfcare-platform' \
+              --certificate-identity-regexp 'https://github.com/sangiya123/selfcare-platform' \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
               --output json > "cosign-$svc.json"
             echo "$svc: signature OK"
@@ -115,10 +115,10 @@ jobs:
         run: |
           SERVICES="${{ steps.svc.outputs.list }}"
           for svc in $SERVICES; do
-            IMG="ghcr.io/omobio/$svc:${{ env.IMAGE_TAG }}"
+            IMG="ghcr.io/sangiya123/$svc:${{ env.IMAGE_TAG }}"
             cosign verify-attestation "$IMG" \
               --type slsaprovenance \
-              --certificate-identity-regexp 'https://github.com/omobio/selfcare-platform' \
+              --certificate-identity-regexp 'https://github.com/sangiya123/selfcare-platform' \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
           done
 
@@ -167,11 +167,11 @@ jobs:
           apiVersion: networking.istio.io/v1beta1
           kind: VirtualService
           metadata:
-            name: omobio-$svc-vs
+            name: selfcare-$svc-vs
             namespace: ${{ env.NAMESPACE }}
           spec:
             hosts:
-            - omobio-$svc
+            - selfcare-$svc
             http:
             - match:
               - headers:
@@ -179,14 +179,14 @@ jobs:
                     exact: "true"
               route:
               - destination:
-                  host: omobio-$svc-canary
+                  host: selfcare-$svc-canary
                   weight: 100
             - route:
               - destination:
-                  host: omobio-$svc-stable
+                  host: selfcare-$svc-stable
                   weight: $((100 - STEP))
               - destination:
-                  host: omobio-$svc-canary
+                  host: selfcare-$svc-canary
                   weight: $STEP
           EOF
           done
@@ -197,14 +197,14 @@ jobs:
           SERVICES: ${{ needs.preflight.outputs.services }}
         run: |
           for svc in $SERVICES; do
-            helm upgrade --install omobio-$svc-canary \
+            helm upgrade --install selfcare-$svc-canary \
               selfcare-platform/backend/deploy/helm/$svc \
               --namespace ${{ env.NAMESPACE }} \
               --set image.tag=${{ env.IMAGE_TAG }} \
-              --set image.repository=ghcr.io/omobio/$svc \
+              --set image.repository=ghcr.io/sangiya123/$svc \
               --set env=${{ env.REGION }} \
               --set replicaCount=2 \
-              --set fullnameOverride=omobio-$svc-canary \
+              --set fullnameOverride=selfcare-$svc-canary \
               --set canary.enabled=true \
               --wait --timeout 5m
           done
@@ -238,11 +238,11 @@ jobs:
           for svc in $SERVICES; do
             # Error rate: 5xx / total over last 5 minutes
             ERR=$(curl -sG "$PROM/api/v1/query" \
-              --data-urlencode "query=sum(rate(http_requests_total{service=\"omobio-$svc-canary\",status=~\"5..\"}[5m]))/sum(rate(http_requests_total{service=\"omobio-$svc-canary\"}[5m]))" \
+              --data-urlencode "query=sum(rate(http_requests_total{service=\"selfcare-$svc-canary\",status=~\"5..\"}[5m]))/sum(rate(http_requests_total{service=\"selfcare-$svc-canary\"}[5m]))" \
               | jq -r '.data.result[0].value[1] // "0"')
             # p99 latency seconds
             P99=$(curl -sG "$PROM/api/v1/query" \
-              --data-urlencode "query=histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"omobio-$svc-canary\"}[5m])))" \
+              --data-urlencode "query=histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"selfcare-$svc-canary\"}[5m])))" \
               | jq -r '.data.result[0].value[1] // "0"')
             echo "[$svc] err_rate=$ERR p99=${P99}s"
             # SLO: error rate < 0.5%, p99 < 1.5s
@@ -297,19 +297,19 @@ jobs:
           apiVersion: networking.istio.io/v1beta1
           kind: VirtualService
           metadata:
-            name: omobio-$svc-vs
+            name: selfcare-$svc-vs
             namespace: ${{ env.NAMESPACE }}
           spec:
             hosts:
-            - omobio-$svc
+            - selfcare-$svc
             http:
             - route:
               - destination:
-                  host: omobio-$svc-stable
+                  host: selfcare-$svc-stable
                   weight: 100
           EOF
             # Scale canary down
-            helm uninstall omobio-$svc-canary \
+            helm uninstall selfcare-$svc-canary \
               --namespace ${{ env.NAMESPACE }} || true
           done
 
@@ -360,16 +360,16 @@ jobs:
           for svc in $SERVICES; do
             echo "Promoting $svc to stable"
             # Update stable deployment
-            helm upgrade --install omobio-$svc \
+            helm upgrade --install selfcare-$svc \
               selfcare-platform/backend/deploy/helm/$svc \
               --namespace ${{ env.NAMESPACE }} \
               --set image.tag=${{ env.IMAGE_TAG }} \
-              --set image.repository=ghcr.io/omobio/$svc \
+              --set image.repository=ghcr.io/sangiya123/$svc \
               --set env=${{ env.REGION }} \
               --set replicaCount=3 \
               --wait --timeout 5m
             # Remove canary
-            helm uninstall omobio-$svc-canary \
+            helm uninstall selfcare-$svc-canary \
               --namespace ${{ env.NAMESPACE }} || true
           done
 

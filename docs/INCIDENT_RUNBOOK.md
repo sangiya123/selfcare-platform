@@ -1,6 +1,6 @@
-# Incident Response Runbook
+﻿# Incident Response Runbook
 
-This is the master runbook for the OMOBIO Selfcare Platform.
+This is the master runbook for the Selfcare Platform.
 
 For specific runbooks (widget timeout, admin auth outage, etc.), see
 [observability/runbooks/](../observability/runbooks/).
@@ -28,13 +28,13 @@ Every SEV-1 and SEV-2 has a designated incident commander. The IC:
 |---|---|---|
 | Slack `#platform-incidents` | Engineering | All incidents |
 | Slack `#platform-status` | Internal stakeholders | SEV-1, SEV-2 |
-| Email `status@omobio.io` | Tenant admins | SEV-1, SEV-2 |
+| Email `status@selfcare.io` | Tenant admins | SEV-1, SEV-2 |
 | Phone tree | Customer executives | SEV-1 only |
 
 ### Status updates
 
 Update the status page at least every 30 minutes during SEV-1/SEV-2:
-- https://status.omobio.io
+- https://status.selfcare.io
 
 ## First-responder checklist (SEV-1)
 

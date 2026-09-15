@@ -5,16 +5,16 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>platform-common</artifactId>
     <packaging>jar</packaging>
-    <name>OMOBIO Platform Common</name>
+    <name>selfcare Platform Common</name>
     <description>
-        Shared foundation for all OMOBIO selfcare platform services.
+        Shared foundation for all Selfcare platform services.
 
         Provides:
         - Tenant resolution and propagation (TenantContext, TenantResolverFilter)

@@ -1,5 +1,5 @@
 -- V2__offers.sql
--- OMOBIO Selfcare Platform — product-service
+-- Selfcare Platform — product-service
 -- Table: offers
 --
 -- A specific deal on a Product for a target segment or for a particular window.

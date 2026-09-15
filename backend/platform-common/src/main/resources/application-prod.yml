@@ -1,15 +1,15 @@
 # PRODUCTION profile overrides
-omobio:
+selfcare:
   security:
     cors:
-      allowed-origins: https://admin.omobio.io
+      allowed-origins: https://admin.selfcare.io
 
 otel:
   enabled: true
 
 logging:
   level:
-    com.omobio: INFO
+    com.selfcare: INFO
     org.springframework: WARN
     org.hibernate: WARN
   pattern:

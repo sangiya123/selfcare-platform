@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Theme Engine — Applies tenant design tokens at runtime.
  *
  * Tokens are resolved from:
- * 1. OMOBIO base tokens (defaults)
+ * 1. selfcare base tokens (defaults)
  * 2. Tenant theme overrides (from manifest.theme)
  * 3. Platform mode (light / dark)
  *
@@ -40,8 +40,8 @@ const BASE_TOKENS: ResolvedTheme = {
     },
     weights: { normal: 400, medium: 500, semibold: 600, bold: 700 },
   },
-  radius: tokens.borderRadius.lg,
-  spacing: tokens.spacing,
+  radius: `${tokens.borderRadius.lg}px`,
+  spacing: Object.values(tokens.spacing),
 };
 
 // ============================================================
@@ -75,11 +75,11 @@ export function applyTheme(tenantTheme: ThemeTokens | null | undefined): Resolve
 export function resolveDarkTheme(light: ResolvedTheme): ResolvedTheme {
   const darkColors: Record<string, string> = {};
   Object.entries(light.colors).forEach(([k, v]) => {
-    // Naive inversion — replace white surfaces with dark equivalents
-    if (v === '#FFFFFF' || v === '#F7F5FB') {
+    // Naive inversion — replace white/surface colors with dark equivalents
+    if (v === '#FFFFFF') {
       darkColors[k] = '#17141F';
-    } else if (v === '#FFFFFF' || v === '#FFFFFF') {
-      darkColors[k] = '#1B1B1B';
+    } else if (v === '#F7F5FB') {
+      darkColors[k] = '#1F1B2A';
     } else {
       darkColors[k] = v;
     }

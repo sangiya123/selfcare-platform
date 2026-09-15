@@ -1,4 +1,4 @@
-# GitHub Actions workflow for security scanning — SBOM, dependency, and container image scanning.
+﻿# GitHub Actions workflow for security scanning — SBOM, dependency, and container image scanning.
 # Runs on every push to main and on PRs against main.
 # Does NOT run unit tests or build — those are handled by backend-ci.yml, admin-ci.yml, mobile-ci.yml.
 name: Security Scan
@@ -238,7 +238,7 @@ jobs:
           context: selfcare-platform/backend/api-gateway
           push: false
           load: true
-          tags: omobio-test-image:latest
+          tags: selfcare-test-image:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -261,7 +261,7 @@ jobs:
             --ignore-unfixed \
             --format json \
             --output sbom/image-scan.json \
-            omobio-test-image:latest || trivy_exit=$?
+            selfcare-test-image:latest || trivy_exit=$?
 
           # Allow exit code 1 (vulnerabilities found) but not other errors
           if [ "${trivy_exit:-0}" -eq 1 ]; then

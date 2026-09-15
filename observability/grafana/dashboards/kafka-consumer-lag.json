@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Kafka Consumer Lag",
-  "uid": "omobio-kafka-consumer-lag",
+﻿{
+  "title": "selfcare Kafka Consumer Lag",
+  "uid": "selfcare-kafka-consumer-lag",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Consumer lag, producer/consumer throughput, broker health, and rebalance monitoring for Kafka. Runbook: https://runbooks.omobio.local/kafka-lag",
-  "tags": ["omobio", "kafka", "lag", "messaging"],
+  "description": "Consumer lag, producer/consumer throughput, broker health, and rebalance monitoring for Kafka. Runbook: https://runbooks.selfcare.local/kafka-lag",
+  "tags": ["selfcare", "kafka", "lag", "messaging"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -77,7 +77,7 @@
       "id": 1,
       "type": "stat",
       "title": "Total Consumer Lag",
-      "description": "Aggregate lag across all consumer groups. Runbook: https://runbooks.omobio.local/kafka-lag",
+      "description": "Aggregate lag across all consumer groups. Runbook: https://runbooks.selfcare.local/kafka-lag",
       "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
       "datasource": "Prometheus",
       "targets": [

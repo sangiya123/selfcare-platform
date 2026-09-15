@@ -1,15 +1,15 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.omobio</groupId>
-    <artifactId>omobio-conformance-tests</artifactId>
+    <groupId>com.selfcare</groupId>
+    <artifactId>selfcare-conformance-tests</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>OMOBIO Conformance Test Suite</name>
-    <description>Comprehensive automated conformance tests for the OMOBIO Selfcare Platform covering all 11 testing layers</description>
+    <name>selfcare Conformance Test Suite</name>
+    <description>Comprehensive automated conformance tests for the Selfcare Platform covering all 11 testing layers</description>
 
     <properties>
         <java.version>21</java.version>
@@ -239,9 +239,9 @@
                         <suiteXmlFile>src/test/resources/testng.xml</suiteXmlFile>
                     </suiteXmlFiles>
                     <systemPropertyVariables>
-                        <omobio.base-url>${omobio.base-url:-http://localhost:8080}</omobio.base-url>
-                        <omobio.tenant>${omobio.tenant:-dialog-lk}</omobio.tenant>
-                        <omobio.admin-tenant>${omobio.admin-tenant:-aia-lk}</omobio.admin-tenant>
+                        <selfcare.base-url>${selfcare.base-url:-http://localhost:8080}</selfcare.base-url>
+                        <selfcare.tenant>${selfcare.tenant:-dialog-lk}</selfcare.tenant>
+                        <selfcare.admin-tenant>${selfcare.admin-tenant:-aia-lk}</selfcare.admin-tenant>
                         <wiremock.port>${wiremock.port:-8090}</wiremock.port>
                     </systemPropertyVariables>
                     <properties>
@@ -290,9 +290,9 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <omobio.base-url>http://localhost:8080</omobio.base-url>
-                <omobio.tenant>dialog-lk</omobio.tenant>
-                <omobio.admin-tenant>aia-lk</omobio.admin-tenant>
+                <selfcare.base-url>http://localhost:8080</selfcare.base-url>
+                <selfcare.tenant>dialog-lk</selfcare.tenant>
+                <selfcare.admin-tenant>aia-lk</selfcare.admin-tenant>
             </properties>
         </profile>
 
@@ -300,9 +300,9 @@
         <profile>
             <id>stg</id>
             <properties>
-                <omobio.base-url>${OMOBIO_BASE_URL:-https://staging.omobio.io}</omobio.base-url>
-                <omobio.tenant>${OMOBIO_TENANT:-dialog-lk}</omobio.tenant>
-                <omobio.admin-tenant>${OMOBIO_ADMIN_TENANT:-aia-lk}</omobio.admin-tenant>
+                <selfcare.base-url>${SELFCARE_BASE_URL:-https://staging.selfcare.io}</selfcare.base-url>
+                <selfcare.tenant>${SELFCARE_TENANT:-dialog-lk}</selfcare.tenant>
+                <selfcare.admin-tenant>${SELFCARE_ADMIN_TENANT:-aia-lk}</selfcare.admin-tenant>
             </properties>
         </profile>
 
@@ -310,9 +310,9 @@
         <profile>
             <id>pat</id>
             <properties>
-                <omobio.base-url>${OMOBIO_BASE_URL:-https://api.omobio.io}</omobio.base-url>
-                <omobio.tenant>${OMOBIO_TENANT:-dialog-lk}</omobio.tenant>
-                <omobio.admin-tenant>${OMOBIO_ADMIN_TENANT:-aia-lk}</omobio.admin-tenant>
+                <selfcare.base-url>${SELFCARE_BASE_URL:-https://api.selfcare.io}</selfcare.base-url>
+                <selfcare.tenant>${SELFCARE_TENANT:-dialog-lk}</selfcare.tenant>
+                <selfcare.admin-tenant>${SELFCARE_ADMIN_TENANT:-aia-lk}</selfcare.admin-tenant>
             </properties>
         </profile>
 

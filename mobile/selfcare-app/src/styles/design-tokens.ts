@@ -1,33 +1,42 @@
 /**
- * Design Tokens — Centralized design system.
+ * Design Tokens — Neutral fallback scale used only when no tenant theme has
+ * been published.
  *
- * Tokens are loaded from the tenant theme config and applied via StyleSheet.
- * Default tokens are OMOBIO base palette (deep purple/violet).
- * Operators can override via theme config.
+ * v6 rule: colors, typography, layout metrics and light/dark are NEVER
+ * hardcoded for a tenant. The full theme (brand colors, font sizes, header /
+ * footer / tab-bar metrics, dark mode) is authored in Selfcare Studio (admin
+ * portal), stored in Mongo and delivered to the app inside the compiled,
+ * signed Experience Manifest (ManifestTheme). Widgets read resolved tokens
+ * through `useTheme()` / `useThemeColors()` — never these raw constants.
+ *
+ * The palette below is intentionally neutral (near-black / grey / white) so a
+ * missing theme can never silently brand the product.
  */
 
 export const tokens = {
-  // Colors
+  // Colors — neutral fallback scale (no brand decision).
   colors: {
-    primary900: '#1B0B45',
-    primary700: '#3D126E',
-    primary500: '#6D28D9',
-    primary300: '#A78BFA',
-    accent500: '#C026D3',
-    accentGlow: '#E879F9',
+    primary900: '#171717',
+    primary700: '#262626',
+    primary500: '#404040',
+    primary300: '#A3A3A3',
+    accent500: '#525252',
+    accentGlow: '#A3A3A3',
     surface: '#FFFFFF',
-    surfaceSubtle: '#F7F5FB',
-    textPrimary: '#17141F',
-    textSecondary: '#6B6475',
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#3B82F6',
-    border: '#E5E7EB',
+    surfaceSubtle: '#F5F5F5',
+    textPrimary: '#171717',
+    textSecondary: '#737373',
+    textOnPrimary: '#FFFFFF',
+    success: '#16A34A',
+    warning: '#D97706',
+    error: '#DC2626',
+    info: '#2563EB',
+    border: '#E5E5E5',
+    shadow: '#000000',
     overlay: 'rgba(0, 0, 0, 0.5)',
   },
 
-  // Typography
+  // Typography — neutral fallback scale (theme overrides from manifest).
   fontSize: {
     xs: 12,
     sm: 14,
@@ -46,7 +55,7 @@ export const tokens = {
     bold: '700' as const,
   },
 
-  // Spacing
+  // Spacing — neutral fallback scale.
   spacing: {
     xs: 4,
     sm: 8,
@@ -57,7 +66,7 @@ export const tokens = {
     '3xl': 48,
   },
 
-  // Border radius
+  // Border radius — neutral fallback scale.
   borderRadius: {
     sm: 4,
     md: 8,
@@ -65,6 +74,21 @@ export const tokens = {
     xl: 16,
     '2xl': 24,
     full: 9999,
+  },
+
+  // Chrome layout metrics — neutral fallback (theme.layout from manifest wins).
+  layout: {
+    headerHeight: 56,
+    footerHeight: 60,
+    tabBarHeight: 60,
+    sectionGap: 16,
+    pagePadding: 16,
+    screenMargin: 12,
+    cardPadding: 16,
+    minTouchTarget: 44,
+    radius: 12,
+    hairlinePx: 1,
+    bubbleMaxWidthPct: 85,
   },
 
   // Elevation

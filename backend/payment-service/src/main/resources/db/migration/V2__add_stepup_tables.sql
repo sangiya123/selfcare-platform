@@ -1,5 +1,5 @@
 -- V2__add_stepup_tables.sql
--- OMOBIO Selfcare Platform — payment-service
+-- Selfcare Platform — payment-service
 -- Tables: step_up_request, step_up_verification
 --
 -- Security:

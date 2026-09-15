@@ -1,4 +1,4 @@
-# DB Connection Pool Exhaustion — Incident Runbook
+﻿# DB Connection Pool Exhaustion — Incident Runbook
 
 **Severity**: SEV-2  
 **Service**: Any Spring Boot service with MySQL/MongoDB  
@@ -22,11 +22,11 @@
 
 ```bash
 # Check which pods are restarting or have OOM
-kubectl -n omobio-prod get pods | grep -v Running | grep -v Completed
+kubectl -n selfcare-prod get pods | grep -v Running | grep -v Completed
 
 # Check DB connection metrics per service
-kubectl -n omobio-prod exec -it deploy/api-gateway -- curl localhost:8080/actuator/metrics/hikaricp.connections.active
-kubectl -n omobio-prod exec -it deploy/api-gateway -- curl localhost:8080/actuator/metrics/hikaricp.connections
+kubectl -n selfcare-prod exec -it deploy/api-gateway -- curl localhost:8080/actuator/metrics/hikaricp.connections.active
+kubectl -n selfcare-prod exec -it deploy/api-gateway -- curl localhost:8080/actuator/metrics/hikaricp.connections
 ```
 
 ### 2. Check MySQL max connections
@@ -52,7 +52,7 @@ LIMIT 20;
 ### 4. Check HikariCP pool config
 
 ```bash
-kubectl exec -it deploy/admin-identity-service -n omobio-prod -- \
+kubectl exec -it deploy/admin-identity-service -n selfcare-prod -- \
   curl localhost:8082/actuator/configprops | jq '.spring.datasource.hikari'
 ```
 
@@ -68,7 +68,7 @@ kubectl exec -it deploy/mysql -n database -- mysql -u root -p \
   -e "SET GLOBAL max_connections = 500;"
 
 # Restart affected pod to clear stale connections
-kubectl rollout restart deployment/<affected-service> -n omobio-prod
+kubectl rollout restart deployment/<affected-service> -n selfcare-prod
 ```
 
 ### Short-term (kill long-running queries)

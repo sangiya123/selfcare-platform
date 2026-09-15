@@ -1,7 +1,7 @@
-# Client Onboarding Guide
+﻿# Client Onboarding Guide
 
 This guide walks through bringing a new client (Dialog, Hutch, AIA, ...)
-onto the OMOBIO Selfcare Platform.
+onto the Selfcare Platform.
 
 ## Overview
 
@@ -54,8 +54,8 @@ In Kubernetes, create:
 
 For per-tenant isolation:
 ```sql
-CREATE DATABASE omobio_<client-id>;
-GRANT ALL ON omobio_<client-id>.* TO 'omobio'@'%';
+CREATE DATABASE selfcare_<client-id>;
+GRANT ALL ON selfcare_<client-id>.* TO 'selfcare'@'%';
 ```
 
 ## Phase 3: Provider integration (2-4 weeks)

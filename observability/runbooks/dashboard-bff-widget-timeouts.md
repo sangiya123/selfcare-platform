@@ -1,4 +1,4 @@
-# Runbook: Dashboard BFF Widget Timeouts
+﻿# Runbook: Dashboard BFF Widget Timeouts
 
 **Severity**: Warning
 **Service**: dashboard-bff
@@ -13,7 +13,7 @@ a partial response.
 ## Initial Triage
 
 1. **Check alert details** — which widget IDs are timing out?
-2. **Check Grafana dashboard** — `OMOBIO Dashboard BFF — Resilience`
+2. **Check Grafana dashboard** — `selfcare Dashboard BFF — Resilience`
 3. **Identify downstream** — each widget calls a specific downstream service
 4. **Check downstream health** — query the downstream service's health endpoint
 

@@ -60,15 +60,15 @@
     ]
   },
   "providerBindings": {
-    "AuthProvider": "com.omobio.providers.airtel.AirtelAuthProvider",
-    "ProfileProvider": "com.omobio.providers.airtel.AirtelProfileProvider",
-    "BalanceProvider": "com.omobio.providers.airtel.AirtelBalanceProvider",
-    "UsageProvider": "com.omobio.providers.airtel.AirtelUsageProvider",
-    "BillingProvider": "com.omobio.providers.airtel.AirtelBillingProvider",
-    "PaymentProvider": "com.omobio.providers.airtel.AirtelPaymentProvider",
-    "RechargeProvider": "com.omobio.providers.airtel.AirtelRechargeProvider",
-    "ProductCatalogProvider": "com.omobio.providers.airtel.AirtelProductCatalogProvider",
-    "NotificationProvider": "com.omobio.providers.airtel.AirtelNotificationProvider"
+    "AuthProvider": "com.selfcare.providers.airtel.AirtelAuthProvider",
+    "ProfileProvider": "com.selfcare.providers.airtel.AirtelProfileProvider",
+    "BalanceProvider": "com.selfcare.providers.airtel.AirtelBalanceProvider",
+    "UsageProvider": "com.selfcare.providers.airtel.AirtelUsageProvider",
+    "BillingProvider": "com.selfcare.providers.airtel.AirtelBillingProvider",
+    "PaymentProvider": "com.selfcare.providers.airtel.AirtelPaymentProvider",
+    "RechargeProvider": "com.selfcare.providers.airtel.AirtelRechargeProvider",
+    "ProductCatalogProvider": "com.selfcare.providers.airtel.AirtelProductCatalogProvider",
+    "NotificationProvider": "com.selfcare.providers.airtel.AirtelNotificationProvider"
   },
   "endpoints": {
     "auth": "https://auth.airtel.lk",

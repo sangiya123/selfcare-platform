@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# verify.sh — Quick smoke test that validates the local OMOBIO deployment
+﻿#!/usr/bin/env bash
+# verify.sh — Quick smoke test that validates the local selfcare deployment
 # Usage: ./scripts/verify.sh [api-gateway-url]
 #
 # Default URL: http://localhost:8080
@@ -10,7 +10,7 @@ URL="${1:-http://localhost:8080}"
 TENANT="dialog-lk"
 
 echo "=============================================="
-echo " OMOBIO Smoke Test"
+echo " selfcare Smoke Test"
 echo " URL    : $URL"
 echo " Tenant : $TENANT"
 echo "=============================================="
@@ -40,7 +40,7 @@ check "API Gateway metrics"    "$URL/actuator/prometheus"          "jvm_threads"
 check "API Gateway swagger"    "$URL/v3/api-docs"                  "openapi"
 
 # 2. Individual service health (via gateway routing)
-for SERVICE in config-tenant-service customer-identity-service account-entitlement-service dashboard-bff product-service usage-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service admin-identity-service; do
+for SERVICE in config-tenant-service customer-identity-service account-entitlement-service dashboard-bff product-service usage-service support-service billing-service payment-service notification-service content-service journey-service reporting-service ai-gateway audit-service insurance-service approval-service admin-identity-service; do
   # Each service exposes its own /actuator/health
   PORT=""
   case $SERVICE in
@@ -61,6 +61,7 @@ for SERVICE in config-tenant-service customer-identity-service account-entitleme
     audit-service) PORT=8095 ;;
     insurance-service) PORT=8096 ;;
     approval-service) PORT=8097 ;;
+    support-service) PORT=8098 ;;
   esac
   check "$SERVICE health" "http://localhost:$PORT/actuator/health" "UP"
 done
@@ -68,8 +69,8 @@ done
 # 3. Verify tenant config in MongoDB
 echo ""
 echo "=== MongoDB tenant config ==="
-docker exec omobio-mongodb mongosh --quiet \
-  mongodb://omobio:omobio_pw@localhost:27017/omobio_config?authSource=admin \
+docker exec selfcare-mongodb mongosh --quiet \
+  mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin \
   --eval "db.tenants.findOne({tenantId: 'dialog-lk'}, {displayName: 1, industry: 1, country: 1, currency: 1})" 2>/dev/null || echo "  (could not query MongoDB)"
 
 echo ""

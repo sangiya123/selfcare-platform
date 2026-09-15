@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Platform Overview",
-  "uid": "omobio-platform-overview",
+﻿{
+  "title": "selfcare Platform Overview",
+  "uid": "selfcare-platform-overview",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Platform-wide health, availability, and traffic overview for OMOBIO Selfcare Platform. See runbook: https://runbooks.omobio.local/platform-overview",
-  "tags": ["omobio", "platform", "overview", "health"],
+  "description": "Platform-wide health, availability, and traffic overview for Selfcare Platform. See runbook: https://runbooks.selfcare.local/platform-overview",
+  "tags": ["selfcare", "platform", "overview", "health"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -283,7 +283,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Error Rate by Service (5xx)",
-      "description": "5xx error rate per service. Runbook: https://runbooks.omobio.local/error-rate",
+      "description": "5xx error rate per service. Runbook: https://runbooks.selfcare.local/error-rate",
       "gridPos": { "x": 0, "y": 10, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

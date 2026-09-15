@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/widget-component.schema.json",
+  "$id": "https://selfcare.example.com/schemas/widget-component.schema.json",
   "title": "WidgetComponent",
-  "description": "Defines an individual widget component registered in the OMOBIO Selfcare Platform component registry. Covers props schema, data binding, actions, states, design tokens, accessibility semantics, analytics, and security classification.",
+  "description": "Defines an individual widget component registered in the Selfcare Platform component registry. Covers props schema, data binding, actions, states, design tokens, accessibility semantics, analytics, and security classification.",
   "type": "object",
   "required": [
     "schemaVersion",

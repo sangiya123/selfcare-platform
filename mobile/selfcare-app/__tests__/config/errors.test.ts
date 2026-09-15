@@ -1,11 +1,11 @@
-/**
- * errors.test.ts — verifies the OmobioError and ErrorCodes exports.
+﻿/**
+ * errors.test.ts — verifies the selfcareError and ErrorCodes exports.
  */
-import { OmobioError, ErrorCodes } from '../../src/config/errors';
+import { selfcareError, ErrorCodes } from '../../src/config/errors';
 
-describe('OmobioError', () => {
+describe('selfcareError', () => {
   it('carries code, message, and optional details', () => {
-    const err = new OmobioError('SOME_CODE', 'something failed', { foo: 'bar' });
+    const err = new selfcareError('SOME_CODE', 'something failed', { foo: 'bar' });
     expect(err.code).toBe('SOME_CODE');
     expect(err.message).toBe('something failed');
     expect(err.details).toEqual({ foo: 'bar' });
@@ -13,7 +13,7 @@ describe('OmobioError', () => {
   });
 
   it('omits details when not provided', () => {
-    const err = new OmobioError('CODE', 'msg');
+    const err = new selfcareError('CODE', 'msg');
     expect(err.details).toBeUndefined();
   });
 });

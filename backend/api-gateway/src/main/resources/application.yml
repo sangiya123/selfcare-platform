@@ -1,5 +1,5 @@
-# OMOBIO API Gateway — Base Configuration
-# Profile is activated by OMOBIO_ENV -> SPRING_PROFILES_ACTIVE
+# selfcare API Gateway — Base Configuration
+# Profile is activated by SELFCARE_ENV -> SPRING_PROFILES_ACTIVE
 # Environment-specific overrides live in application-{dev,stg,reg,prod}.yml
 
 spring:
@@ -12,309 +12,451 @@ spring:
 
   cloud:
     gateway:
-      # ----------------------------------------------------------------
-      # Global CORS — allows all origins for SPA / mobile clients.
-      # Specific operator CORS policies are enforced at config-tenant-service.
-      # ----------------------------------------------------------------
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOriginPatterns: "*"
-            allowedMethods: "*"
-            allowedHeaders: "*"
-            exposedHeaders:
-              - X-Correlation-Id
-              - X-Tenant-Id
-              - X-Config-Version
-            allowCredentials: true
-            maxAge: 3600
+      # NOTE: Spring Cloud Gateway 5.x binds gateway config under the
+      #       spring.cloud.gateway.server.webflux.* prefix. The legacy
+      #       spring.cloud.gateway.routes prefix is NO LONGER MIGRATED
+      #       (Gateway 5 removed GatewayServerWebfluxPropertiesMigrationListener),
+      #       so routes below MUST stay under server -> webflux.
 
-      # ----------------------------------------------------------------
-      # Service discovery — auto-routes for unregistered services.
-      # Explicit routes below are preferred; this is the fallback.
-      # ----------------------------------------------------------------
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-          predicates:
-            - name: Path
+      server:
+        webflux:
+          # ------------------------------------------------------------
+          # Global CORS — allows all origins for SPA / mobile clients.
+          # Specific operator CORS policies are enforced at config-tenant-service.
+          # ------------------------------------------------------------
+          globalcors:
+            corsConfigurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods: "*"
+                allowedHeaders: "*"
+                exposedHeaders:
+                  - X-Correlation-Id
+                  - X-Tenant-Id
+                  - X-Config-Version
+                allowCredentials: true
+                maxAge: 3600
+
+          # ------------------------------------------------------------
+          # Service discovery — auto-routes for unregistered services.
+          # Explicit routes below are preferred; this is the fallback.
+          # ------------------------------------------------------------
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+              predicates:
+                - name: Path
+                  args:
+                    pattern: "/{service}/**"
+              filters:
+                - RewritePath="/{service}/(?<segment>.*)", "/$\{segment}"
+
+          # ------------------------------------------------------------
+          # Default filters applied to ALL routes.
+          # GlobalFilter beans (JwtRateLimitExclusionFilter,
+          # JwtAuthenticationHeaderRelay) are registered automatically and
+          # run before per-route filters.
+          # ------------------------------------------------------------
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin
+            - name: Waf
               args:
-                pattern: "/{service}/**"
-          filters:
-            - RewritePath="/{service}/(?<segment>.*)", "/$\{segment}"
+                enabled: ${WAF_ENABLED:false}
 
-      # ----------------------------------------------------------------
-      # Default filters applied to ALL routes.
-      # GlobalFilter beans (JwtRateLimitExclusionFilter,
-      # JwtAuthenticationHeaderRelay) are registered automatically and
-      # run before per-route filters.
-      # ----------------------------------------------------------------
-      default-filters:
-        - DedupeResponseHeader=Access-Control-Allow-Origin
-        - name: Waf
-          args:
-            enabled: ${WAF_ENABLED:false}
+          # ------------------------------------------------------------
+          # Route definitions
+          # Filter order per route (top to bottom):
+          #   1. TenantRouting         — tenant validation + header propagation
+          #   2. RequestRateLimiter    — Redis-backed rate limiting (see redis config)
+          #   3. CircuitBreaker        — resilience4j circuit breaker (dashboard-bff only)
+          #   4. StripPrefix=0         — path is passed as-is to downstream
+          # ------------------------------------------------------------
+          routes:
 
-      # ----------------------------------------------------------------
-      # Route definitions
-      # Filter order per route (top to bottom):
-      #   1. TenantRouting         — tenant validation + header propagation
-      #   2. RequestRateLimiter    — Redis-backed rate limiting (see redis config)
-      #   3. CircuitBreaker        — resilience4j circuit breaker (dashboard-bff only)
-      #   4. StripPrefix=0         — path is passed as-is to downstream
-      # ----------------------------------------------------------------
-      routes:
+            # ==========================================================
+            # IDENTITY SERVICES
+            # ==========================================================
 
-        # ================================================================
-        # IDENTITY SERVICES
-        # ================================================================
+            - id: customer-identity
+              uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity-service:8082}
+              predicates:
+                - Path=/api/v1/auth/**
+              filters:
+                - name: TenantRouting
+                # Auth endpoints are EXCLUDED from rate limiting by
+                # JwtRateLimitExclusionFilter (global), not by the resolver here,
+                # because the resolver cannot know the path before routing.
+                # The exclusion filter short-circuits Redis token consumption.
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: customer-identity
-          uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity-service:8081}
-          predicates:
-            - Path=/api/v1/auth/**
-          filters:
-            - name: TenantRouting
-            # Auth endpoints are EXCLUDED from rate limiting by
-            # JwtRateLimitExclusionFilter (global), not by the resolver here,
-            # because the resolver cannot know the path before routing.
-            # The exclusion filter short-circuits Redis token consumption.
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: admin-identity
+              uri: ${ADMIN_IDENTITY_URL:http://admin-identity-service:8083}
+              predicates:
+                - Path=/api/v1/admin/auth/**,/api/v1/admin/users/**,/api/v1/admin/settings/auth/**,/api/v1/admin/mfa/**,/api/v1/admin/roles/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: admin-identity
-          uri: ${ADMIN_IDENTITY_URL:http://admin-identity-service:8082}
-          predicates:
-            - Path=/api/v1/admin/auth/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            # ==========================================================
+            # ADMIN CONFIG FAMILY (config-tenant-service hosts these)
+            # ==========================================================
 
-        # ================================================================
-        # EXPERIENCE / CONFIG
-        # ================================================================
+            - id: admin-config
+              uri: ${CONFIG_TENANT_URL:http://config-tenant-service:8081}
+              predicates:
+                - Path=/api/v1/admin/tenants/**,/api/v1/admin/themes/**,/api/v1/admin/pages/**,/api/v1/admin/feature-flags/**,/api/v1/admin/integrations/**,/api/v1/admin/navigation/**,/api/v1/admin/assets/**,/api/v1/admin/product-mapping/**,/api/v1/admin/components/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 500
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: config-tenant
-          uri: ${CONFIG_TENANT_URL:http://config-tenant-service:8083}
-          predicates:
-            - Path=/api/v1/config/**,/api/v1/themes/**,/api/v1/layouts/**,/api/v1/admin/feature-flags/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 200
-                redis-rate-limiter.burstCapacity: 500
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: admin-ai
+              uri: ${AI_GATEWAY_URL:http://ai-gateway:8094}
+              predicates:
+                - Path=/api/v1/admin/ai/**,/api/v1/admin/ai-governance/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        # ================================================================
-        # ACCOUNT / ENTITLEMENT
-        # ================================================================
+            - id: admin-audit
+              uri: ${AUDIT_SERVICE_URL:http://audit-service:8095}
+              predicates:
+                - Path=/api/v1/admin/audit/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 400
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: account-entitlement
-          uri: ${ACCOUNT_ENTITLEMENT_URL:http://account-entitlement-service:8084}
-          predicates:
-            - Path=/api/v1/accounts/**,/api/v1/connections/**,/api/v1/entitlements/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 300
-                redis-rate-limiter.burstCapacity: 600
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: admin-content
+              uri: ${CONTENT_SERVICE_URL:http://content-service:8091}
+              predicates:
+                - Path=/api/v1/admin/content/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 500
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        # ================================================================
-        # BFF — DASHBOARD
-        # ================================================================
+            - id: admin-journey
+              uri: ${JOURNEY_SERVICE_URL:http://journey-service:8092}
+              predicates:
+                - Path=/api/v1/admin/journeys/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: dashboard-bff
-          uri: ${DASHBOARD_BFF_URL:http://dashboard-bff:8085}
-          predicates:
-            - Path=/api/v1/dashboard/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 500
-                redis-rate-limiter.burstCapacity: 1000
-                key-resolver: "#{@tenantKeyResolver}"
-            - name: CircuitBreaker
-              args:
-                name: dashboardBff
-                fallbackUri: forward:/fallback/dashboard
-            - StripPrefix=0
+            - id: admin-reports
+              uri: ${REPORTING_SERVICE_URL:http://reporting-service:8093}
+              predicates:
+                - Path=/api/v1/admin/reports/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        # ================================================================
-        # CAPABILITY SERVICES
-        # ================================================================
+            - id: admin-token-policy
+              uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity-service:8082}
+              predicates:
+                - Path=/api/v1/admin/token-policy/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: product-service
-          uri: ${PRODUCT_SERVICE_URL:http://product-service:8086}
-          predicates:
-            - Path=/api/v1/products/**,/api/v1/catalog/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 200
-                redis-rate-limiter.burstCapacity: 400
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            # ==========================================================
+            # EXPERIENCE / CONFIG
+            # ==========================================================
 
-        - id: usage-service
-          uri: ${USAGE_SERVICE_URL:http://usage-service:8087}
-          predicates:
-            - Path=/api/v1/usage/**,/api/v1/balance/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 200
-                redis-rate-limiter.burstCapacity: 400
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: config-tenant
+              uri: ${CONFIG_TENANT_URL:http://config-tenant-service:8081}
+              predicates:
+                - Path=/api/v1/config/**,/api/v1/themes/**,/api/v1/layouts/**,/api/v1/admin/feature-flags/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 500
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: billing-service
-          uri: ${BILLING_SERVICE_URL:http://billing-service:8088}
-          predicates:
-            - Path=/api/v1/bills/**,/api/v1/invoices/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            # ==========================================================
+            # ACCOUNT / ENTITLEMENT
+            # ==========================================================
 
-        - id: payment-service
-          uri: ${PAYMENT_SERVICE_URL:http://payment-service:8089}
-          predicates:
-            - Path=/api/v1/payments/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: account-entitlement
+              uri: ${ACCOUNT_ENTITLEMENT_URL:http://account-entitlement-service:8084}
+              predicates:
+                - Path=/api/v1/accounts/**,/api/v1/connections/**,/api/v1/entitlements/**,/api/v1/me/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 300
+                    redis-rate-limiter.burstCapacity: 600
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: notification-service
-          uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8090}
-          predicates:
-            - Path=/api/v1/notifications/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 300
-                redis-rate-limiter.burstCapacity: 600
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            # ==========================================================
+            # BFF — DASHBOARD
+            # ==========================================================
 
-        - id: content-service
-          uri: ${CONTENT_SERVICE_URL:http://content-service:8091}
-          predicates:
-            - Path=/api/v1/content/**,/api/v1/articles/**,/api/v1/faqs/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 200
-                redis-rate-limiter.burstCapacity: 500
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: dashboard-bff
+              uri: ${DASHBOARD_BFF_URL:http://dashboard-bff:8085}
+              predicates:
+                - Path=/api/v1/dashboard/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 500
+                    redis-rate-limiter.burstCapacity: 1000
+                    key-resolver: "#{@tenantKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: dashboardBff
+                    fallbackUri: forward:/fallback/dashboard
+                - StripPrefix=0
 
-        - id: journey-service
-          uri: ${JOURNEY_SERVICE_URL:http://journey-service:8092}
-          predicates:
-            - Path=/api/v1/journeys/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            # ==========================================================
+            # CAPABILITY SERVICES
+            # ==========================================================
 
-        - id: reporting-service
-          uri: ${REPORTING_SERVICE_URL:http://reporting-service:8093}
-          predicates:
-            - Path=/api/v1/reports/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: product-service
+              uri: ${PRODUCT_SERVICE_URL:http://product-service:8086}
+              predicates:
+                - Path=/api/v1/products/**,/api/v1/catalog/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 400
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: ai-gateway
-          uri: ${AI_GATEWAY_URL:http://ai-gateway:8094}
-          predicates:
-            - Path=/api/v1/ai/**,/api/v1/assistant/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: usage-service
+              uri: ${USAGE_SERVICE_URL:http://usage-service:8087}
+              predicates:
+                - Path=/api/v1/usage/**,/api/v1/balance/**,/api/v1/credit-limit/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 400
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: audit-service
-          uri: ${AUDIT_SERVICE_URL:http://audit-service:8095}
-          predicates:
-            - Path=/api/v1/audit/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 200
-                redis-rate-limiter.burstCapacity: 400
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: support-service
+              uri: ${SUPPORT_SERVICE_URL:http://support-service:8098}
+              predicates:
+                - Path=/api/v1/support/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: approval-service
-          uri: ${APPROVAL_SERVICE_URL:http://approval-service:8096}
-          predicates:
-            - Path=/api/v1/admin/approvals/**
-          filters:
-            - name: TenantRouting
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@tenantKeyResolver}"
-            - StripPrefix=0
+            - id: billing-service
+              uri: ${BILLING_SERVICE_URL:http://billing-service:8088}
+              predicates:
+                - Path=/api/v1/bills/**,/api/v1/invoices/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        # ================================================================
-        # STRANGLER-FIG FALLBACK (Legacy PHP for unmigrated paths)
-        # ================================================================
+            - id: payment-service
+              uri: ${PAYMENT_SERVICE_URL:http://payment-service:8089}
+              predicates:
+                - Path=/api/v1/payments/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
 
-        - id: legacy-php-fallback
-          uri: ${LEGACY_PHP_URL:http://legacy-php.local:80}
-          predicates:
-            - Path=/legacy/**
-          filters:
-            - name: TenantRouting
-            - StripPrefix=1
-            # No rate limiter for legacy — PHP app handles its own throttling
-            # No circuit breaker — PHP fallback is best-effort
+            - id: notification-service
+              uri: ${NOTIFICATION_SERVICE_URL:http://notification-service:8090}
+              predicates:
+                - Path=/api/v1/notifications/**,/api/v1/admin/notifications/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 300
+                    redis-rate-limiter.burstCapacity: 600
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: content-service
+              uri: ${CONTENT_SERVICE_URL:http://content-service:8091}
+              predicates:
+                - Path=/api/v1/content/**,/api/v1/articles/**,/api/v1/faqs/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 500
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: journey-service
+              uri: ${JOURNEY_SERVICE_URL:http://journey-service:8092}
+              predicates:
+                - Path=/api/v1/journeys/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: reporting-service
+              uri: ${REPORTING_SERVICE_URL:http://reporting-service:8093}
+              predicates:
+                - Path=/api/v1/reports/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: ai-gateway
+              uri: ${AI_GATEWAY_URL:http://ai-gateway:8094}
+              predicates:
+                - Path=/api/v1/ai/**,/api/v1/assistant/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: audit-service
+              uri: ${AUDIT_SERVICE_URL:http://audit-service:8095}
+              predicates:
+                - Path=/api/v1/audit/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 200
+                    redis-rate-limiter.burstCapacity: 400
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: approval-service
+              uri: ${APPROVAL_SERVICE_URL:http://approval-service:8097}
+              predicates:
+                - Path=/api/v1/admin/approvals/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: insurance-service
+              uri: ${INSURANCE_SERVICE_URL:http://insurance-service:8096}
+              predicates:
+                - Path=/api/v1/insurance/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            - id: gdpr-customer
+              uri: ${CUSTOMER_IDENTITY_URL:http://customer-identity-service:8082}
+              predicates:
+                - Path=/api/v1/customer/**
+              filters:
+                - name: TenantRouting
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 200
+                    key-resolver: "#{@tenantKeyResolver}"
+                - StripPrefix=0
+
+            # ==========================================================
+            # STRANGLER-FIG FALLBACK (Legacy PHP for unmigrated paths)
+            # ==========================================================
+
+            - id: legacy-php-fallback
+              uri: ${LEGACY_PHP_URL:http://legacy-php.local:80}
+              predicates:
+                - Path=/legacy/**
+              filters:
+                - name: TenantRouting
+                - StripPrefix=1
+                # No rate limiter for legacy — PHP app handles its own throttling
+                # No circuit breaker — PHP fallback is best-effort
 
   # WebFlux base path is /; the gateway itself listens on the root context
   webflux:
@@ -327,7 +469,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
       database: ${REDIS_DATABASE:0}
       timeout: 2s
       ssl:
@@ -340,14 +482,14 @@ spring:
           max-wait: 1s
 
 # ================================================================
-# OMOBIO PLATFORM CONFIG
+# selfcare PLATFORM CONFIG
 # ================================================================
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${JWT_JWKS_URI:${CUSTOMER_IDENTITY_URL:http://customer-identity-service:8081}/.well-known/jwks.json}
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
       # Enable for local development to generate an ephemeral key pair.
       # Tokens from customer-identity and admin-identity will NOT validate
       # unless they also use the same key (only for local testing).
@@ -377,7 +519,7 @@ omobio:
     service-name: api-gateway
     endpoint: ${OTEL_ENDPOINT:http://localhost:4317}
   discovery:
-    provider: ${OMOBIO_DISCOVERY_PROVIDER:eureka}
+    provider: ${SELFCARE_DISCOVERY_PROVIDER:eureka}
 
 # ================================================================
 # RESILIENCE4J
@@ -475,7 +617,7 @@ server:
 # ================================================================
 logging:
   level:
-    com.omobio: ${LOG_LEVEL:INFO}
+    com.selfcare: ${LOG_LEVEL:INFO}
     org.springframework.cloud.gateway: INFO
     reactor.netty: INFO
   pattern:
@@ -503,7 +645,7 @@ spring:
       host: localhost
       port: 6379
 
-omobio:
+selfcare:
   discovery:
     provider: eureka
   security:

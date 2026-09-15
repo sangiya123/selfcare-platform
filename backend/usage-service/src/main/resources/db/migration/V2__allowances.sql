@@ -1,5 +1,5 @@
 -- V2__allowances.sql
--- OMOBIO Selfcare Platform — usage-service
+-- Selfcare Platform — usage-service
 -- Table: allowances
 --
 -- Per-connection bucket of data/voice/SMS allowance with expiry.

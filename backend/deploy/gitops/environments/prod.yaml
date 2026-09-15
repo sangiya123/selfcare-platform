@@ -13,7 +13,7 @@ env:
   ENV_PURPOSE: "Live customer-facing production deployment"
 
   # Cluster (per-region in real deployment; this is the template)
-  CLUSTER_URL: https://prod-lk.omobio.example.com
+  CLUSTER_URL: https://prod-lk.selfcare.example.com
   CLUSTER_NAME: prod-cluster
   CLUSTER_REGION: ap-southeast-1
   CLUSTER_ENVIRONMENT: prod
@@ -25,8 +25,8 @@ env:
   DEFAULT_IMAGE_TAG: ""  # Must be set explicitly per release
   DEFAULT_TARGET_REVISION: "tags/v*"  # Only release tags
   IMAGE_PULL_POLICY: IfNotPresent
-  IMAGE_REGISTRY: ghcr.io/omobio
-  IMAGE_REPOSITORY: omobio/selfcare-platform
+  IMAGE_REGISTRY: ghcr.io/sangiya123
+  IMAGE_REPOSITORY: sangiya123/selfcare-platform
   IMAGE_DIGEST_REQUIRED: "true"  # Must use digest, not tag
 
   # Auto-sync — DISABLED for prod

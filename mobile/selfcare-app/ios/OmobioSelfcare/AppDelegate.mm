@@ -1,4 +1,4 @@
-#import "AppDelegate.h"
+﻿#import "AppDelegate.h"
 #import <React/RCTBundleURLProvider.h>
 
 @implementation AppDelegate
@@ -6,7 +6,7 @@
 - (BOOL)application:(UIApplication *)application
   didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-  self.moduleName = @"OmobioSelfcare";
+  self.moduleName = @"selfcareSelfcare";
   self.initialProps = @{};
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];

@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/component-registry.schema.json",
+  "$id": "https://selfcare.example.com/schemas/component-registry.schema.json",
   "title": "ComponentRegistry",
-  "description": "Master registry of all widget components available to the OMOBIO Selfcare Platform client renderers. Aggregates component metadata, platform compatibility, minimum client renderer version requirements, and approval status.",
+  "description": "Master registry of all widget components available to the Selfcare Platform client renderers. Aggregates component metadata, platform compatibility, minimum client renderer version requirements, and approval status.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -172,7 +172,7 @@
         },
         "schemaRef": {
           "type": "string",
-          "description": "URI reference to the props schema (e.g. 'https://omobio.example.com/schemas/widget-component.schema.json#/properties/propsSchema')"
+          "description": "URI reference to the props schema (e.g. 'https://selfcare.example.com/schemas/widget-component.schema.json#/properties/propsSchema')"
         },
         "securityClassification": {
           "type": "string",

@@ -1,4 +1,4 @@
-# ADR-010: Data Storage Decisions
+﻿# ADR-010: Data Storage Decisions
 
 ## Status
 Accepted — 2026-09-03
@@ -33,8 +33,8 @@ requirements. We need a clear, per-data-type storage strategy.
 
 - **MySQL tables**: snake_case, all tables have `tenant_id` (NOT NULL), `created_at`, `updated_at`
 - **MongoDB collections**: snake_case, all documents have `tenantId`, `_id` is UUID string
-- **Redis keys**: `omobio:{tenantId}:{domain}:{key}`
-- **Kafka topics**: `omobio.{domain}.{event-name}.v1`
+- **Redis keys**: `selfcare:{tenantId}:{domain}:{key}`
+- **Kafka topics**: `selfcare.{domain}.{event-name}.v1`
 
 ## Migrations
 - **Flyway** for MySQL (V{n}__{name}.sql)

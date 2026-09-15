@@ -1,13 +1,15 @@
-# OMOBIO Insurance Service
+# selfcare Insurance Service
 spring:
+  main:
+    web-application-type: servlet
   application:
     name: insurance-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&serverTimezone=UTC
-    username: ${DB_USERNAME:omobio}
-    password: ${DB_PASSWORD:omobio_pw}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:selfcare_core}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:selfcare}
+    password: ${DB_PASSWORD:Selfcare_My5ql_Db_Pa55w0rd!2026}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -18,16 +20,12 @@ spring:
         format_sql: false
     open-in-view: false
   mongodb:
-    host: ${MONGO_HOST:localhost}
-    port: ${MONGO_PORT:27017}
-    database: ${MONGO_DATABASE:omobio_config}
-    username: ${MONGO_USERNAME:omobio}
-    password: ${MONGO_PASSWORD:changeme}
+    uri: mongodb://${MONGO_USERNAME:selfcare}:${MONGO_PASSWORD:Selfcare_M0ng0_Db_Pa55w0rd!2026}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:selfcare_config}?authSource=admin
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:omobio_pw}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
 
@@ -42,16 +40,16 @@ management:
 
 logging:
   level:
-    com.omobio: ${LOG_LEVEL:INFO}
+    com.selfcare: ${LOG_LEVEL:INFO}
   pattern:
     level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
 
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
   otel:
     enabled: ${OTEL_ENABLED:false}
     service-name: insurance-service

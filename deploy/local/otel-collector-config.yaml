@@ -15,7 +15,7 @@ receivers:
   prometheus:
     config:
       scrape_configs:
-        - job_name: 'omobio-services'
+        - job_name: 'selfcare-services'
           metrics_path: /actuator/prometheus
           static_configs:
             - targets:
@@ -52,7 +52,7 @@ processors:
   resource:
     attributes:
       - key: service.namespace
-        value: omobio
+        value: selfcare
         action: upsert
       - key: deployment.environment
         value: dev
@@ -68,10 +68,10 @@ processors:
 exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
-    namespace: omobio
+    namespace: selfcare
     const_labels:
       env: dev
-      platform: omobio-selfcare
+      platform: selfcare
     send_timestamps: true
     metric_expiration: 5m
     add_metric_suffixes: true

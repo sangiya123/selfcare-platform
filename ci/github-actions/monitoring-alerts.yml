@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Monitoring & Alerting Pipeline
+﻿# Selfcare Platform — Monitoring & Alerting Pipeline
 #
 # Continuous monitoring job that:
 #   - Validates Sentry / Grafana / Prometheus are receiving data from prod
@@ -148,7 +148,7 @@ jobs:
           AWS_DEFAULT_REGION: eu-west-1
         run: |
           aws s3 cp slo-output/snapshot.json \
-            s3://omobio-slo-snapshots/$(date -u +%Y/%m/%d)/snapshot-${{ github.run_id }}.json
+            s3://selfcare-slo-snapshots/$(date -u +%Y/%m/%d)/snapshot-${{ github.run_id }}.json
 
       - name: Alert on SLO violation
         env:
@@ -275,7 +275,7 @@ jobs:
             echo "::warning::SENTRY_DSN not configured"
             exit 0
           fi
-          curl -XPOST "https://sentry.io/api/0/projects/omobio/selfcare-platform/events/" \
+          curl -XPOST "https://sentry.io/api/0/projects/selfcare/selfcare-platform/events/" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
             -d '{

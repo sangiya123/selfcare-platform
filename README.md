@@ -1,6 +1,6 @@
-# OMOBIO Selfcare Platform — Local Deployment
+# Selfcare Platform — Local Deployment
 
-This guide covers running the full OMOBIO platform locally on Docker Desktop.
+This guide covers running the full selfcare platform locally on Docker Desktop.
 
 ## Prerequisites
 
@@ -53,11 +53,11 @@ Once running, the platform is accessible at:
 |---|---|---|
 | **API Gateway** | http://localhost:8080 | All requests enter here |
 | **Swagger UI** | http://localhost:8080/swagger-ui.html | Auto-generated API docs |
-| **Grafana** | http://localhost:3000 | admin/admin |
+| **Grafana** | http://localhost:3000 | admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026 |
 | **Prometheus** | http://localhost:9090 | Metrics & alerts |
-| **MongoDB** | localhost:27017 | omobio / omobio_pw |
-| **MySQL** | localhost:3306 | omobio / omobio_pw |
-| **Redis** | localhost:6379 | password: omobio_pw |
+| **MongoDB** | localhost:27017 | selfcare / Selfcare_M0ng0_Db_Pa55w0rd!2026 |
+| **MySQL** | localhost:3306 | selfcare / Selfcare_My5ql_Db_Pa55w0rd!2026 |
+| **Redis** | localhost:6379 | password: Selfcare_R3d1s_Pa55w0rd!2026 |
 | **Kafka** | localhost:9092 | |
 
 For Kubernetes, replace `localhost:8080` with `localhost:30080`, etc.
@@ -67,7 +67,7 @@ For Kubernetes, replace `localhost:8080` with `localhost:30080`, etc.
 | Service | Gateway route | Local port |
 |---|---|---|
 | API Gateway | http://localhost:30080 | 80 → 8080 |
-| Admin portal (Selfcare Studio) | http://localhost:30081 | 80 |
+| Admin portal (selfcare Studio) | http://localhost:30081 | 80 |
 | Customer Identity (auth/OTP/JWKS) | http://localhost:30080/api/v1/auth/** | 8081 |
 | Admin Identity (SAML/RBAC login) | http://localhost:30080/api/v1/admin/** | 8082 |
 | Config Tenant (tenant config) | http://localhost:30080/api/v1/config/** | 8083 |
@@ -85,14 +85,14 @@ For Kubernetes, replace `localhost:8080` with `localhost:30080`, etc.
 | Audit | http://localhost:30080/api/v1/audit/** | 8095 |
 | Insurance | http://localhost:30080/api/v1/insurance/** | 8096 |
 | Approval | http://localhost:30080/api/v1/approval/** | 8097 |
-| Grafana | http://localhost:30300 | admin / admin |
+| Grafana | http://localhost:30300 | admin / Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026 |
 | Prometheus | http://localhost:30090 | |
 
 Direct per-service access (port-forward):
 
 ```bash
-kubectl port-forward -n omobio svc/customer-identity-service 8081:8081
-kubectl port-forward -n omobio svc/product-service 8086:8086
+kubectl port-forward -n selfcare svc/customer-identity-service 8081:8081
+kubectl port-forward -n selfcare svc/product-service 8086:8086
 ```
 
 ## Tenant: dialog-lk
@@ -140,21 +140,21 @@ docker compose logs -f payment-service
 docker compose restart api-gateway
 
 # Open a shell in a container
-docker exec -it omobio-mongodb mongosh
-docker exec -it omobio-mysql mysql -uomobio -pomobio_pw
+docker exec -it selfcare-mongodb mongosh
+docker exec -it selfcare-mysql mysql -uselfcare -pSelfcare_My5ql_Db_Pa55w0rd!2026
 
 # Check tenant config
-docker exec -it omobio-mongodb mongosh \
-  mongodb://omobio:omobio_pw@localhost:27017/omobio_config?authSource=admin \
+docker exec -it selfcare-mongodb mongosh \
+  mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin \
   --eval "db.tenants.find().pretty()"
 
 # Tear down everything
 docker compose down -v
 
 # Kubernetes equivalents
-kubectl get pods -n omobio
-kubectl logs -n omobio -l app=api-gateway
-kubectl port-forward -n omobio svc/api-gateway 8080:8080
+kubectl get pods -n selfcare
+kubectl logs -n selfcare -l app=api-gateway
+kubectl port-forward -n selfcare svc/api-gateway 8080:8080
 ```
 
 ## Health Checks
@@ -173,12 +173,12 @@ Each service exposes Spring Actuator endpoints:
 ### "Cannot connect to MongoDB"
 ```bash
 docker compose logs mongodb
-docker exec omobio-mongodb mongosh --eval "db.adminCommand('ping')"
+docker exec selfcare-mongodb mongosh --eval "db.adminCommand('ping')"
 ```
 
 > **Spring Boot 4.1.1 note:** the MongoDB property prefix is `spring.mongodb.*`,
 > not `spring.data.mongodb.*`. Config is injected cluster-wide from the
-> `omobio-config` ConfigMap (SPRING_MONGODB_HOST / _PORT / _URI / ...). If pods
+> `selfcare-config` ConfigMap (SPRING_MONGODB_HOST / _PORT / _URI / ...). If pods
 > log `hosts=[localhost:27017]`, those env keys are missing from the ConfigMap.
 
 ### "API Gateway returns 502"

@@ -60,15 +60,15 @@
     ]
   },
   "providerBindings": {
-    "AuthProvider": "com.omobio.providers.hutch.HutchAuthProvider",
-    "ProfileProvider": "com.omobio.providers.hutch.HutchProfileProvider",
-    "BalanceProvider": "com.omobio.providers.hutch.HutchBalanceProvider",
-    "UsageProvider": "com.omobio.providers.hutch.HutchUsageProvider",
-    "BillingProvider": "com.omobio.providers.hutch.HutchBillingProvider",
-    "PaymentProvider": "com.omobio.providers.hutch.HutchPaymentProvider",
-    "RechargeProvider": "com.omobio.providers.hutch.HutchRechargeProvider",
-    "ProductCatalogProvider": "com.omobio.providers.hutch.HutchProductCatalogProvider",
-    "NotificationProvider": "com.omobio.providers.hutch.HutchNotificationProvider"
+    "AuthProvider": "com.selfcare.providers.hutch.HutchAuthProvider",
+    "ProfileProvider": "com.selfcare.providers.hutch.HutchProfileProvider",
+    "BalanceProvider": "com.selfcare.providers.hutch.HutchBalanceProvider",
+    "UsageProvider": "com.selfcare.providers.hutch.HutchUsageProvider",
+    "BillingProvider": "com.selfcare.providers.hutch.HutchBillingProvider",
+    "PaymentProvider": "com.selfcare.providers.hutch.HutchPaymentProvider",
+    "RechargeProvider": "com.selfcare.providers.hutch.HutchRechargeProvider",
+    "ProductCatalogProvider": "com.selfcare.providers.hutch.HutchProductCatalogProvider",
+    "NotificationProvider": "com.selfcare.providers.hutch.HutchNotificationProvider"
   },
   "endpoints": {
     "auth": "https://auth.hutch.lk",

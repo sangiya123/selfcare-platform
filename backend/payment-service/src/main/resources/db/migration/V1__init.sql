@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — payment-service
+-- Selfcare Platform — payment-service
 -- Tables: payment_methods, payment_transactions
 --
 -- Security:

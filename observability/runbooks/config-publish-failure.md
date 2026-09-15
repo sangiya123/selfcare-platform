@@ -1,4 +1,4 @@
-# Runbook: Config Publish Failure
+﻿# Runbook: Config Publish Failure
 
 ## Symptoms
 - Admin sees "publish failed" in Selfcare Studio
@@ -10,7 +10,7 @@
 1. **What's the error message?**
    - Check config-tenant-service logs:
      ```bash
-     kubectl -n omobio-prod logs -l app=config-tenant-service --since=10m | grep -i compile
+     kubectl -n selfcare-prod logs -l app=config-tenant-service --since=10m | grep -i compile
      ```
 
 2. **Was a new component introduced?**

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App identity -->
-    <string name="app_name">OMOBIO Selfcare</string>
-    <string name="app_subtitle">Powered by OMOBIO</string>
+    <string name="app_name">My Dialog</string>
+    <string name="app_subtitle">My Dialog by Dialog Axiata</string>
 
     <!-- Network security config -->
     <string name="network_security_config">network_security_config</string>

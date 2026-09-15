@@ -1,8 +1,8 @@
-# ADR-008: Partial Dashboard Response
+﻿# ADR-008: Partial Dashboard Response
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 
@@ -33,7 +33,7 @@ breakers, a single slow downstream can stall the entire dashboard.
 ```json
 {
   "data": {
-    "correlationId": "omobio-a1b2c3d4",
+    "correlationId": "selfcare-a1b2c3d4",
     "elapsedMs": 412,
     "overallStatus": "PARTIAL",
     "widgets": {
@@ -104,7 +104,7 @@ dashboard reload.
 ## Configuration
 
 ```yaml
-omobio:
+selfcare:
   dashboard:
     overall-deadline-ms: 500      # hard deadline for the whole dashboard
     default-widget-timeout-ms: 300 # per-widget timeout

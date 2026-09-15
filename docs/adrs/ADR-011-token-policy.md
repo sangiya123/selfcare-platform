@@ -1,8 +1,8 @@
-# ADR-011: Token Lifecycle, Replay Prevention, and Per-Tenant TTL Policy
+﻿# ADR-011: Token Lifecycle, Replay Prevention, and Per-Tenant TTL Policy
 
 **Status**: ACCEPTED (resolves prior OPEN review)
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council, Security Team, Product
+**Deciders**: selfcare Architecture Council, Security Team, Product
 
 ## Context
 
@@ -44,7 +44,7 @@ threat model. This revision **resolves** the OPEN status.
 
 ```
 Access Token (JWT, RS256 signed)
-├── iss: omobio-platform
+├── iss: selfcare-platform
 ├── sub: connectionId
 ├── aud: tenantId
 ├── tenantId: dialog-lk
@@ -145,7 +145,7 @@ The policy is a MongoDB document in the `tenant_config` collection:
   justification: null,                 // required if TTL > defaults
   policyVersion: 3,
   updatedAt: ISODate(),
-  updatedBy: "admin@omobio"
+  updatedBy: "admin@selfcare"
 }
 ```
 
@@ -164,7 +164,7 @@ For tenants that want the 42d/7mo policy:
   justification: "Long-lived policy clients expect infrequent re-auth; mandatory device binding + rotation are enforced.",
   policyVersion: 1,
   updatedAt: ISODate(),
-  updatedBy: "ciso@omobio"
+  updatedBy: "ciso@selfcare"
 }
 ```
 
@@ -261,7 +261,7 @@ To detect unauthorized refresh token theft (e.g. man-in-the-middle):
 
 ```
 Access Token (JWT, RS256 signed)
-├── iss: omobio-platform
+├── iss: selfcare-platform
 ├── sub: connectionId
 ├── aud: tenantId
 ├── tenantId: dialog-lk

@@ -11,9 +11,9 @@ spring:
   # DATABASE (MySQL / JPA)
   # ============================================================
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_selfcare}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DB_USERNAME:omobio}
-    password: ${DB_PASSWORD:changeme}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:selfcare_core}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:selfcare}
+    password: ${DB_PASSWORD:Selfcare_My5ql_Db_Pa55w0rd!2026}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:20}
@@ -37,8 +37,9 @@ spring:
 # ============================================================
 # MONGODB
 # ============================================================
+spring.mongodb:
+  uri: mongodb://${MONGO_USERNAME:selfcare}:${MONGO_PASSWORD:Selfcare_M0ng0_Db_Pa55w0rd!2026}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:selfcare_config}?authSource=admin
 spring.data.mongodb:
-  uri: mongodb://${MONGO_USERNAME:omobio}:${MONGO_PASSWORD:changeme}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:omobio_config}?authSource=admin
   auto-index-creation: true
 
 # ============================================================
@@ -47,7 +48,7 @@ spring.data.mongodb:
 spring.data.redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:}
+  password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
   timeout: 2000ms
   lettuce:
     pool:
@@ -80,18 +81,18 @@ spring.kafka:
 # TenantConfigurationService and admin Studio Integrations page)
 # ============================================================
 # No client-specific URLs/credentials here. To configure a client,
-# use the Selfcare Studio admin portal: Integrations > <client>.
+# use the selfcare Studio admin portal: Integrations > <client>.
 # At runtime, the TenantConfigurationService loads the config from
 # MongoDB and the industry-pack provider beans read it via the service.
 #
 # Default tenant for local dev (optional — used by services that
 # need a fallback when no DB entry exists).
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${JWT_JWKS_URI:${CUSTOMER_IDENTITY_URL:http://customer-identity:8080}/.well-known/jwks.json}
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_SECONDS:86400}
       refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL_SECONDS:2592000}
     cors:
@@ -173,7 +174,7 @@ otel:
 # ============================================================
 logging:
   level:
-    com.omobio: ${LOG_LEVEL:INFO}
+    com.selfcare: ${LOG_LEVEL:INFO}
     org.springframework: WARN
     org.hibernate: WARN
   pattern:

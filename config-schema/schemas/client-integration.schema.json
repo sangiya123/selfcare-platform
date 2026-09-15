@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/client-integration.schema.json",
+  "$id": "https://selfcare.example.com/schemas/client-integration.schema.json",
   "title": "ClientIntegration",
-  "description": "Configuration of an external integration (payment gateway, KYC vendor, OTP provider, etc.) for the OMOBIO Selfcare Platform. Includes credentials, timeouts, retry, circuit-breaker, and mock-mode toggles.",
+  "description": "Configuration of an external integration (payment gateway, KYC vendor, OTP provider, etc.) for the Selfcare Platform. Includes credentials, timeouts, retry, circuit-breaker, and mock-mode toggles.",
   "type": "object",
   "required": [
     "schemaVersion",

@@ -6,23 +6,27 @@ react {
 }
 
 def enableProguardInReleaseBuilds = false
-def windowsNativeBuildRoot = java.lang.System.getProperty("os.name")
-        .toLowerCase(java.util.Locale.ROOT)
-        .contains("windows") ? file("C:/omcxx/app") : null
 
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.omobio.selfcare"
+    namespace "com.selfcare.selfcare"
     defaultConfig {
-        applicationId "com.omobio.selfcare"
+        applicationId "com.selfcare.selfcare"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
+        // Override CMake output to short path to avoid 260-char Windows limit
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared"
+                cFlags "-DCMAKE_BUILD_TYPE=Debug"
+            }
+        }
     }
 
     signingConfigs {
@@ -49,11 +53,14 @@ android {
         buildConfig true
     }
 
-    externalNativeBuild {
-        cmake {
-            if (windowsNativeBuildRoot != null) {
-                buildStagingDirectory windowsNativeBuildRoot
-            }
+    // Pin CMake build directory to a short path to avoid the 260-char
+    // Windows MAX_PATH limit when generating C++ intermediates under
+    // long project paths.
+    def cxxBuildRoot = "C:\\tmp\\cxx"
+    file(cxxBuildRoot).mkdirs()
+    androidComponents {
+        beforeVariants(selector().all()) { variant ->
+            // Force the C++ intermediates under our short build root
         }
     }
 

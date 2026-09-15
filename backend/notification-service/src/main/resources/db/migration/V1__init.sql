@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — notification-service
+-- Selfcare Platform — notification-service
 -- Tables: notifications
 --
 -- NotificationTemplate (MongoDB) and Notification (MySQL).

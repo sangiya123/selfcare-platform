@@ -3,8 +3,8 @@ spring:
     name: reporting-service
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:selfcare_reporting}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
+    username: ${DB_USER:selfcare}
+    password: ${DB_PASSWORD:Selfcare_My5ql_Db_Pa55w0rd!2026}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -39,7 +39,7 @@ spring:
 server:
   port: ${SERVER_PORT:8093}
 
-omobio:
+selfcare:
   reporting:
     output-dir: ${REPORT_OUTPUT_DIR:/tmp/reports}
     max-rows-per-report: 1000000
@@ -51,7 +51,7 @@ omobio:
 
 logging:
   level:
-    com.omobio.reporting: ${LOG_LEVEL:INFO}
+    com.selfcare.reporting: ${LOG_LEVEL:INFO}
     org.springframework.scheduling: INFO
   pattern:
     level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"

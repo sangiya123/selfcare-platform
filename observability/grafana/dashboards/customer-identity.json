@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Customer Identity Service",
-  "uid": "omobio-customer-identity",
+﻿{
+  "title": "selfcare Customer Identity Service",
+  "uid": "selfcare-customer-identity",
   "schemaVersion": 39,
   "version": 1,
-  "description": "OTP, login, MFA, JWT and session metrics for the customer-identity-service. Runbook: https://runbooks.omobio.local/customer-identity",
-  "tags": ["omobio", "customer-identity", "auth", "mfa"],
+  "description": "OTP, login, MFA, JWT and session metrics for the customer-identity-service. Runbook: https://runbooks.selfcare.local/customer-identity",
+  "tags": ["selfcare", "customer-identity", "auth", "mfa"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -266,7 +266,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Login Success vs Failure",
-      "description": "Authentications by outcome. Runbook: https://runbooks.omobio.local/login-failures",
+      "description": "Authentications by outcome. Runbook: https://runbooks.selfcare.local/login-failures",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

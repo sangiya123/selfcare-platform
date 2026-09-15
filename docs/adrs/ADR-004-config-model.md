@@ -1,8 +1,8 @@
-# ADR-004: MongoDB as Config Source of Truth
+﻿# ADR-004: MongoDB as Config Source of Truth
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 

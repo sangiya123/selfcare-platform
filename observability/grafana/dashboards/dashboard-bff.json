@@ -1,9 +1,9 @@
-{
-  "title": "OMOBIO Dashboard BFF — Resilience",
-  "uid": "omobio-dashboard-bff-resilience",
+﻿{
+  "title": "selfcare Dashboard BFF — Resilience",
+  "uid": "selfcare-dashboard-bff-resilience",
   "schemaVersion": 39,
   "version": 1,
-  "tags": ["omobio", "dashboard-bff", "resilience"],
+  "tags": ["selfcare", "dashboard-bff", "resilience"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {

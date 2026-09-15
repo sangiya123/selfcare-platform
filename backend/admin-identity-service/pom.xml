@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>admin-identity-service</artifactId>
@@ -12,7 +12,7 @@
     <description>Internal admin authentication: SAML, MFA, RBAC, audit.</description>
     <dependencies>
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
         </dependency>
         <dependency>
@@ -66,6 +66,12 @@
             <groupId>dev.samstevens.totp</groupId>
             <artifactId>totp</artifactId>
             <version>1.7.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- QR code generation for MFA setup -->

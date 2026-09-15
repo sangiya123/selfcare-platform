@@ -1,0 +1,42 @@
+﻿// ============================================================================
+// Selfcare — DEV train (wrapper)
+// ============================================================================
+// Pins DEPLOY_ENV=dev. All QA/security/scan flows OFF.
+// Just: Compile → Docker Build+Push → Deploy DEV → Smoke.
+//
+// Point a Jenkins job at: ci/jenkins/Jenkinsfile.dev
+// ============================================================================
+
+def masterJob = env.SELFCARE_SELF_CARE_MASTER_JOB ?: 'selfcare-Selfcare-Platform'
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+        githubPush()
+    }
+
+    stages {
+        stage('Trigger Dev') {
+            steps {
+                build job: masterJob, wait: true, propagate: true,
+                    parameters: [
+                        choice(name: 'DEPLOY_ENV', choices: ['dev']),
+                        string(name: 'RELEASE_TAG', value: ''),
+                        booleanParam(name: 'FORCE_QA', value: false),
+                        booleanParam(name: 'FORCE_SECURITY', value: false),
+                        booleanParam(name: 'SKIP_DEPLOY', value: false)
+                    ]
+            }
+        }
+    }
+
+    post { failure { echo 'DEV train failed — check selfcare-Selfcare-Platform build.' } }
+}

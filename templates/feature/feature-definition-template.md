@@ -1,4 +1,4 @@
-# Feature Definition — <Feature name>
+﻿# Feature Definition — <Feature name>
 
 | Field | Value |
 |---|---|
@@ -84,7 +84,7 @@ High-level design (1-2 paragraphs). Reference design docs and PRs.
 
 ## Rollout
 
-- **Feature flag:** `omobio.feature.<feature-name>` (default OFF)
+- **Feature flag:** `selfcare.feature.<feature-name>` (default OFF)
 - **Canary cohort:** internal users → 5% → 25% → 100%
 - **Rollback:** set flag to OFF
 - **Telemetry:** events to track, dashboards to add

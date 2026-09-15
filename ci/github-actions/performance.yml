@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — k6 Performance Tests CI
+﻿# Selfcare Platform — k6 Performance Tests CI
 #
 # Runs the k6 performance test suite against stg environment on:
 #   - Pull requests that touch backend/ or config-tenant-service/
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
 
 env:
-  API_GATEWAY: ${{ secrets.PERF_API_GATEWAY || 'http://api.stg.omobio.io' }}
+  API_GATEWAY: ${{ secrets.PERF_API_GATEWAY || 'http://api.stg.selfcare.io' }}
   TENANT_ID: ${{ vars.PERF_TENANT || 'dialog-lk' }}
 
 jobs:
@@ -127,7 +127,7 @@ jobs:
           # Use the platform's chaos toggle to inject a 60s outage in a non-critical
           # downstream provider (e.g. balance provider). The dashboard should
           # continue serving partial responses.
-          kubectl -n omobio-stg exec deploy/chaos-controller -- \
+          kubectl -n selfcare-stg exec deploy/chaos-controller -- \
             enable-fault --provider balance-provider --duration 60s
 
       - name: Run k6 resilience test

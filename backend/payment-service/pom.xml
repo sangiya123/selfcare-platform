@@ -1,12 +1,12 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
@@ -17,8 +17,24 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
+        </dependency>
+        <!-- Telco operator pack providers (Dialog, Hutch, Airtel) -->
+        <dependency>
+            <groupId>com.selfcare.dialog</groupId>
+            <artifactId>dialog-providers</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.selfcare.hutch</groupId>
+            <artifactId>hutch-providers</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.selfcare.airtel</groupId>
+            <artifactId>airtel-providers</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,4 +1,4 @@
-// OMOBIO Selfcare Platform — Jenkins pipeline
+﻿// Selfcare Platform — Jenkins pipeline
 //
 // Mirrors the GitHub Actions workflow for teams using Jenkins.
 // Stages: lint → test → scan → build → publish → deploy
@@ -155,7 +155,7 @@ pipeline {
             parallel {
                 stage('Admin tests') {
                     steps {
-                        dir('selfcare-platform/admin/selfcare-studio') {
+                        dir('selfcare-platform/admin/selfcare-admin') {
                             sh '''
                                 npm ci
                                 npx vitest run --coverage
@@ -165,7 +165,7 @@ pipeline {
                     post {
                         always {
                             junit testResults:
-                                'selfcare-platform/admin/selfcare-studio/junit.xml',
+                                'selfcare-platform/admin/selfcare-admin/junit.xml',
                                 allowEmptyResults: true
                         }
                     }
@@ -204,16 +204,16 @@ pipeline {
                 sh '''
                     docker run -d --name=mongo -p 27017:27017 mongo:7 || true
                     docker run -d --name=redis -p 6379:6379 redis:7-alpine || true
-                    docker run -d --name=mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root
+                    docker run -d --name=mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=Selfcare_My5ql_R00t_Pa55w0rd!2026
                         -e MYSQL_DATABASE=selfcare_test mysql:8 || true
                     sleep 30
                 '''
                 dir('selfcare-platform/tests/conformance') {
                     sh '''
-                        OMOBIO_TEST_GATEWAY_URL=http://localhost:8080 \
-                        OMOBIO_TEST_DB_URL=jdbc:mysql://localhost:3306/selfcare_test \
-                        OMOBIO_TEST_REDIS_URL=redis://localhost:6379 \
-                        OMOBIO_TEST_MONGO_URL=mongodb://localhost:27017/selfcare_test \
+                        SELFCARE_TEST_GATEWAY_URL=http://localhost:8080 \
+                        SELFCARE_TEST_DB_URL=jdbc:mysql://localhost:3306/selfcare_test \
+                        SELFCARE_TEST_REDIS_URL=redis://localhost:6379 \
+                        SELFCARE_TEST_MONGO_URL=mongodb://localhost:27017/selfcare_test \
                         mvn -B test
                     '''
                 }
@@ -444,9 +444,9 @@ pipeline {
                                               product-service usage-service billing-service payment-service
                                               notification-service content-service journey-service reporting-service
                                               ai-gateway audit-service insurance-service approval-service; do
-                                    helm upgrade --install omobio-\${service} \
+                                    helm upgrade --install selfcare-\${service} \
                                         selfcare-platform/backend/deploy/helm/\${service} \
-                                        --namespace omobio-${ENV} --create-namespace \
+                                        --namespace selfcare-${ENV} --create-namespace \
                                         --set image.tag=\${GIT_COMMIT} \
                                         --set image.repository=${DOCKER_REGISTRY}/\${service} \
                                         --set env=${ENV} \

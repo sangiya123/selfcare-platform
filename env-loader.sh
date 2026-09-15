@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 # =====================================================================
-# OMOBIO Environment Loader
+# selfcare Environment Loader
 # =====================================================================
-# Sources the active .env.<OMOBIO_ENV> file and exports all variables.
+# Sources the active .env.<SELFCARE_ENV> file and exports all variables.
 # Usage:
-#   source ./env-loader.sh        # uses $OMOBIO_ENV or defaults to dev
-#   OMOBIO_ENV=stg source ./env-loader.sh
+#   source ./env-loader.sh        # uses $SELFCARE_ENV or defaults to dev
+#   SELFCARE_ENV=stg source ./env-loader.sh
 #   ./env-loader.sh --print       # print loaded vars (for debugging)
 # =====================================================================
 
 set -euo pipefail
 
 # Resolve active environment
-OMOBIO_ENV="${OMOBIO_ENV:-dev}"
+SELFCARE_ENV="${SELFCARE_ENV:-dev}"
 
-case "$OMOBIO_ENV" in
+case "$SELFCARE_ENV" in
   dev|stg|reg|prod) ;;
   *)
-    echo "ERROR: OMOBIO_ENV must be one of: dev, stg, reg, prod (got: $OMOBIO_ENV)" >&2
+    echo "ERROR: SELFCARE_ENV must be one of: dev, stg, reg, prod (got: $SELFCARE_ENV)" >&2
     exit 1
     ;;
 esac
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ENV_FILE="${SCRIPT_DIR}/.env.${OMOBIO_ENV}"
+ENV_FILE="${SCRIPT_DIR}/.env.${SELFCARE_ENV}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: Environment file not found: $ENV_FILE" >&2
-  echo "       Create it from .env.example or set OMOBIO_ENV to a valid value." >&2
+  echo "       Create it from .env.example or set SELFCARE_ENV to a valid value." >&2
   exit 1
 fi
 
@@ -39,11 +39,11 @@ set +a
 
 # If only print mode, dump and exit
 if [[ "${1:-}" == "--print" ]]; then
-  echo "Loaded environment: $OMOBIO_ENV"
+  echo "Loaded environment: $SELFCARE_ENV"
   echo "From: $ENV_FILE"
   echo "---"
   env | grep -E '^[A-Z_]+=' | sort
   exit 0
 fi
 
-echo "[env-loader] Loaded OMOBIO_ENV=${OMOBIO_ENV} from ${ENV_FILE}"
+echo "[env-loader] Loaded SELFCARE_ENV=${SELFCARE_ENV} from ${ENV_FILE}"

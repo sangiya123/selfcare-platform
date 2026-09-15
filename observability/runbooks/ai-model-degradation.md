@@ -1,4 +1,4 @@
-# Runbook: AI Model Degradation
+﻿# Runbook: AI Model Degradation
 
 ## Overview
 This runbook covers scenarios where the AI model gateway experiences quality
@@ -14,8 +14,8 @@ degradation, provider outages, cost spikes, or safety policy violations.
 ## Quick checks
 1. **Is the ai-gateway service up?**
    ```bash
-   kubectl -n omobio-prod get pods -l app=ai-gateway
-   kubectl -n omobio-prod logs -l app=ai-gateway --tail=100 | grep -E "ERROR|provider|anthropic|openai"
+   kubectl -n selfcare-prod get pods -l app=ai-gateway
+   kubectl -n selfcare-prod logs -l app=ai-gateway --tail=100 | grep -E "ERROR|provider|anthropic|openai"
    ```
 2. **Is the AI provider responding?**
    ```bash
@@ -24,7 +24,7 @@ degradation, provider outages, cost spikes, or safety policy violations.
 3. **Check AI cost metrics**
    ```bash
    kubectl exec -it prometheus-0 -- promtool query instant \
-     'increase(ai_cost_usd_total[1h])' | grep omobio
+     'increase(ai_cost_usd_total[1h])' | grep selfcare
    ```
 4. **Check kill switches**
    ```bash
@@ -96,7 +96,7 @@ curl -s http://api-gateway/api/v1/admin/ai-governance/release-gate/customer_chat
 **Fix**: Flush RAG index and re-index from clean source
 ```bash
 # Flush Redis cache for RAG
-redis-cli KEYS "omobio:rag:*" | xargs redis-cli DEL
+redis-cli KEYS "selfcare:rag:*" | xargs redis-cli DEL
 
 # Trigger re-index (via admin API)
 curl -X POST http://config-service/api/v1/admin/rag/reindex \

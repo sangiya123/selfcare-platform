@@ -1,15 +1,15 @@
-# applicationset.yaml — ArgoCD ApplicationSet for OMOBIO Selfcare Platform
+# applicationset.yaml — ArgoCD ApplicationSet for Selfcare Platform
 # Generates per-tenant per-environment ArgoCD Applications using Matrix Generator
 # Build once, promote immutable — artifact version controlled via targetRevision
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: omobio-selfcare-platform
+  name: selfcare-platform
   namespace: argocd
   labels:
-    app.kubernetes.io/name: omobio-selfcare-platform
+    app.kubernetes.io/name: selfcare-platform
     app.kubernetes.io/component: gitops
-    app.kubernetes.io/part-of: omobio-platform
+    app.kubernetes.io/part-of: selfcare-platform
   annotations:
     argocd.argoproj.io/sync-options: "Validate=false"
 spec:
@@ -20,7 +20,7 @@ spec:
       generators:
         # Generator 1: List all tenant configurations from tenants/ directory
         - git:
-            repoURL: https://github.com/omobio/selfcare-platform
+            repoURL: https://github.com/sangiya123/selfcare-platform
             revision: main
             directories:
               - path: backend/deploy/gitops/tenants/*.yaml
@@ -28,7 +28,7 @@ spec:
           template:
             metadata:
               labels:
-                omobio.gitops.type: tenant
+                selfcare.gitops.type: tenant
             spec:
               env:
                 - name: TENANT_ID
@@ -38,7 +38,7 @@ spec:
 
         # Generator 2: List all environment configurations from environments/ directory
         - git:
-            repoURL: https://github.com/omobio/selfcare-platform
+            repoURL: https://github.com/sangiya123/selfcare-platform
             revision: main
             directories:
               - path: backend/deploy/gitops/environments/*.yaml
@@ -46,7 +46,7 @@ spec:
           template:
             metadata:
               labels:
-                omobio.gitops.type: environment
+                selfcare.gitops.type: environment
             spec:
               env:
                 - name: ENV_NAME
@@ -61,31 +61,30 @@ spec:
   # Template for the generated ArgoCD Application
   template:
     metadata:
-      name: "omobio-{{ TENANT_ID }}-{{ ENV_NAME }}"
+      name: "selfcare-{{ TENANT_ID }}-{{ ENV_NAME }}"
       namespace: argocd
       labels:
-        omobio.platform: selfcare
-        omobio.tenant: "{{ TENANT_ID }}"
-        omobio.environment: "{{ ENV_NAME }}"
-        omobio.gitops.generated: "true"
-        omobio.industry: "{{ env.TENANT_INDUSTRY }}"
-        omobio.operator: "{{ env.TENANT_OPERATOR }}"
-        omobio.tenant-type: "{{ env.TENANT_TYPE }}"
-        omobio.region: "{{ env.TENANT_REGION }}"
+        selfcare.platform: Selfcare.tenant: "{{ TENANT_ID }}"
+        selfcare.environment: "{{ ENV_NAME }}"
+        selfcare.gitops.generated: "true"
+        selfcare.industry: "{{ env.TENANT_INDUSTRY }}"
+        selfcare.operator: "{{ env.TENANT_OPERATOR }}"
+        selfcare.tenant-type: "{{ env.TENANT_TYPE }}"
+        selfcare.region: "{{ env.TENANT_REGION }}"
       annotations:
-        omobio.gitops.promotion: "{{ env.PROMOTION_STRATEGY }}"
-        omobio.gitops.image-strategy: "{{ env.IMAGE_TAG_MUTABLE }}"
-        omobio.gitops.sync-window: "{{ env.SYNC_WINDOW }}"
+        selfcare.gitops.promotion: "{{ env.PROMOTION_STRATEGY }}"
+        selfcare.gitops.image-strategy: "{{ env.IMAGE_TAG_MUTABLE }}"
+        selfcare.gitops.sync-window: "{{ env.SYNC_WINDOW }}"
         argocd.argoproj.io/sync-options: "Prune=true,SelfHeal=true"
       finalizers:
         - resources-finalizer.argocd.argoproj.io/foreground
     spec:
       # Project scope — references argocd-project.yaml
-      project: omobio-platform
+      project: selfcare-platform
 
       # Source: Helm chart with tenant-specific values
       source:
-        repoURL: https://github.com/omobio/selfcare-platform
+        repoURL: https://github.com/sangiya123/selfcare-platform
         # targetRevision controls promotion: use branch/tag/commit SHA
         # dev: main (mutable — latest), prod: pinned tag (immutable)
         targetRevision: "{{ env.DEFAULT_TARGET_REVISION }}"
@@ -152,7 +151,7 @@ spec:
       # Destination: Kubernetes cluster + namespace
       destination:
         server: "{{ env.CLUSTER_URL }}"
-        namespace: "omobio-{{ TENANT_ID }}-{{ ENV_NAME }}"
+        namespace: "selfcare-{{ TENANT_ID }}-{{ ENV_NAME }}"
 
       # Sync policy: automated for dev/stg/reg, manual for prod
       syncPolicy:
@@ -210,12 +209,12 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: omobio-selfcare-platform-scm
+  name: selfcare-platform-scm
   namespace: argocd
   labels:
-    app.kubernetes.io/name: omobio-selfcare-platform-scm
+    app.kubernetes.io/name: selfcare-platform-scm
     app.kubernetes.io/component: gitops
-    app.kubernetes.io/part-of: omobio-platform
+    app.kubernetes.io/part-of: selfcare-platform
 spec:
   # SCM Provider Generator: scan repos for tags matching promotion pattern
   generators:
@@ -223,7 +222,7 @@ spec:
         cloneProtocol: https
         github:
           # Organization or user owning the repository
-          organization: omobio
+          organization: selfcare
           # Scan for repos matching this pattern
           repoFilter:
             - repository: selfcare-platform
@@ -232,18 +231,17 @@ spec:
         tagMatch: "v*"  # Only release tags
   template:
     metadata:
-      name: "omobio-{{ repo }}-{{ branch }}"
+      name: "selfcare-{{ repo }}-{{ branch }}"
       namespace: argocd
       labels:
-        omobio.platform: selfcare
-        omobio.repo: "{{ repo }}"
-        omobio.branch: "{{ branch }}"
-        omobio.gitops.generated: "true"
-        omobio.gitops.type: scm-branch
+        selfcare.platform: Selfcare.repo: "{{ repo }}"
+        selfcare.branch: "{{ branch }}"
+        selfcare.gitops.generated: "true"
+        selfcare.gitops.type: scm-branch
       finalizers:
         - resources-finalizer.argocd.argoproj.io/foreground
     spec:
-      project: omobio-platform
+      project: selfcare-platform
       source:
         repoURL: "{{ url }}"
         targetRevision: "{{ branch }}"
@@ -253,7 +251,7 @@ spec:
             - values.yaml
       destination:
         server: https://kubernetes.default.svc
-        namespace: "omobio-{{ repo }}-{{ branch }}"
+        namespace: "selfcare-{{ repo }}-{{ branch }}"
       syncPolicy:
         automated:
           enabled: false  # Manual for SCM-based promotion

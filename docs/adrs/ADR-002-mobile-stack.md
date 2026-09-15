@@ -1,8 +1,8 @@
-# ADR-002: React Native + TypeScript for Mobile
+﻿# ADR-002: React Native + TypeScript for Mobile
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 

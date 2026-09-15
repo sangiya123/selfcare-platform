@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — billing-service
+-- Selfcare Platform — billing-service
 -- Table: bills
 --
 -- Canonical Bill entity. Status lifecycle:

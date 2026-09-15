@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AIClient, ChatMessage, Intent, ChatSession } from '../config/AIClient';
 import { ApiClient } from '../config/ApiClient';
-import { useAuth } from './useAuth';
+import { useAuthStore } from './useAuth';
 import { useTenant } from './useTenant';
 
 const RECOMMENDED_PROMPTS = [
@@ -33,7 +33,7 @@ const URGENT_INTENTS = ['COMPLAINT', 'BILL_INQUIRY'];
 
 export function useAIChat() {
   const { tenantId } = useTenant();
-  const auth = useAuth();
+  const auth = useAuthStore();
   const [client, setClient] = useState<AIClient | null>(null);
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);

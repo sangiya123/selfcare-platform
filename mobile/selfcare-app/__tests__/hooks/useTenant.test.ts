@@ -2,76 +2,69 @@
  * useTenant hook tests.
  *
  * Verifies:
- * - Default tenant comes from MOBILE_TENANT_ID env
+ * - Default tenant is null until set
  * - industryPack is inferred from tenant id prefix (aia-* → insurance,
- *   dialog-*/hutch-*/airtel-* → telco)
- * - setActiveTenant updates the active tenant
- * - hydrated flag is set after initial load
+ *   dialog-* / hutch-* / airtel-* → telco)
+ * - setTenant updates the active tenant
+ * - clear resets the store
  */
 import { act, renderHook } from '@testing-library/react-native';
 import { useTenant } from '../../src/hooks/useTenant';
 
 describe('useTenant', () => {
   beforeEach(() => {
-    // Reset module-level state for each test
+    // Reset module-level store state for each test
     jest.resetModules();
   });
 
-  it('defaults to dialog-lk when env not set', () => {
+  it('defaults to null before a tenant is set', () => {
     const { result } = renderHook(() => useTenant());
-    expect(result.current.tenantId).toBe('dialog-lk');
+    expect(result.current.tenantId).toBeNull();
+    expect(result.current.industryPack).toBeNull();
   });
 
-  it('infers TELCO industry pack for dialog-lk', () => {
+  it('infers telco industry pack for dialog-lk', () => {
     const { result } = renderHook(() => useTenant());
-    expect(result.current.industryPack).toBe('TELCO');
-  });
-
-  it('infers TELCO industry pack for hutch-lk', () => {
-    jest.isolateModules(() => {
-      // Set env BEFORE module is required
-      process.env.MOBILE_TENANT_ID = 'hutch-lk';
-      const { useTenant } = require('../../src/hooks/useTenant');
-      const { result } = renderHook(() => useTenant());
-      expect(result.current.industryPack).toBe('TELCO');
-    });
-  });
-
-  it('infers INSURANCE industry pack for aia-multi', () => {
-    jest.isolateModules(() => {
-      process.env.MOBILE_TENANT_ID = 'aia-multi';
-      const { useTenant } = require('../../src/hooks/useTenant');
-      const { result } = renderHook(() => useTenant());
-      expect(result.current.industryPack).toBe('INSURANCE');
-    });
-  });
-
-  it('infers INSURANCE industry pack for aia-lk', () => {
-    jest.isolateModules(() => {
-      process.env.MOBILE_TENANT_ID = 'aia-lk';
-      const { useTenant } = require('../../src/hooks/useTenant');
-      const { result } = renderHook(() => useTenant());
-      expect(result.current.industryPack).toBe('INSURANCE');
-    });
-  });
-
-  it('falls back to TELCO for unknown tenant ids', () => {
-    jest.isolateModules(() => {
-      process.env.MOBILE_TENANT_ID = 'unknown-tenant';
-      const { useTenant } = require('../../src/hooks/useTenant');
-      const { result } = renderHook(() => useTenant());
-      expect(result.current.industryPack).toBe('TELCO');
-    });
-  });
-
-  it('setActiveTenant updates the active tenant id', () => {
-    const { result } = renderHook(() => useTenant());
-
     act(() => {
-      result.current.setActiveTenant('aia-lk');
+      result.current.setTenant('dialog-lk');
     });
+    expect(result.current.tenantId).toBe('dialog-lk');
+    expect(result.current.industryPack).toBe('telco');
+  });
 
-    expect(result.current.tenantId).toBe('aia-lk');
-    expect(result.current.industryPack).toBe('INSURANCE');
+  it('infers telco industry pack for hutch-lk', () => {
+    const { result } = renderHook(() => useTenant());
+    act(() => {
+      result.current.setTenant('hutch-lk');
+    });
+    expect(result.current.industryPack).toBe('telco');
+  });
+
+  it('infers insurance industry pack for aia-lk', () => {
+    const { result } = renderHook(() => useTenant());
+    act(() => {
+      result.current.setTenant('aia-lk');
+    });
+    expect(result.current.industryPack).toBe('insurance');
+  });
+
+  it('returns null industry pack for unknown tenant ids', () => {
+    const { result } = renderHook(() => useTenant());
+    act(() => {
+      result.current.setTenant('unknown-tenant');
+    });
+    expect(result.current.industryPack).toBeNull();
+  });
+
+  it('clear resets the active tenant', () => {
+    const { result } = renderHook(() => useTenant());
+    act(() => {
+      result.current.setTenant('aia-lk');
+    });
+    act(() => {
+      result.current.clear();
+    });
+    expect(result.current.tenantId).toBeNull();
+    expect(result.current.industryPack).toBeNull();
   });
 });

@@ -11,7 +11,7 @@ spring:
             allowCredentials: true
             maxAge: 3600
 
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${CUSTOMER_IDENTITY_URL:http://localhost:8081}/.well-known/jwks.json
@@ -26,4 +26,4 @@ management:
 
 logging:
   level:
-    com.omobio: DEBUG
+    com.selfcare: DEBUG

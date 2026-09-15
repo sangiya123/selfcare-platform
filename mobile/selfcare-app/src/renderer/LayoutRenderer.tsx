@@ -3,29 +3,45 @@
  *
  * Renders each section by:
  * 1. Looking up the component in the registry
- * 2. Checking visibility conditions
- * 3. Loading data from the data source
+ * 2. Applying visibility rules (feature flag / LOB / segment) + component
+ *    availability (platform / min app version / customer type) per v6 §12
+ * 3. Loading data through the DataSourceResolver
  * 4. Rendering with loading/error/stale states
- * 5. Passing action handlers
+ * 5. Passing action handlers (closed action set, ADR-009)
+ *
+ * Contract: ManifestSection / ManifestAction from `src/manifest/types`.
  */
 
-import React, { ReactElement, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
-import { Section, Action } from '../config/ConfigSDK';
+import React, { ReactElement, useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, RefreshControl, ScrollView } from 'react-native';
+import { ManifestSection, ManifestAction, DataSourceResolver } from '../manifest/types';
 import { ComponentRegistry, WidgetProps } from '../components/ComponentRegistry';
-import { useApi } from '../hooks/useApi';
+import { useTheme, fontSizePx, ResolvedTheme } from '../manifest/ThemeEngine';
+import { APP_VERSION } from '../utils/appVersion';
+
+export interface RendererContext {
+  tenantId?: string | null;
+  connectionId?: string | null;
+  platform: 'ios' | 'android' | 'web';
+  appVersion: string;
+  lob?: string | null;
+  segment?: string | null;
+  featureFlags?: Record<string, boolean>;
+}
 
 export interface LayoutRendererProps {
-  sections: Section[];
+  sections: ManifestSection[];
   registry: ComponentRegistry;
-  dataSourceResolver: DataSourceResolver;
-  onAction: (action: Action) => void;
+  dataSourceResolver?: DataSourceResolver;
+  onAction: (action: ManifestAction) => void;
   onWidgetRefresh?: (widgetId: string) => void;
+  context?: Partial<RendererContext>;
 }
 
-export interface DataSourceResolver {
-  resolve(dataSource: string, connectionId: string, tenantId: string): Promise<unknown>;
-}
+const DEFAULT_CONTEXT: RendererContext = {
+  platform: 'ios',
+  appVersion: APP_VERSION,
+};
 
 export function LayoutRenderer({
   sections,
@@ -33,10 +49,14 @@ export function LayoutRenderer({
   dataSourceResolver,
   onAction,
   onWidgetRefresh,
+  context,
 }: LayoutRendererProps): ReactElement {
-  // Sort sections by order
+  const ctx: RendererContext = { ...DEFAULT_CONTEXT, ...context };
+  const styles = useChromeStyles();
+
   const sortedSections = [...sections]
-    .filter(s => !s.visibleWhen || isVisible(s.visibleWhen))
+    .filter((s) => isSectionVisible(s, ctx))
+    .filter((s) => isSectionAvailable(s, registry, ctx))
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 
   return (
@@ -57,6 +77,7 @@ export function LayoutRenderer({
           section={section}
           registry={registry}
           dataSourceResolver={dataSourceResolver}
+          context={ctx}
           onAction={onAction}
           onRefresh={() => onWidgetRefresh?.(section.id)}
         />
@@ -69,16 +90,19 @@ export function SectionRenderer({
   section,
   registry,
   dataSourceResolver,
+  context,
   onAction,
   onRefresh,
 }: {
-  section: Section;
+  section: ManifestSection;
   registry: ComponentRegistry;
-  dataSourceResolver: DataSourceResolver;
-  onAction: (action: Action) => void;
+  dataSourceResolver?: DataSourceResolver;
+  context: RendererContext;
+  onAction: (action: ManifestAction) => void;
   onRefresh: () => void;
 }): ReactElement | null {
-  const Component = registry.get(section.component);
+  const Component = registry.getOrResolve(section.component);
+  const styles = useChromeStyles();
 
   if (!Component) {
     console.warn(`[LayoutRenderer] Unknown component: ${section.component} (section: ${section.id})`);
@@ -89,50 +113,70 @@ export function SectionRenderer({
     );
   }
 
-  // Determine data loading strategy
   const [data, setData] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadData() {
+      if (!section.dataSource || !dataSourceResolver) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await dataSourceResolver.resolve(section.dataSource, {
+          tenantId: context.tenantId,
+          connectionId: context.connectionId,
+        });
+        if (cancelled) return;
+        setData(result);
+        setIsStale(false);
+      } catch (e) {
+        if (cancelled) return;
+        const message = e instanceof Error ? e.message : 'Failed to load data';
+        setError(message);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
     loadData();
-  }, [section.dataSource, section.props]);
-
-  async function loadData() {
-    if (!section.dataSource) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await dataSourceResolver.resolve(section.dataSource, '', '');
-      setData(result);
-      setIsStale(false);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to load data';
-      setError(message);
-      // Check if it's a timeout (retryable)
-    } finally {
-      setIsLoading(false);
-    }
-  }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section.dataSource, section.id, context.connectionId]);
 
   async function handleRetry() {
     setIsLoading(true);
     setError(null);
-    await loadData();
+    if (section.dataSource && dataSourceResolver) {
+      try {
+        const result = await dataSourceResolver.resolve(section.dataSource, {
+          tenantId: context.tenantId,
+          connectionId: context.connectionId,
+        });
+        setData(result);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to load data';
+        setError(message);
+      }
+    }
+    setIsLoading(false);
     onRefresh();
   }
 
-  function handleAction(action: Action) {
+  function handleAction(action: ManifestAction) {
     onAction(action);
   }
 
-  // Build widget props
   const widgetProps: WidgetProps = {
     id: section.id,
     componentId: section.component,
@@ -140,15 +184,14 @@ export function SectionRenderer({
     data,
     dataSource: section.dataSource,
     props: section.props,
-    onAction: handleAction,
+    onAction: handleAction as WidgetProps['onAction'],
     isLoading,
     isStale,
-    error,
+    error: error ?? undefined,
     retryable: error !== null,
     onRetry: handleRetry,
   };
 
-  // Render states
   if (isLoading && !data) {
     return (
       <View style={styles.widgetContainer}>
@@ -176,10 +219,57 @@ export function SectionRenderer({
   );
 }
 
-function isVisible(condition: Section['visibleWhen']): boolean {
-  if (!condition) return true;
-  // Check feature flags, LOB, connection type, segment
-  // Implemented by connecting to FeatureFlagClient
+/**
+ * Visibility gate (feature flag / LOB / segment). Unknown feature flags are
+ * treated as visible unless the feature is explicitly disabled in config.
+ */
+export function isSectionVisible(
+  section: ManifestSection,
+  context: RendererContext
+): boolean {
+  const rule = section.visibleWhen;
+  if (!rule) return true;
+
+  if (rule.feature && context.featureFlags) {
+    if (context.featureFlags[rule.feature] === false) return false;
+  }
+
+  if (rule.lob && context.lob && rule.lob !== context.lob) return false;
+  if (rule.segment && context.segment && rule.segment !== context.segment) return false;
+
+  return true;
+}
+
+/**
+ * Availability gate: section-level LOB/customerType/platform/max constraints
+ * AND the registered component's platform/minAppVersion availability.
+ */
+export function isSectionAvailable(
+  section: ManifestSection,
+  registry: ComponentRegistry,
+  context: RendererContext
+): boolean {
+  const availability = section.availability;
+  if (availability) {
+    if (availability.platform && !availability.platform.includes(context.platform)) return false;
+    if (availability.lob && context.lob && !availability.lob.includes(context.lob)) return false;
+    if (availability.customerType && context.segment && !availability.customerType.includes(context.segment)) return false;
+    if (availability.minAppVersion && !satisfiesMinVersion(context.appVersion, availability.minAppVersion)) return false;
+  }
+  return registry.isAvailable(section.component, context.platform, context.appVersion);
+}
+
+/** Compare semver strings: true when version >= minVersion. */
+export function satisfiesMinVersion(version: string, minVersion: string): boolean {
+  const vParts = version.split('.').map(Number);
+  const mParts = minVersion.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(vParts.length, mParts.length); i++) {
+    const v = vParts[i] || 0;
+    const m = mParts[i] || 0;
+    if (v > m) return true;
+    if (v < m) return false;
+  }
   return true;
 }
 
@@ -188,6 +278,7 @@ function isVisible(condition: Section['visibleWhen']): boolean {
 // ============================================================
 
 function SkeletonWidget({ sectionId }: { sectionId: string }): ReactElement {
+  const styles = useChromeStyles();
   return (
     <View style={styles.skeleton}>
       <View style={styles.skeletonBlock} />
@@ -204,6 +295,7 @@ function ErrorWidget({
   message: string;
   onRetry: () => void;
 }): ReactElement {
+  const styles = useChromeStyles();
   return (
     <View style={styles.errorWidget}>
       <Text style={styles.errorTitle}>Couldn't load</Text>
@@ -215,64 +307,76 @@ function ErrorWidget({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    paddingBottom: 100, // Bottom nav safe area
-  },
-  widgetContainer: {
-    marginBottom: 16,
-  },
-  unknownComponent: {
-    padding: 12,
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-  },
-  unknownText: {
-    color: '#856404',
-    fontSize: 13,
-  },
-  skeleton: {
-    padding: 16,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-  },
-  skeletonBlock: {
-    height: 20,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  skeletonShort: {
-    width: '60%',
-  },
-  errorWidget: {
-    padding: 16,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  errorTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  errorMessage: {
-    fontSize: 13,
-    color: '#6B6475',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6D28D9',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-});
+/** Chrome styles — fully resolved from the manifest theme (no hardcoded values). */
+function createChromeStyles(t: ResolvedTheme): ReturnType<typeof StyleSheet.create> {
+  const colors = t.colors;
+  const layout = t.layout;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: layout.pagePadding,
+      paddingVertical: Math.round(layout.sectionGap / 2),
+      paddingBottom: layout.tabBarHeight + layout.sectionGap, // Bottom nav safe area
+    },
+    widgetContainer: {
+      marginBottom: layout.sectionGap,
+    },
+    unknownComponent: {
+      padding: layout.cardPadding,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: t.layout.radius ?? (t.radius ? parseInt(t.radius.replace('px', ''), 10) : 8),
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    unknownText: {
+      color: colors.textSecondary,
+      fontSize: fontSizePx(t, 'sm'),
+    },
+    skeleton: {
+      padding: layout.cardPadding,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: t.layout.radius ?? 12,
+    },
+    skeletonBlock: {
+      height: 20,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      marginBottom: 8,
+    },
+    skeletonShort: {
+      width: '60%',
+    },
+    errorWidget: {
+      padding: layout.cardPadding,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: t.layout.radius ?? 12,
+      alignItems: 'center',
+    },
+    errorTitle: {
+      fontSize: fontSizePx(t, 'base'),
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    errorMessage: {
+      fontSize: fontSizePx(t, 'sm'),
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    retryButton: {
+      fontSize: fontSizePx(t, 'sm'),
+      fontWeight: '600',
+      color: colors.primary500,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+    },
+  });
+}
+
+function useChromeStyles() {
+  const theme = useTheme();
+  return useMemo(() => createChromeStyles(theme), [theme]);
+}

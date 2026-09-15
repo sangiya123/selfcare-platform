@@ -1,6 +1,6 @@
-jenkins:
-  systemMessage: "OMOBIO Selfcare CI/CD. Deployments target Docker Desktop Kubernetes."
-  numExecutors: 2
+﻿jenkins:
+  systemMessage: "Selfcare CI/CD — AEE Flow Matrix pipeline."
+  numExecutors: 3
   mode: NORMAL
   quietPeriod: 5
   scmCheckoutRetryCount: 2
@@ -31,3 +31,20 @@ credentials:
               scope: GLOBAL
               id: "sonar-token"
               secret: "${SONAR_TOKEN}"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "docker-registry"
+              username: "${DOCKER_REGISTRY_USER:-}"
+              password: "${DOCKER_REGISTRY_PASSWORD:-}"
+          - string:
+              scope: GLOBAL
+              id: "argocd-token"
+              secret: "${ARGOCD_TOKEN:-}"
+          - string:
+              scope: GLOBAL
+              id: "owasp-nvd-api-key"
+              secret: "${OWASP_NVD_API_KEY:-}"
+          - string:
+              scope: GLOBAL
+              id: "sentry-dsn"
+              secret: "${SENTRY_DSN:-}"

@@ -1,0 +1,34 @@
+# reg environment overrides (release candidate — manual promotion target)
+environment:
+  name: reg
+  profiles: release
+
+image:
+  tag: reg-latest
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  host: reg.selfcare.example.com
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+observability:
+  logLevel: WARN
+  tracing:
+    enabled: true
+    endpoint: http://otel-collector:4317
+  prometheus:
+    enabled: true

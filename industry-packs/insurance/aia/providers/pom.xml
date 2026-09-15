@@ -5,13 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio.industry</groupId>
+        <groupId>com.selfcare.industry</groupId>
         <artifactId>insurance-industry-pack</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.omobio.aia</groupId>
+    <groupId>com.selfcare.aia</groupId>
     <artifactId>aia-insurance-providers</artifactId>
     <packaging>jar</packaging>
 
@@ -27,7 +27,7 @@
              canonical interface), and providers implement that interface.
              The service depends on providers (not vice versa) — see insurance-service/pom.xml. -->
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
             <version>${project.version}</version>
         </dependency>

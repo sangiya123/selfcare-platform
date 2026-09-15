@@ -1,4 +1,4 @@
-{
+﻿{
   "annotations": {
     "list": [
       {
@@ -175,12 +175,12 @@
   "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["omobio", "ai"],
+  "tags": ["selfcare", "ai"],
   "templating": {"list": []},
   "time": {"from": "now-6h", "to": "now"},
   "timepicker": {},
   "timezone": "",
   "title": "AI Gateway — Advanced",
-  "uid": "omobio-ai-advanced",
+  "uid": "selfcare-ai-advanced",
   "version": 1
 }

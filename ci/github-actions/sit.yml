@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — System Integration Testing (SIT)
+﻿# Selfcare Platform — System Integration Testing (SIT)
 #
 # Runs end-to-end conformance + contract tests against a fully-deployed
 # environment (typically stg or reg) with all 18 services + 3 datastores
@@ -69,8 +69,8 @@ jobs:
           ENV="${{ github.event.inputs.environment || 'stg' }}"
           if [ -z "${{ github.event.inputs.gateway_url }}" ]; then
             case "$ENV" in
-              stg) URL="https://stg-api.omobio.io" ;;
-              reg) URL="https://reg-api.omobio.io" ;;
+              stg) URL="https://stg-api.selfcare.io" ;;
+              reg) URL="https://reg-api.selfcare.io" ;;
               *) URL="http://localhost:8080" ;;
             esac
           else
@@ -144,7 +144,7 @@ jobs:
         image: mysql:8
         ports: ['3306:3306']
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: Selfcare_My5ql_R00t_Pa55w0rd!2026
           MYSQL_DATABASE: selfcare_test
     steps:
       - uses: actions/checkout@v4
@@ -166,11 +166,11 @@ jobs:
       - name: Run conformance suite
         working-directory: selfcare-platform/tests/conformance
         env:
-          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
-          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
-          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
-          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
-          OMOBIO_TEST_ENV: ${{ needs.preflight.outputs.ENV }}
+          SELFCARE_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+          SELFCARE_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          SELFCARE_TEST_REDIS_URL: redis://localhost:6379
+          SELFCARE_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          SELFCARE_TEST_ENV: ${{ needs.preflight.outputs.ENV }}
         run: |
           mvn -B -e -fae \
             -Dgroups="api-contract,auth,dashboard,payment,provider,tenant,security,journey" \
@@ -221,10 +221,10 @@ jobs:
       - name: Run API automation suite
         working-directory: selfcare-platform/tests/conformance
         env:
-          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
-          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
-          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
-          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          SELFCARE_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+          SELFCARE_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          SELFCARE_TEST_REDIS_URL: redis://localhost:6379
+          SELFCARE_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
         run: |
           mvn -B -e -fae \
             -Dgroups="api-automation,e2e-api" \
@@ -292,7 +292,7 @@ jobs:
 
       - name: Run synthetic monitoring
         env:
-          OMOBIO_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
+          SELFCARE_TEST_GATEWAY_URL: ${{ needs.preflight.outputs.URL }}
         run: |
           mvn -B -e -fae -pl selfcare-platform/tests/conformance \
             -Dgroups=synthetic-monitoring \

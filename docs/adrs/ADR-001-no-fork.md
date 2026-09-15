@@ -1,8 +1,8 @@
-# ADR-001: One Product, Zero Client Forks
+﻿# ADR-001: One Product, Zero Client Forks
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 
@@ -15,7 +15,7 @@ notifications, support) are essentially the same within an industry.
 
 ## Decision
 
-**One OMOBIO Selfcare Product Kernel** that serves clients across multiple industries:
+**One Selfcare Product Kernel** that serves clients across multiple industries:
 
 - Shared source code (React Native + TypeScript mobile, React + TypeScript admin,
   Java 25 + Spring reactive backend)
@@ -38,7 +38,7 @@ notifications, support) are essentially the same within an industry.
 
 | Term | Meaning |
 |---|---|
-| Client / Tenant | A business using OMOBIO (Dialog, AIA, ...) |
+| Client / Tenant | A business using selfcare (Dialog, AIA, ...) |
 | Industry | TELCO, INSURANCE, TRAVEL, BANKING, ... |
 | Tenant type | OPERATOR, INSURER, MVNO, AIRLINE, ... |
 | Industry pack | Per-vertical provider implementation (telco pack, insurance pack) |

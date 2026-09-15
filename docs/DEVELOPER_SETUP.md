@@ -1,7 +1,7 @@
-# OMOBIO Selfcare Platform — Developer Setup Guide
+﻿# Selfcare Platform — Developer Setup Guide
 
 This guide walks through setting up a local development environment
-for the OMOBIO Selfcare Platform from scratch.
+for the Selfcare Platform from scratch.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ docker compose -f selfcare-platform/backend/deploy/docker-compose.dev.yml up
 
 ### Admin (Selfcare Studio)
 ```bash
-cd selfcare-platform/admin/selfcare-studio
+cd selfcare-platform/admin/selfcare-admin
 cp .env.example .env.local
 npm install
 npm run dev
@@ -104,7 +104,7 @@ mvn test
 
 ### Admin unit tests (Vitest)
 ```bash
-cd selfcare-platform/admin/selfcare-studio
+cd selfcare-platform/admin/selfcare-admin
 npm test
 ```
 
@@ -136,7 +136,7 @@ export OPENAI_API_KEY=sk-...
 ### Environment variables (mobile)
 Edit `selfcare-platform/mobile/selfcare-app/.env.dev`:
 ```
-OMOBIO_ENV=dev
+SELFCARE_ENV=dev
 MOBILE_ENV=development
 MOBILE_API_BASE_URL=http://localhost:8080
 MOBILE_TENANT_ID=dialog-lk
@@ -160,7 +160,7 @@ To bootstrap a new tenant manually, copy a seed file and adjust.
 
 ### AI gateway
 - LLM requests are logged with full request/response (excluding PII)
-- Set log level: `LOGGING_LEVEL_COM_OMOBIO_AI=DEBUG`
+- Set log level: `LOGGING_LEVEL_COM_selfcare_AI=DEBUG`
 - Mock mode: leave `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` empty to use fallback only
 
 ## Common issues

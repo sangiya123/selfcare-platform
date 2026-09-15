@@ -1,4 +1,4 @@
-# kustomize base — OMOBIO Selfcare Platform
+# kustomize base — Selfcare Platform
 # Base resources applied to all tenants and environments
 # Each tenant/environment overlay patches these with their specific values
 
@@ -6,26 +6,26 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: omobio-selfcare-base
+  name: selfcare-base
   annotations:
-    omobio.platform/kustomize: "base"
-    omobio.platform/version: "1.0.0"
+    selfcare.platform/kustomize: "base"
+    selfcare.platform/version: "1.0.0"
 
 # Namespace — created by overlays per tenant+env
-# Each overlay sets namespace: omobio-{tenant}-{env}
-namespace: omobio-base
+# Each overlay sets namespace: selfcare-{tenant}-{env}
+namespace: selfcare-base
 
 # Common labels applied to all resources
 commonLabels:
-  app.kubernetes.io/name: omobio-selfcare
-  app.kubernetes.io/part-of: omobio-platform
+  app.kubernetes.io/name: selfcare
+  app.kubernetes.io/part-of: selfcare-platform
   app.kubernetes.io/managed-by: kustomize
   app.kubernetes.io/component: backend
 
 # Common annotations
 commonAnnotations:
-  omobio.platform/kustomize-managed: "true"
-  omobio.platform/gitops-source: "selfcare-platform"
+  selfcare.platform/kustomize-managed: "true"
+  selfcare.platform/gitops-source: "selfcare-platform"
 
 # Resources — base set applied to all overlays
 # Each overlay includes these via ../../base
@@ -85,58 +85,58 @@ resources:
 # Images — base images
 # Overlays patch these to pin to specific tags
 images:
-  - name: omobio/api-gateway
-    newName: omobio/api-gateway
+  - name: selfcare/api-gateway
+    newName: selfcare/api-gateway
     newTag: latest
-  - name: omobio/config-tenant-service
-    newName: omobio/config-tenant-service
+  - name: selfcare/config-tenant-service
+    newName: selfcare/config-tenant-service
     newTag: latest
-  - name: omobio/customer-identity-service
-    newName: omobio/customer-identity-service
+  - name: selfcare/customer-identity-service
+    newName: selfcare/customer-identity-service
     newTag: latest
-  - name: omobio/dashboard-bff
-    newName: omobio/dashboard-bff
+  - name: selfcare/dashboard-bff
+    newName: selfcare/dashboard-bff
     newTag: latest
-  - name: omobio/account-entitlement-service
-    newName: omobio/account-entitlement-service
+  - name: selfcare/account-entitlement-service
+    newName: selfcare/account-entitlement-service
     newTag: latest
-  - name: omobio/product-service
-    newName: omobio/product-service
+  - name: selfcare/product-service
+    newName: selfcare/product-service
     newTag: latest
-  - name: omobio/usage-service
-    newName: omobio/usage-service
+  - name: selfcare/usage-service
+    newName: selfcare/usage-service
     newTag: latest
-  - name: omobio/billing-service
-    newName: omobio/billing-service
+  - name: selfcare/billing-service
+    newName: selfcare/billing-service
     newTag: latest
-  - name: omobio/payment-service
-    newName: omobio/payment-service
+  - name: selfcare/payment-service
+    newName: selfcare/payment-service
     newTag: latest
-  - name: omobio/notification-service
-    newName: omobio/notification-service
+  - name: selfcare/notification-service
+    newName: selfcare/notification-service
     newTag: latest
-  - name: omobio/content-service
-    newName: omobio/content-service
+  - name: selfcare/content-service
+    newName: selfcare/content-service
     newTag: latest
-  - name: omobio/journey-service
-    newName: omobio/journey-service
+  - name: selfcare/journey-service
+    newName: selfcare/journey-service
     newTag: latest
-  - name: omobio/reporting-service
-    newName: omobio/reporting-service
+  - name: selfcare/reporting-service
+    newName: selfcare/reporting-service
     newTag: latest
-  - name: omobio/ai-gateway
-    newName: omobio/ai-gateway
+  - name: selfcare/ai-gateway
+    newName: selfcare/ai-gateway
     newTag: latest
-  - name: omobio/audit-service
-    newName: omobio/audit-service
+  - name: selfcare/audit-service
+    newName: selfcare/audit-service
     newTag: latest
 
 # ConfigMapGenerator — base config
 configMapGenerator:
-  - name: omobio-base-config
+  - name: selfcare-base-config
     literals:
-      - OMOBIO_PLATFORM_VERSION=1.0.0
-      - OMOBIO_GITOPS_MODE=true
+      - SELFCARE_PLATFORM_VERSION=1.0.0
+      - SELFCARE_GITOPS_MODE=true
       - SPRING_PROFILES_ACTIVE=base
       - LOGGING_LEVEL_ROOT=INFO
       - LOGGING_PATTERN_CONSOLE="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
@@ -147,11 +147,11 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
       labels:
-        omobio.config: base
+        selfcare.config: base
 
 # Secret generator — placeholder, real secrets from external secrets
 secretGenerator:
-  - name: omobio-base-secrets
+  - name: selfcare-base-secrets
     literals:
       - DB_PASSWORD=__REPLACE_WITH_EXTERNAL_SECRET__
       - REDIS_PASSWORD=__REPLACE_WITH_EXTERNAL_SECRET__
@@ -226,11 +226,11 @@ components:
 
 # Generators — Helm chart inflation (alternative to resources)
 # helmCharts:
-#   - name: omobio-microservice
-#     repo: https://omobio.github.io/helm-charts
+#   - name: selfcare-microservice
+#     repo: https://selfcare.github.io/helm-charts
 #     version: 1.0.0
-#     releaseName: omobio
-#     namespace: omobio-base
+#     releaseName: selfcare
+#     namespace: selfcare-base
 #     valuesFile: values.yaml
 
 # Vars — kustomize variables for substitution
@@ -238,10 +238,10 @@ vars:
   - name: PLATFORM_VERSION
     objref:
       kind: ConfigMap
-      name: omobio-base-config
+      name: selfcare-base-config
       apiVersion: v1
     fieldref:
-      fieldpath: data.OMOBIO_PLATFORM_VERSION
+      fieldpath: data.SELFCARE_PLATFORM_VERSION
 
 # Configurations — kustomize build configurations
 configurations:

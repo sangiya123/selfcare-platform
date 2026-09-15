@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/navigation-document.schema.json",
+  "$id": "https://selfcare.example.com/schemas/navigation-document.schema.json",
   "title": "NavigationDocument",
-  "description": "Server-driven navigation graph for the OMOBIO Selfcare Platform. Defines bottom tabs, drawer items, quick actions, canonical routes, and deep/universal link mappings.",
+  "description": "Server-driven navigation graph for the Selfcare Platform. Defines bottom tabs, drawer items, quick actions, canonical routes, and deep/universal link mappings.",
   "type": "object",
   "required": [
     "schemaVersion",

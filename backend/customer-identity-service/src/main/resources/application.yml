@@ -1,11 +1,13 @@
 # ============================================================
-# OMOBIO Customer Identity Service — Base Configuration
+# selfcare Customer Identity Service — Base Configuration
 # ============================================================
-# Profile is activated by OMOBIO_ENV → SPRING_PROFILES_ACTIVE
+# Profile is activated by SELFCARE_ENV → SPRING_PROFILES_ACTIVE
 # Environment-specific overrides live in application-{dev,stg,reg,prod}.yml
 # ============================================================
 
 spring:
+  main:
+    web-application-type: servlet
   application:
     name: customer-identity-service
   profiles:
@@ -15,9 +17,9 @@ spring:
   # DATABASE (MySQL / JPA) — durable store for sessions and OTPs
   # ============================================================
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:omobio_identity}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
-    username: ${DB_USERNAME:omobio}
-    password: ${DB_PASSWORD:changeme}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:selfcare_identity}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:selfcare}
+    password: ${DB_PASSWORD:Selfcare_My5ql_Db_Pa55w0rd!2026}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:20}
@@ -48,9 +50,10 @@ spring:
   # ============================================================
   # MONGODB — used for client/tenant config (cross-service)
   # ============================================================
+  mongodb:
+    uri: mongodb://${MONGO_USERNAME:selfcare}:${MONGO_PASSWORD:Selfcare_M0ng0_Db_Pa55w0rd!2026}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:selfcare_config}?authSource=admin
   data:
     mongodb:
-      uri: mongodb://${MONGO_USERNAME:omobio}:${MONGO_PASSWORD:changeme}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:omobio_config}?authSource=admin
       auto-index-creation: true
 
   # ============================================================
@@ -59,7 +62,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
       timeout: 2000ms
       lettuce:
         pool:
@@ -96,17 +99,17 @@ spring:
     locations: classpath:db/migration
 
 # ============================================================
-# OMOBIO SECURITY
+# selfcare SECURITY
 # ============================================================
-omobio:
+selfcare:
   security:
     jwt:
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
       # ADR-011 token policy: see CLAUDE.md. 24h access, 30d refresh (configurable).
       access-token-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:86400}
       refresh-token-seconds: ${JWT_REFRESH_TOKEN_TTL_SECONDS:2592000}
-      key-id: ${JWT_KEY_ID:omobio-selfcare-1}
+      key-id: ${JWT_KEY_ID:selfcare-1}
       # Optional: PEM-encoded PKCS#8 private key. If unset, a fresh key pair
       # is generated at startup (NOT recommended for production).
       private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
@@ -178,7 +181,7 @@ server:
 # ============================================================
 logging:
   level:
-    com.omobio: ${LOG_LEVEL:INFO}
+    com.selfcare: ${LOG_LEVEL:INFO}
     org.springframework: WARN
     org.hibernate: WARN
   pattern:

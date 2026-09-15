@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConsentManager — User consent and data-privacy controls.
  *
  * Implements:
@@ -20,6 +20,7 @@
 
 import SecureStorage from './SecureStorage';
 import { ApiClient } from '../config/ApiClient';
+import { servicePath } from '../config/serviceEndpoints';
 import { uuidv4 } from '../utils/crypto';
 
 export type ConsentPurpose =
@@ -63,7 +64,7 @@ export interface ConsentState {
   lastUpdatedAt: string;
 }
 
-const STORAGE_KEY = 'omobio_consent_state';
+const STORAGE_KEY = 'selfcare_consent_state';
 const DEFAULT_CONSENT_VERSION = '1.0.0';
 
 /**
@@ -242,7 +243,7 @@ class ConsentManagerImpl {
     };
     // 3. Notify server
     if (this.apiClient) {
-      await this.apiClient.post('/api/v1/customer/data-erasure', {
+      await this.apiClient.post(servicePath('customer', 'dataErasure', '/api/v1/customer/data-erasure'), {
         erasureId,
         requestedAt: new Date().toISOString(),
         source: 'mobile-app',
@@ -270,7 +271,10 @@ class ConsentManagerImpl {
   private async sendToServer(consent: Consent): Promise<void> {
     if (!this.apiClient) return;
     try {
-      await this.apiClient.post('/api/v1/customer/consent', consent);
+      await this.apiClient.post(
+        servicePath('customer', 'consent', '/api/v1/customer/consent'),
+        { ...consent } as Record<string, unknown>
+      );
     } catch (e) {
       if (__DEV__) {
         console.warn('[ConsentManager] Failed to sync consent to server', e);

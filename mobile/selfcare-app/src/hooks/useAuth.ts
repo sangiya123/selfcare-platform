@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useAuth — Authentication state store.
  *
  * Holds:
@@ -12,7 +12,7 @@
 import { create } from 'zustand';
 import { MMKV } from 'react-native-mmkv';
 
-const secureStorage = new MMKV({ id: 'omobio-auth-secure' });
+const secureStorage = new MMKV({ id: 'selfcare-auth-secure' });
 const ACCESS_KEY = 'accessToken';
 const REFRESH_KEY = 'refreshToken';
 const EXPIRES_KEY = 'accessExpiresAt';

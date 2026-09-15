@@ -1,5 +1,5 @@
 -- V1__init.sql
--- OMOBIO Selfcare Platform — customer-identity-service
+-- Selfcare Platform — customer-identity-service
 -- Tables: otp_codes, customer_sessions
 --
 -- Notes:

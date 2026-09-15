@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO DB Connection Pools",
-  "uid": "omobio-db-connection-pools",
+﻿{
+  "title": "selfcare DB Connection Pools",
+  "uid": "selfcare-db-connection-pools",
   "schemaVersion": 39,
   "version": 1,
-  "description": "HikariCP pool usage, connection acquire time, active connections, leaked connections, and slow query monitoring. Runbook: https://runbooks.omobio.local/db-pool",
-  "tags": ["omobio", "database", "hikari", "connection-pool", "slow-query"],
+  "description": "HikariCP pool usage, connection acquire time, active connections, leaked connections, and slow query monitoring. Runbook: https://runbooks.selfcare.local/db-pool",
+  "tags": ["selfcare", "database", "hikari", "connection-pool", "slow-query"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -78,7 +78,7 @@
       "id": 1,
       "type": "stat",
       "title": "Pools at Risk",
-      "description": "Count of pools where active connections exceed 80% of max. Runbook: https://runbooks.omobio.local/db-pool-exhaustion",
+      "description": "Count of pools where active connections exceed 80% of max. Runbook: https://runbooks.selfcare.local/db-pool-exhaustion",
       "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
       "datasource": "Prometheus",
       "targets": [
@@ -260,7 +260,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Hikari Pool Usage by Service (active / max)",
-      "description": "Active connections as a fraction of max pool size per service. Runbook: https://runbooks.omobio.local/db-pool-tuning",
+      "description": "Active connections as a fraction of max pool size per service. Runbook: https://runbooks.selfcare.local/db-pool-tuning",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

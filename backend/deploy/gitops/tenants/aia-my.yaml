@@ -3,7 +3,7 @@
 # Region: MY
 # Industry: INSURANCE
 # Tenant Type: INSURER
-# Created by: OMOBIO Platform Team
+# Created by: selfcare Platform Team
 
 env:
   # Tenant identity
@@ -22,8 +22,8 @@ env:
   # Branding
   TENANT_BRAND_COLOR_PRIMARY: "#D9001B"
   TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
-  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/aia-my/logo.svg"
-  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/aia-my/favicon.ico"
+  TENANT_BRAND_LOGO_URL: "https://assets.selfcare.example/brands/aia-my/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.selfcare.example/brands/aia-my/favicon.ico"
 
   # Domain configuration
   TENANT_DOMAIN: aia.com.my

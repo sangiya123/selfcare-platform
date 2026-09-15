@@ -5,15 +5,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>insurance-service</artifactId>
     <packaging>jar</packaging>
 
-    <name>OMOBIO Insurance Service</name>
+    <name>selfcare Insurance Service</name>
     <description>
         Insurance selfcare BFF — exposes insurance APIs to mobile and admin portals.
         Uses the InsuranceProvider adapter registry to dispatch to operator-specific
@@ -22,12 +22,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
         </dependency>
         <!-- Insurance operator pack providers (AIA, future insurers) -->
         <dependency>
-            <groupId>com.omobio.aia</groupId>
+            <groupId>com.selfcare.aia</groupId>
             <artifactId>aia-insurance-providers</artifactId>
             <version>${project.version}</version>
         </dependency>

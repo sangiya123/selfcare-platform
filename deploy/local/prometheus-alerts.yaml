@@ -1,0 +1,26 @@
+# Prometheus alerting rules — local dev plain-format (not the K8s PrometheusRule CRD)
+# Loaded via rule_files in deploy/local/prometheus.yml (/etc/prometheus/alerts/prometheus-alerts.yaml)
+
+groups:
+  - name: platform-availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"selfcare-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "selfcare service {{ $labels.job }} is down"
+          description: "Service {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+  - name: platform-slos
+    interval: 30s
+    rules:
+      - record: api_gateway:requests_per_second
+        expr: sum(rate(http_server_requests_seconds_count{application="api-gateway"}[1m]))
+      - record: payment:success_rate
+        expr: sum(rate(payment_succeeded_total[5m])) / sum(rate(payment_attempted_total[5m]))
+      - record: dashboard_bff:partial_response_rate
+        expr: sum(rate(dashboard_partial_response_total[5m])) / sum(rate(dashboard_total_responses[5m]))

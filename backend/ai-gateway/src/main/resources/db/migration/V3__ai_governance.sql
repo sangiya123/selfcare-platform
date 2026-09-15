@@ -1,5 +1,5 @@
 -- V3__ai_governance.sql
--- OMOBIO Selfcare Platform — ai-gateway
+-- Selfcare Platform — ai-gateway
 -- Tables for AI governance (ADR-013): use cases, prompt versions, evaluation
 -- results, kill switches. Implements the controls required by
 -- Planning doc/06_ai/02_AI_Governance_Evaluation.md.
@@ -150,7 +150,7 @@ VALUES
      'platform-ai-owner', 'MEDIUM', 'anthropic,openai', 'claude-sonnet-4-5',
      NULL, FALSE, 30, 50.0000, 2000, 'ANY', TRUE, TRUE, TRUE, NOW(), NOW()),
     ('content_rewrite', NULL, 'Content Rewrite / Translation',
-     'AI-assisted content generation and translation for Selfcare Studio',
+     'AI-assisted content generation and translation for selfcare Studio',
      'platform-ai-owner', 'LOW', 'anthropic,openai', 'claude-sonnet-4-5',
      NULL, FALSE, 30, 50.0000, 4000, 'ANY', TRUE, TRUE, TRUE, NOW(), NOW()),
     ('payment_action_prep', NULL, 'Payment Action Preparation',

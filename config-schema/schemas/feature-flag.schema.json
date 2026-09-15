@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/feature-flag.schema.json",
+  "$id": "https://selfcare.example.com/schemas/feature-flag.schema.json",
   "title": "FeatureFlag",
-  "description": "Feature flag definition for the OMOBIO Selfcare Platform. Controls rollout, targeting, kill switches, and expiry for platform features.",
+  "description": "Feature flag definition for the Selfcare Platform. Controls rollout, targeting, kill switches, and expiry for platform features.",
   "type": "object",
   "required": [
     "schemaVersion",

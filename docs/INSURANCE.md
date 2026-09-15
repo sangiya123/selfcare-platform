@@ -1,4 +1,4 @@
-# Insurance Industry Pack
+﻿# Insurance Industry Pack
 
 This document covers how the platform extends to the insurance vertical,
 with AIA as the reference client.
@@ -73,14 +73,14 @@ AIA APIs use OAuth2 client_credentials. The AIA provider caches tokens
 per tenant (refreshed 5 min before expiry).
 
 ### Mock mode
-For development, `omobio.aia.mock-mode=true` returns realistic mock data
-without calling AIA. This keeps the seeder URLs (`https://aia-mock.omobio.io`)
+For development, `selfcare.aia.mock-mode=true` returns realistic mock data
+without calling AIA. This keeps the seeder URLs (`https://aia-mock.selfcare.io`)
 working in dev.
 
 ### Real API integration
-Set `omobio.aia.mock-mode=false` and configure:
+Set `selfcare.aia.mock-mode=false` and configure:
 ```yaml
-omobio:
+selfcare:
   aia:
     mock-mode: false
     timeout-ms: 5000

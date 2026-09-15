@@ -1,6 +1,6 @@
-# OMOBIO Conformance Test Suite
+﻿# selfcare Conformance Test Suite
 
-Comprehensive automated conformance tests for the OMOBIO Selfcare Platform. This
+Comprehensive automated conformance tests for the Selfcare Platform. This
 suite validates that a deployment or new client is correctly integrated with the
 platform by exercising the full API surface across all 11 testing layers defined
 in [Test Strategy §12.2](../docs/CONFORMANCE_SUITE.md).
@@ -32,7 +32,7 @@ tests/conformance/
 ├── pom.xml                              # Maven project (TestNG, RestAssured, WireMock, Testcontainers)
 ├── README.md                            # this file
 └── src/test/
-    ├── java/com/omobio/conformance/
+    ├── java/com/selfcare/conformance/
     │   ├── TestRunner.java              # ISuiteListener / ITestListener; writes JSON summary
     │   ├── tenant/TenantIsolationTest.java
     │   ├── auth/
@@ -77,14 +77,14 @@ mvn test
 ### Against a deployed environment
 
 ```bash
-export OMOBIO_BASE_URL=https://staging.omobio.io
-export OMOBIO_TENANT=dialog-lk
-export OMOBIO_ADMIN_TENANT=aia-lk
+export SELFCARE_BASE_URL=https://staging.selfcare.io
+export SELFCARE_TENANT=dialog-lk
+export SELFCARE_ADMIN_TENANT=aia-lk
 
 mvn -f tests/conformance/pom.xml test -P stg \
-  -Domobio.base-url=$OMOBIO_BASE_URL \
-  -Domobio.tenant=$OMOBIO_TENANT \
-  -Domobio.admin-tenant=$OMOBIO_ADMIN_TENANT
+  -Dselfcare.base-url=$SELFCARE_BASE_URL \
+  -Dselfcare.tenant=$SELFCARE_TENANT \
+  -Dselfcare.admin-tenant=$SELFCARE_ADMIN_TENANT
 ```
 
 ### Run only one group (faster feedback)
@@ -107,9 +107,9 @@ mvn -f tests/conformance/pom.xml test -P security-tests
 - name: Run conformance suite
   run: |
     mvn -B -f tests/conformance/pom.xml test \
-        -Domobio.base-url=${{ secrets.STAGING_URL }} \
-        -Domobio.tenant=${{ secrets.STAGING_TENANT }} \
-        -Domobio.admin-tenant=${{ secrets.STAGING_ADMIN_TENANT }}
+        -Dselfcare.base-url=${{ secrets.STAGING_URL }} \
+        -Dselfcare.tenant=${{ secrets.STAGING_TENANT }} \
+        -Dselfcare.admin-tenant=${{ secrets.STAGING_ADMIN_TENANT }}
 ```
 
 ## Test design principles
@@ -223,9 +223,9 @@ target environment:
 ## Notes
 
 - **WireMock port:** default `8090`. Override with `-Dwiremock.port=...` or
-  `OMOBIO_WIREMOCK_PORT`.
+  `SELFCARE_WIREMOCK_PORT`.
 - **No auto-start of platform services:** the suite expects the platform to be
-  running at `omobio.base-url`. For local development, start the services
+  running at `selfcare.base-url`. For local development, start the services
   (`docker compose up` or your IDE) and then run `mvn test`.
 - **Idempotent:** each test generates unique identifiers via
   `TestDataFactory` so reruns never collide.

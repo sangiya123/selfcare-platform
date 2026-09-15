@@ -1,4 +1,4 @@
-# ADR-026: Multi-Tenancy Model — Tenant Resolution and Context
+﻿# ADR-026: Multi-Tenancy Model — Tenant Resolution and Context
 
 ## Status
 Accepted — 2026-09-04
@@ -17,7 +17,7 @@ codebase. Every request must be tagged with a tenant. The platform must:
 Each incoming request resolves the tenant in this priority:
 1. **`X-Tenant-Id` header** (highest priority, explicit routing)
 2. **JWT `tenant_id` claim** (after authentication)
-3. **Subdomain** (`dialog-lk.omobio.io` → `dialog-lk`)
+3. **Subdomain** (`dialog-lk.selfcare.io` → `dialog-lk`)
 4. **Path prefix** (`/api/dialog-lk/...` → `dialog-lk`, legacy only)
 5. **Default tenant** from config (dev environment only)
 
@@ -50,7 +50,7 @@ Each tenant gets isolated data in MongoDB via:
 - Collection-level access via `MongoTemplate` with mandatory filter
 
 ### 5. Redis isolation
-- Key prefix: `omobio:{tenantId}:{key}`
+- Key prefix: `selfcare:{tenantId}:{key}`
 - Logical DB index per tenant (configurable)
 - `RedisTenantFilter` validates prefix on all keys
 

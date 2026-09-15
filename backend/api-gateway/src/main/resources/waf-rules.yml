@@ -1,4 +1,4 @@
-# OWASP ModSecurity Core Rule Set (CRS) inspired rules for OMOBIO API Gateway
+# OWASP ModSecurity Core Rule Set (CRS) inspired rules for selfcare API Gateway
 # These rules are enforced when WAF_ENABLED=true
 # Deployed as a sidecar or inline filter depending on deployment model
 #

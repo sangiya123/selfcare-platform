@@ -5,15 +5,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.omobio</groupId>
-        <artifactId>omobio-selfcare-platform</artifactId>
+        <groupId>com.selfcare</groupId>
+        <artifactId>selfcare-platform</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>api-gateway</artifactId>
     <packaging>jar</packaging>
     <name>API Gateway</name>
-    <description>Single entry point for all OMOBIO selfcare platform requests. Routes to downstream services or legacy PHP (strangler-fig).</description>
+    <description>Single entry point for all Selfcare platform requests. Routes to downstream services or legacy PHP (strangler-fig).</description>
 
     <dependencies>
         <!-- ============================================================ -->
@@ -90,7 +90,7 @@
         <!-- Netty stack.                                                -->
         <!-- ============================================================ -->
         <dependency>
-            <groupId>com.omobio</groupId>
+            <groupId>com.selfcare</groupId>
             <artifactId>platform-common</artifactId>
             <exclusions>
                 <exclusion>

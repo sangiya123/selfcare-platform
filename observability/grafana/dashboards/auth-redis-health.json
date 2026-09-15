@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Auth Redis Health",
-  "uid": "omobio-auth-redis",
+﻿{
+  "title": "selfcare Auth Redis Health",
+  "uid": "selfcare-auth-redis",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Memory, keys, eviction, hit ratio, slow log, and replication health for the auth Redis cluster. Runbook: https://runbooks.omobio.local/auth-redis",
-  "tags": ["omobio", "redis", "auth", "session", "health"],
+  "description": "Memory, keys, eviction, hit ratio, slow log, and replication health for the auth Redis cluster. Runbook: https://runbooks.selfcare.local/auth-redis",
+  "tags": ["selfcare", "redis", "auth", "session", "health"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {

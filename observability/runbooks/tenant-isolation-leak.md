@@ -1,4 +1,4 @@
-# Runbook: Tenant Isolation Leak (CRITICAL)
+﻿# Runbook: Tenant Isolation Leak (CRITICAL)
 
 ## CRITICAL
 A tenant isolation leak is a **SEV-1 security incident**. Treat as urgent.
@@ -19,7 +19,7 @@ Page the security team immediately.
 
 2. **Halt the affected service**
    ```bash
-   kubectl -n omobio-prod scale deploy/<service> --replicas=0
+   kubectl -n selfcare-prod scale deploy/<service> --replicas=0
    ```
 
 3. **Capture evidence**

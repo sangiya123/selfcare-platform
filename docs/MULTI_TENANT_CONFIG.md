@@ -1,4 +1,4 @@
-# Multi-Tenant Configuration
+﻿# Multi-Tenant Configuration
 
 This document describes how the platform handles multi-tenancy: the rules,
 boundaries, and operational practices for running multiple clients on a
@@ -6,7 +6,7 @@ single deployment.
 
 ## Tenant definition
 
-A **tenant** is a business that uses the OMOBIO platform to deliver a
+A **tenant** is a business that uses the selfcare platform to deliver a
 selfcare product. Each tenant:
 - Has a unique `tenantId` (e.g. `dialog-lk`, `aia-lk`)
 - Has its own data (strict isolation)
@@ -36,7 +36,7 @@ and the recommended setup for regulated industries.
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://mysql.omobio.io/${TENANT_DATABASE:omobio_selfcare_dialog}
+    url: jdbc:mysql://mysql.selfcare.io/${TENANT_DATABASE:selfcare_dialog}
 ```
 
 ### Shared database with tenant_id column (cost-optimized)
@@ -49,7 +49,7 @@ auto-injects the `tenant_id` predicate.
 ### Cache isolation
 Every Redis key MUST include `tenantId` in the key:
 ```
-omobio:<service>:<tenantId>:<key>
+selfcare:<service>:<tenantId>:<key>
 ```
 
 The platform-common `RedisKey` utility enforces this pattern.
@@ -134,7 +134,7 @@ All metrics are labeled with `tenant_id`.
 - Tokens are tenant-scoped
 - Cross-tenant access is rejected (HTTP 403)
 - Audit log records all cross-tenant access attempts
-- Run `omobio.conformance.tenant-isolation` regularly to verify isolation
+- Run `selfcare.conformance.tenant-isolation` regularly to verify isolation
 
 ## Limits
 

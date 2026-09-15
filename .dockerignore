@@ -1,4 +1,4 @@
-# Docker build context must stay under ~5MB to avoid Windows Docker Desktop
+﻿# Docker build context must stay under ~5MB to avoid Windows Docker Desktop
 # named-pipe context transfer cancellation (known WSL2 issue)
 
 # IDE / OS
@@ -21,7 +21,7 @@ mobile/
 # Docs / planning (not needed for build)
 docs/
 "Planning doc"/
-"OMOBIO_Global_Selfcare_ALL_MARKDOWN_DOCUMENTS"/
+"selfcare_Global_selfcare_ALL_MARKDOWN_DOCUMENTS"/
 templates/
 
 # Observability (not needed for build)
@@ -30,13 +30,11 @@ observability/
 # CI configs (not needed for build)
 ci/
 
-# Config schema (not needed for build)
-config-schema/
-
 # Build outputs
-**/target/
+**/target/*
 **/build/
 **/*.jar
+!backend/**/target/*-SNAPSHOT.jar
 **/*.war
 **/*.ear
 **/coverage/

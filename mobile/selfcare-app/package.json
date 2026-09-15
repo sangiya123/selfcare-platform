@@ -1,8 +1,8 @@
 {
-  "name": "@omobio/selfcare-app",
+  "name": "@selfcare/selfcare-app",
   "version": "1.0.0",
   "private": true,
-  "description": "OMOBIO Selfcare App — React Native kernel with server-driven UI",
+  "description": "Selfcare App — React Native kernel with server-driven UI",
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -52,6 +52,7 @@
     "@react-native-community/cli-platform-ios": "20.2.0",
     "@react-native/babel-preset": "0.87.1",
     "@react-native/eslint-config": "0.87.1",
+    "@react-native/jest-preset": "0.87.1",
     "@react-native/metro-config": "0.87.1",
     "@react-native/typescript-config": "0.87.1",
     "@testing-library/jest-native": "^5.4.3",
@@ -68,6 +69,7 @@
     "jest-circus": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "prettier": "^3.5.3",
+    "react-test-renderer": "19.2.3",
     "typescript": "~5.8.3"
   },
   "engines": {

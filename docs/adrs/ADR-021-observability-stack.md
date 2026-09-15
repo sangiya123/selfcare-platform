@@ -1,4 +1,4 @@
-# ADR-021: Observability Stack — OpenTelemetry + Prometheus + ELK
+﻿# ADR-021: Observability Stack — OpenTelemetry + Prometheus + ELK
 
 ## Status
 Accepted — 2026-09-04
@@ -37,9 +37,9 @@ We adopt a **unified observability stack**:
 - Required dimensions: tenant, environment, service, capability, endpoint, provider, journey, configVersion, appVersion
 - RED metrics per service: Rate, Errors, Duration
 - USE metrics per host: Utilization, Saturation, Errors
-- Business KPIs: separate `omobio_business_*` metric namespace
-- AI: `omobio_ai_call_total{model=X,use_case=Y,outcome=Z}`
-- AI tokens: `omobio_ai_tokens_total{model=X,use_case=Y,type=input|output}`
+- Business KPIs: separate `selfcare_business_*` metric namespace
+- AI: `selfcare_ai_call_total{model=X,use_case=Y,outcome=Z}`
+- AI tokens: `selfcare_ai_tokens_total{model=X,use_case=Y,type=input|output}`
 
 ### 3. Logs
 - Structured JSON logs to stdout

@@ -1,4 +1,4 @@
-# Mobile SDK — Integration Guide
+﻿# Mobile SDK — Integration Guide
 
 The mobile app (React Native) ships with a built-in SDK that handles
 authentication, config fetching, theme resolution, and component rendering.
@@ -6,12 +6,12 @@ authentication, config fetching, theme resolution, and component rendering.
 ## Quick start
 
 ```tsx
-import { OmobioApp } from '@omobio/selfcare-sdk';
+import { selfcareApp } from '@selfcare/selfcare-sdk';
 
 export default function App() {
   return (
-    <OmobioApp
-      apiBaseUrl="https://api.omobio.io"
+    <selfcareApp
+      apiBaseUrl="https://api.selfcare.io"
       tenantId="dialog-lk"          // or null for multi-tenant
       experience="home"
       onError={(err) => console.error(err)}
@@ -32,10 +32,10 @@ That's it — the SDK handles:
 ### ConfigSDK
 
 ```ts
-import { ConfigSDK } from '@omobio/selfcare-sdk';
+import { ConfigSDK } from '@selfcare/selfcare-sdk';
 
 const config = new ConfigSDK({
-  apiBaseUrl: 'https://api.omobio.io',
+  apiBaseUrl: 'https://api.selfcare.io',
   tenantId: 'dialog-lk',
   cache: 'mmkv'        // or 'encryptedStorage' for sensitive
 });
@@ -48,9 +48,9 @@ const theme = await config.getTheme();
 ### AuthSDK
 
 ```ts
-import { AuthSDK } from '@omobio/selfcare-sdk';
+import { AuthSDK } from '@selfcare/selfcare-sdk';
 
-const auth = new AuthSDK({ apiBaseUrl: 'https://api.omobio.io', tenantId: 'dialog-lk' });
+const auth = new AuthSDK({ apiBaseUrl: 'https://api.selfcare.io', tenantId: 'dialog-lk' });
 
 // Send OTP
 await auth.sendOtp({ identifier: '+94771234567', channel: 'SMS' });
@@ -72,7 +72,7 @@ await auth.signOut();
 Register a custom component to make it usable in server-driven layouts:
 
 ```ts
-import { ComponentRegistry } from '@omobio/selfcare-sdk';
+import { ComponentRegistry } from '@selfcare/selfcare-sdk';
 import { MyCustomWidget } from './widgets/MyCustomWidget';
 
 ComponentRegistry.register('MyCustomWidget', MyCustomWidget, {
@@ -96,7 +96,7 @@ approval workflow per ADR-009).
 ### LayoutRenderer
 
 ```tsx
-import { LayoutRenderer } from '@omobio/selfcare-sdk';
+import { LayoutRenderer } from '@selfcare/selfcare-sdk';
 
 <LayoutRenderer
   manifest={manifest}
@@ -122,7 +122,7 @@ import { LayoutRenderer } from '@omobio/selfcare-sdk';
 ### ThemeEngine
 
 ```tsx
-import { ThemeEngine } from '@omobio/selfcare-sdk';
+import { ThemeEngine } from '@selfcare/selfcare-sdk';
 
 const theme = ThemeEngine.fromManifest(manifest);
 
@@ -172,7 +172,7 @@ ComponentRegistry.onAction('OPEN_WEB', (action, ctx) => {
 
 ### Enable verbose logging
 ```ts
-import { setLogLevel } from '@omobio/selfcare-sdk';
+import { setLogLevel } from '@selfcare/selfcare-sdk';
 setLogLevel('debug');
 ```
 
@@ -194,7 +194,7 @@ await config.refreshManifest('home');
 ```bash
 cd ios
 pod install
-xcodebuild -workspace OmobioSelfcare.xcworkspace -scheme OmobioSelfcare -configuration Release
+xcodebuild -workspace selfcareSelfcare.xcworkspace -scheme selfcareSelfcare -configuration Release
 ```
 
 ### Android

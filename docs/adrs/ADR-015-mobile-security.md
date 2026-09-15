@@ -1,4 +1,4 @@
-# ADR-015: Mobile Security Baseline
+﻿# ADR-015: Mobile Security Baseline
 
 ## Status
 Accepted — 2026-09-04
@@ -40,7 +40,7 @@ We adopt a **defense-in-depth** mobile security baseline:
 - Android: signed with release key in CI; Play Integrity API check on launch
 
 ### 5. Logging
-- Structured logger (`@omobio/mobile-logger`)
+- Structured logger (`@selfcare/mobile-logger`)
 - Token, password, OTP, MSISDN masked at logger level
 - Logs never sent to console in release builds
 - Crash logs (Sentry/Crashlytics) include correlation ID but no PII

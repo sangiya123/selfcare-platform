@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =====================================================================
-# OMOBIO — Universal env launcher for Docker / K8s / bare-metal
+# selfcare — Universal env launcher for Docker / K8s / bare-metal
 # =====================================================================
 # Usage:
 #   ./env.sh dev    backend-run
 #   ./env.sh stg    admin-build
 #   ./env.sh prod   mobile-build-android
 #
-# Or with explicit env:  OMOBIO_ENV=prod ./env.sh <command...>
+# Or with explicit env:  SELFCARE_ENV=prod ./env.sh <command...>
 # =====================================================================
 
 set -euo pipefail
@@ -18,11 +18,11 @@ shift || true
 CMD="${@:-env-show}"
 
 if [[ -z "$ENV" ]]; then
-  if [[ -n "${OMOBIO_ENV:-}" ]]; then
-    ENV="$OMOBIO_ENV"
+  if [[ -n "${SELFCARE_ENV:-}" ]]; then
+    ENV="$SELFCARE_ENV"
   else
     echo "Usage: $0 <env> <command...>"
-    echo "       OMOBIO_ENV must be one of: dev, stg, reg, prod"
+    echo "       SELFCARE_ENV must be one of: dev, stg, reg, prod"
     exit 1
   fi
 fi
@@ -47,5 +47,5 @@ export VITE_APP_ENV="$ENV"
 export NODE_ENV="$ENV"
 
 # Run the command
-echo "[env.sh] OMOBIO_ENV=$ENV  CMD=$CMD"
+echo "[env.sh] SELFCARE_ENV=$ENV  CMD=$CMD"
 exec $CMD

@@ -1,8 +1,10 @@
 /**
- * OtpScreen — user enters the 6-digit code they received.
+ * OtpScreen — user enters the verification code they received.
  *
- * Submits to auth.verifyOtp() and on success the SDK transitions to authenticated.
- * Includes a countdown resend button and a back button.
+ * Submits via the configured auth SDK (auth.verifyOtp(); on success the SDK
+ * transitions to authenticated and App.tsx swaps to Main, and OTP resend uses
+ * the configured delivery channel). OTP length is admin-authored (manifest
+ * auth.methods.otp.options.length). All copy/colors/sizes are config-driven.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -10,46 +12,61 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useApi } from '../hooks/useApi';
-import { useTenant } from '../hooks/useTenant';
-import { tokens } from '../styles/design-tokens';
+import { useLocalize } from '../manifest/Localization';
+import { useTheme, fontSizePx, readableOn, ResolvedTheme } from '../manifest/ThemeEngine';
+import { resolveLoginPlan } from '../config/loginFlow';
+import type { SelfcareSDK } from '../config/ConfigSDK';
 import type { RootStackParamList } from '../../App';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Otp'>;
 type R = RouteProp<RootStackParamList, 'Otp'>;
 
 const RESEND_SECONDS = 30;
-const CODE_LENGTH = 6;
+const DEFAULT_CODE_LENGTH = 6;
+
+function getSdk(): SelfcareSDK | undefined {
+  return (globalThis as unknown as { __SELFCARE_SDK__?: SelfcareSDK }).__SELFCARE_SDK__;
+}
 
 export function OtpScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
-  const api = useApi();
-  const { tenantId: activeTenant } = useTenant();
+  const sdk = getSdk();
+  const theme = useTheme();
+  const { t } = useLocalize();
 
-  const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
+  // OTP length + resend channel are admin-authored (manifest auth config),
+  // never hardcoded in the app.
+  const loginPlan = resolveLoginPlan(sdk?.getManifest() ?? null);
+  const otpMethod = loginPlan.enabledMethods.find((m) => m.method === 'otp');
+  const codeLength = otpMethod?.options?.length ?? DEFAULT_CODE_LENGTH;
+  const resendChannel = ((otpMethod?.options?.channels ?? ['sms'])[0] ?? 'sms').toUpperCase() as
+    | 'SMS'
+    | 'WHATSAPP'
+    | 'EMAIL';
+
+  const [code, setCode] = useState<string[]>(() => Array(codeLength).fill(''));
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(RESEND_SECONDS);
   const [error, setError] = useState<string | null>(null);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<Array<{ focus?: () => void } | null>>([]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn(resendIn - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setResendIn(resendIn - 1), 1000);
+    return () => clearTimeout(timer);
   }, [resendIn]);
 
   useEffect(() => {
-    // Auto-focus first box
-    inputRefs.current[0]?.focus();
+    inputRefs.current[0]?.focus?.();
   }, []);
 
   const handleCodeChange = useCallback(
@@ -59,89 +76,102 @@ export function OtpScreen(): React.JSX.Element {
       next[index] = digit;
       setCode(next);
       setError(null);
-      if (digit && index < CODE_LENGTH - 1) {
-        inputRefs.current[index + 1]?.focus();
+      if (digit && index < codeLength - 1) {
+        inputRefs.current[index + 1]?.focus?.();
       }
-      // Auto-submit when all filled
-      if (index === CODE_LENGTH - 1 && digit) {
+      if (index === codeLength - 1 && digit) {
         const full = next.join('');
-        if (full.length === CODE_LENGTH) {
+        if (full.length === codeLength) {
           onVerify(full);
         }
       }
     },
-    [code]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [code, codeLength]
   );
 
   const onVerify = useCallback(
     async (fullCode?: string) => {
       const final = fullCode ?? code.join('');
-      if (final.length !== CODE_LENGTH) {
-        setError('Please enter the full 6-digit code.');
+      if (final.length !== codeLength) {
+        setError(
+          t('otp.incomplete', {
+            default: 'Please enter the full {length}-digit code.',
+            params: { length: String(codeLength) },
+          })
+        );
+        return;
+      }
+      if (!sdk) {
+        setError(t('otp.notReady', { default: 'Sign-in is not ready yet.' }));
         return;
       }
       setLoading(true);
       try {
-        const result = await api.auth.verifyOtp({
-          identifier: route.params.msisdn,
-          code: final,
-          tenantId: activeTenant,
-        });
+        const result = await sdk.auth.verifyOtp(route.params.msisdn, final);
         if (result.success) {
-          // App.tsx will switch to Main when auth state becomes 'authenticated'
+          // App.tsx swaps to Main when the SDK emits 'authenticated'.
         } else {
-          setError(result.errorMessage ?? 'Invalid code');
-          setCode(Array(CODE_LENGTH).fill(''));
-          inputRefs.current[0]?.focus();
+          setError(t('otp.invalid', { default: 'Invalid code' }));
+          setCode(Array(codeLength).fill(''));
+          inputRefs.current[0]?.focus?.();
         }
       } catch (err: any) {
-        setError(err?.message ?? 'Network error');
+        setError(err?.message ?? t('otp.networkError', { default: 'Network error' }));
       } finally {
         setLoading(false);
       }
     },
-    [code, route.params.msisdn, activeTenant, api]
+    [code, codeLength, route.params.msisdn, sdk, t]
   );
 
   const onResend = useCallback(async () => {
-    if (resendIn > 0) return;
+    if (resendIn > 0 || !sdk) return;
     setResendIn(RESEND_SECONDS);
     setError(null);
-    setCode(Array(CODE_LENGTH).fill(''));
+    setCode(Array(codeLength).fill(''));
     try {
-      await api.auth.sendOtp({
-        identifier: route.params.msisdn,
-        channel: 'sms',
-        tenantId: activeTenant,
-      });
-      Alert.alert('Code resent', 'A new 6-digit code has been sent.');
+      await sdk.auth.sendOtp(route.params.msisdn, resendChannel);
+      Alert.alert(
+        t('otp.resentTitle', { default: 'Code resent' }),
+        t('otp.resentBody', { default: 'A new code has been sent.' })
+      );
     } catch (err: any) {
-      Alert.alert('Could not resend', err?.message ?? 'Try again later.');
+      Alert.alert(
+        t('otp.resendFailedTitle', { default: 'Could not resend' }),
+        err?.message ?? t('otp.resendFailedBody', { default: 'Try again later.' })
+      );
     }
-  }, [resendIn, route.params.msisdn, activeTenant, api]);
+  }, [resendIn, route.params.msisdn, sdk, t, codeLength, resendChannel]);
+
+  const s = otpStyles(theme);
+  const onPrimary = readableOn(theme.colors.primary500 ?? theme.colors.primary);
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.body}>
-        <Text style={styles.title}>Enter verification code</Text>
-        <Text style={styles.subtitle}>
-          We sent a 6-digit code to{'\n'}
-          <Text style={styles.identifier}>{route.params.msisdn}</Text>
+      <View style={s.body}>
+        <Text style={s.title}>{t('otp.title', { default: 'Enter verification code' })}</Text>
+        <Text style={s.subtitle}>
+          {t('otp.subtitle', {
+            default: 'We sent a code to the number you provided.',
+          })}
+          {'\n'}
+          <Text style={s.identifier}>{route.params.msisdn}</Text>
         </Text>
 
-        <View style={styles.codeRow}>
+        <View style={s.codeRow}>
           {code.map((digit, i) => (
             <TextInput
               key={i}
               ref={(ref) => {
                 inputRefs.current[i] = ref;
               }}
-              style={[styles.codeBox, error && styles.codeBoxError]}
+              style={[s.codeBox, error && s.codeBoxError]}
               value={digit}
-              onChangeText={(t) => handleCodeChange(t, i)}
+              onChangeText={(value) => handleCodeChange(value, i)}
               keyboardType="number-pad"
               maxLength={1}
               selectTextOnFocus
@@ -150,81 +180,117 @@ export function OtpScreen(): React.JSX.Element {
           ))}
         </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error ? <Text style={s.errorText}>{error}</Text> : null}
 
         <TouchableOpacity
-          style={[styles.cta, loading && styles.ctaDisabled]}
+          style={[s.cta, loading && s.ctaDisabled]}
           onPress={() => onVerify()}
           disabled={loading}
           testID="otp-submit"
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Verify</Text>}
+          {loading ? (
+            <ActivityIndicator color={onPrimary} />
+          ) : (
+            <Text style={s.ctaText}>{t('otp.verify', { default: 'Verify' })}</Text>
+          )}
         </TouchableOpacity>
 
-        <View style={styles.resendRow}>
-          <Text style={styles.resendLabel}>Didn't get a code?</Text>
+        <View style={s.resendRow}>
+          <Text style={s.resendLabel}>{t('otp.resendHint', { default: "Didn't get a code?" })}</Text>
           {resendIn > 0 ? (
-            <Text style={styles.resendTimer}>Resend in {resendIn}s</Text>
+            <Text style={s.resendTimer}>
+                {t('otp.resendIn', {
+                  default: 'Resend in {seconds}s',
+                  params: { seconds: String(resendIn) },
+                })}
+              </Text>
           ) : (
             <TouchableOpacity onPress={onResend} testID="otp-resend">
-              <Text style={styles.resendButton}>Resend</Text>
+              <Text style={s.resendButton}>{t('otp.resend', { default: 'Resend' })}</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>← Change number</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
+          <Text style={s.backText}>{t('otp.changeNumber', { default: '← Change number' })}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: tokens.colors.surface },
-  body: { flex: 1, padding: 24, justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '700', color: tokens.colors.textPrimary, textAlign: 'center' },
-  subtitle: {
-    fontSize: 14,
-    color: tokens.colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  identifier: { fontWeight: '600', color: tokens.colors.textPrimary },
-  codeRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  codeBox: {
-    width: 44,
-    height: 56,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    borderRadius: 8,
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '600',
-    color: tokens.colors.textPrimary,
-    backgroundColor: '#fff',
-  },
-  codeBoxError: { borderColor: tokens.colors.error },
-  errorText: {
-    color: tokens.colors.error,
-    textAlign: 'center',
-    marginTop: 12,
-    fontSize: 13,
-  },
-  cta: {
-    marginTop: 32,
-    backgroundColor: tokens.colors.primary500,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  ctaDisabled: { opacity: 0.6 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  resendRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20, gap: 6 },
-  resendLabel: { color: tokens.colors.textSecondary, fontSize: 13 },
-  resendTimer: { color: tokens.colors.textSecondary, fontSize: 13, fontWeight: '500' },
-  resendButton: { color: tokens.colors.primary500, fontSize: 13, fontWeight: '600' },
-  back: { marginTop: 24, alignSelf: 'center' },
-  backText: { color: tokens.colors.textSecondary, fontSize: 13 },
-});
+function otpStyles(theme: ResolvedTheme): ReturnType<typeof StyleSheet.create> {
+  const colors = theme.colors;
+  const layout = theme.layout;
+  const base = colors.surface ?? '#f5f5f5';
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.surface },
+    body: { flex: 1, padding: layout.pagePadding, justifyContent: 'center' },
+    title: {
+      fontSize: fontSizePx(theme, '2xl'),
+      fontWeight: '700',
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    subtitle: {
+      fontSize: fontSizePx(theme, 'sm'),
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 8,
+      marginBottom: 32,
+    },
+    identifier: { fontWeight: '600', color: colors.textPrimary },
+    codeRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    codeBox: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget + 12,
+      borderWidth: layout.hairlinePx,
+      borderColor: colors.border,
+      borderRadius: layout.radius,
+      textAlign: 'center',
+      fontSize: fontSizePx(theme, '2xl'),
+      fontWeight: '600',
+      color: colors.textPrimary,
+      backgroundColor: colors.surfaceStrong ?? base,
+    },
+    codeBoxError: { borderColor: colors.error },
+    errorText: {
+      color: colors.error,
+      textAlign: 'center',
+      marginTop: 12,
+      fontSize: fontSizePx(theme, 'sm'),
+    },
+    cta: {
+      marginTop: 32,
+      backgroundColor: colors.primary500 ?? colors.primary,
+      borderRadius: layout.radius,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    ctaDisabled: { opacity: 0.6 },
+    ctaText: {
+      color: readableOn(colors.primary500 ?? colors.primary),
+      fontSize: fontSizePx(theme, 'base'),
+      fontWeight: '600',
+    },
+    resendRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    resendLabel: { color: colors.textSecondary, fontSize: fontSizePx(theme, 'sm') },
+    resendTimer: {
+      color: colors.textSecondary,
+      fontSize: fontSizePx(theme, 'sm'),
+      fontWeight: '500',
+    },
+    resendButton: {
+      color: colors.primary500 ?? colors.primary,
+      fontSize: fontSizePx(theme, 'sm'),
+      fontWeight: '600',
+    },
+    back: { marginTop: 24, alignSelf: 'center' },
+    backText: { color: colors.textSecondary, fontSize: fontSizePx(theme, 'sm') },
+  });
+}

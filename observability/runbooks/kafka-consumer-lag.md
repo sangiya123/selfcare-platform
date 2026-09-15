@@ -1,4 +1,4 @@
-# Kafka Consumer Lag — Incident Runbook
+﻿# Kafka Consumer Lag — Incident Runbook
 
 **Severity**: SEV-2 (growing lag) / SEV-3 (stable lag)  
 **Service**: Any Kafka consumer service  
@@ -27,19 +27,19 @@ kubectl exec -it deploy/kafka -n kafka -- \
 # Check lag for a specific group
 kubectl exec -it deploy/kafka -n kafka -- \
   kafka-consumer-groups.sh --bootstrap-server localhost:9092 \
-  --group omobio-audit-consumer --describe
+  --group selfcare-audit-consumer --describe
 ```
 
 ### 2. Check which partition(s) have lag
 
 ```
 GROUP, TOPIC, PARTITION, CURRENT-OFFSET, LOG-END-OFFSET, LAG, CONSUMER-HOST
-omobio-audit-consumer, audit.events, 0, 12345, 12900, 555, kafka-consumer-0.omobio
+selfcare-audit-consumer, audit.events, 0, 12345, 12900, 555, kafka-consumer-0.selfcare
 ```
 
 ### 3. Identify the slow consumer
 
-- Is the consumer pod running? `kubectl get pods -n omobio-prod | grep audit`
+- Is the consumer pod running? `kubectl get pods -n selfcare-prod | grep audit`
 - Check consumer logs for errors: `kubectl logs -f deploy/audit-service --tail=100`
 - Common errors: OOM, crash loop, DB connection exhaustion
 
@@ -47,7 +47,7 @@ omobio-audit-consumer, audit.events, 0, 12345, 12900, 555, kafka-consumer-0.omob
 
 ```bash
 # Messages per second consumed
-kubectl exec -it deploy/audit-service -n omobio-prod -- \
+kubectl exec -it deploy/audit-service -n selfcare-prod -- \
   curl localhost:8085/actuator/metrics/kafka_consumer_records_consumed_total
 ```
 
@@ -59,11 +59,11 @@ kubectl exec -it deploy/audit-service -n omobio-prod -- \
 
 ```bash
 # Restart the consumer
-kubectl rollout restart deployment/audit-service -n omobio-prod
-kubectl rollout status deployment/audit-service -n omobio-prod
+kubectl rollout restart deployment/audit-service -n selfcare-prod
+kubectl rollout status deployment/audit-service -n selfcare-prod
 
 # If OOM: temporarily increase memory limit
-kubectl patch deployment audit-service -n omobio-prod \
+kubectl patch deployment audit-service -n selfcare-prod \
   -p '{"spec":{"template":{"spec":{"containers":[{"name":"audit-service","resources":{"limits":{"memory":"2Gi"}}}]}}}}'
 ```
 
@@ -71,12 +71,12 @@ kubectl patch deployment audit-service -n omobio-prod \
 
 ```bash
 # Scale up consumer replicas (if consumer group supports multiple instances)
-kubectl scale deployment audit-service -n omobio-prod --replicas=4
+kubectl scale deployment audit-service -n selfcare-prod --replicas=4
 
 # Or: reset consumer offset to latest (loses messages — only in dev/stg)
 kubectl exec -it deploy/kafka -n kafka -- \
   kafka-consumer-groups.sh --bootstrap-server localhost:9092 \
-  --group omobio-audit-consumer \
+  --group selfcare-audit-consumer \
   --topic audit.events \
   --reset-offsets --to-latest --execute
 ```

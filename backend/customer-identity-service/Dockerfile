@@ -1,14 +1,15 @@
-# Multi-stage Dockerfile for OMOBIO microservices
+﻿# Multi-stage Dockerfile for selfcare microservices
 # Build context: repository root (selfcare-platform)
 # Strategy:
 #   1. Install Maven 3.9.9 (Java 25 compatible — no Alpine package version skew)
 #   2. Copy entire project tree (parent pom.xml needs industry-packs to exist)
 #   3. Install parent pom (non-recursive) so child modules can find it
 #   4. Install platform-common to local .m2 repo
-#   5. Build only the target service module
+#   5. Install the telco industry packs (customer-identity-service depends on dialog-providers)
+#   6. Build only the target service module
 #
 # Usage (from selfcare-platform/):
-#   docker build -t omobio/customer-identity-service:1.0.0 -f backend/customer-identity-service/Dockerfile .
+#   docker build -t selfcare/customer-identity-service:1.0.0 -f backend/customer-identity-service/Dockerfile .
 
 FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /build
@@ -35,6 +36,11 @@ RUN mvn -s backend/settings.xml -f backend/pom.xml -N install -DskipTests -B \
 RUN mvn -s backend/settings.xml -f backend/pom.xml -pl platform-common install -DskipTests -B \
   -Dmaven.repo.local=/build/.m2
 
+# Install the telco industry packs to the local .m2 repo (backend services
+# depend on the pack jars: dialog-providers, hutch-providers, airtel-providers)
+RUN mvn -s backend/settings.xml -f industry-packs/telco/pom.xml install \
+  -Dmaven.test.skip=true -Djacoco.skip=true -B -Dmaven.repo.local=/build/.m2
+
 # Build ONLY the target service module
 RUN mvn -s backend/settings.xml -f backend/pom.xml -pl ${MODULE} package -Dmaven.test.skip=true -B \
   -Dmaven.repo.local=/build/.m2
@@ -43,7 +49,7 @@ RUN mvn -s backend/settings.xml -f backend/pom.xml -pl ${MODULE} package -Dmaven
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
-RUN addgroup -g 1000 -S omobio && adduser -u 1000 -S omobio -G omobio
+RUN addgroup -g 1000 -S selfcare && adduser -u 1000 -S selfcare -G selfcare
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
@@ -53,7 +59,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 ARG MODULE=customer-identity-service
 COPY --from=builder /build/backend/${MODULE}/target/${MODULE}-*-SNAPSHOT.jar app.jar
 
-USER omobio
+USER selfcare
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8094}
   reactive:
     max-memory: 512M
 
@@ -7,18 +7,20 @@ spring:
   application:
     name: ai-gateway
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/omobio_identity?useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:omobio}
-    password: ${SPRING_DATASOURCE_PASSWORD:omobio_pw}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:selfcare}
+    password: ${SPRING_DATASOURCE_PASSWORD:Selfcare_My5ql_Db_Pa55w0rd!2026}
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  mongodb:
+    uri: ${MONGO_URI:mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin}
   data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/selfcare_ai}
     redis:
-      url: ${REDIS_URL:redis://localhost:6379}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
   cloud:
     stream:
       kafka:
@@ -48,8 +50,8 @@ resilience4j:
         max-attempts: 2
         wait-duration: 500ms
 
-# OMOBIO AI configuration
-omobio:
+# selfcare AI configuration
+selfcare:
   ai:
     # Default LLM provider
     default-provider: ${AI_DEFAULT_PROVIDER:anthropic}
@@ -107,6 +109,6 @@ otel:
 logging:
   level:
     root: INFO
-    com.omobio: DEBUG
+    com.selfcare: DEBUG
   pattern:
     console: "%d{ISO8601} [%thread] %-5level [%X{tenantId:-},%X{correlationId:-}] %logger{36} - %msg%n"

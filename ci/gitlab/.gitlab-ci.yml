@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — GitLab CI/CD pipeline
+﻿# Selfcare Platform — GitLab CI/CD pipeline
 #
 # Mirror of the GitHub Actions workflow for teams using GitLab.
 # Stages: lint → test → scan → build → deploy
@@ -106,16 +106,16 @@ unit-tests:admin:
   stage: test
   image: node:20
   script:
-    - cd selfcare-platform/admin/selfcare-studio
+    - cd selfcare-platform/admin/selfcare-admin
     - npm ci
     - npx vitest run --coverage --reporter=junit --outputFile.junit=./junit.xml
   artifacts:
     when: always
     reports:
-      junit: selfcare-platform/admin/selfcare-studio/junit.xml
+      junit: selfcare-platform/admin/selfcare-admin/junit.xml
       coverage_report:
         coverage_format: cobertura
-        path: selfcare-platform/admin/selfcare-studio/coverage/cobertura-coverage.xml
+        path: selfcare-platform/admin/selfcare-admin/coverage/cobertura-coverage.xml
   rules:
     - if: '$CI_COMMIT_BRANCH'
       changes:
@@ -151,13 +151,13 @@ conformance-tests:
       alias: mysql
       command: ['--default-authentication-plugin=mysql_native_password']
       variables:
-        MYSQL_ROOT_PASSWORD: 'root'
+        MYSQL_ROOT_PASSWORD: 'Selfcare_My5ql_R00t_Pa55w0rd!2026'
         MYSQL_DATABASE: 'selfcare_test'
   variables:
-    OMOBIO_TEST_GATEWAY_URL: 'http://localhost:8080'
-    OMOBIO_TEST_DB_URL: 'jdbc:mysql://mysql:3306/selfcare_test'
-    OMOBIO_TEST_REDIS_URL: 'redis://redis:6379'
-    OMOBIO_TEST_MONGO_URL: 'mongodb://mongo:27017/selfcare_test'
+    SELFCARE_TEST_GATEWAY_URL: 'http://localhost:8080'
+    SELFCARE_TEST_DB_URL: 'jdbc:mysql://mysql:3306/selfcare_test'
+    SELFCARE_TEST_REDIS_URL: 'redis://redis:6379'
+    SELFCARE_TEST_MONGO_URL: 'mongodb://mongo:27017/selfcare_test'
   script:
     - cd selfcare-platform/tests/conformance
     - mvn $MAVEN_CLI_OPTS test
@@ -245,12 +245,12 @@ build:admin:
   stage: build
   image: node:20
   script:
-    - cd selfcare-platform/admin/selfcare-studio
+    - cd selfcare-platform/admin/selfcare-admin
     - npm ci
     - npm run build
   artifacts:
     paths:
-      - selfcare-platform/admin/selfcare-studio/dist
+      - selfcare-platform/admin/selfcare-admin/dist
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
@@ -289,9 +289,9 @@ deploy:dev:
                     billing-service payment-service notification-service content-service
                     journey-service reporting-service ai-gateway audit-service insurance-service
                     approval-service; do
-        helm upgrade --install omobio-${service} \
+        helm upgrade --install selfcare-${service} \
           selfcare-platform/backend/deploy/helm/${service} \
-          --namespace omobio-dev --create-namespace \
+          --namespace selfcare-dev --create-namespace \
           --set image.tag=$CI_COMMIT_SHORT_SHA \
           --set image.repository=$DOCKER_REGISTRY/${service} \
           --set env=dev --set replicaCount=1 \
@@ -299,7 +299,7 @@ deploy:dev:
       done
   environment:
     name: dev
-    url: https://api.dev.omobio.io
+    url: https://api.dev.selfcare.io
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
@@ -318,9 +318,9 @@ deploy:stg:
                     billing-service payment-service notification-service content-service
                     journey-service reporting-service ai-gateway audit-service insurance-service
                     approval-service; do
-        helm upgrade --install omobio-${service} \
+        helm upgrade --install selfcare-${service} \
           selfcare-platform/backend/deploy/helm/${service} \
-          --namespace omobio-stg --create-namespace \
+          --namespace selfcare-stg --create-namespace \
           --set image.tag=$CI_COMMIT_SHORT_SHA \
           --set image.repository=$DOCKER_REGISTRY/${service} \
           --set env=stg --set replicaCount=2 \
@@ -328,7 +328,7 @@ deploy:stg:
       done
   environment:
     name: stg
-    url: https://api.stg.omobio.io
+    url: https://api.stg.selfcare.io
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
@@ -349,9 +349,9 @@ deploy:prod:
                     billing-service payment-service notification-service content-service
                     journey-service reporting-service ai-gateway audit-service insurance-service
                     approval-service; do
-        helm upgrade --install omobio-${service} \
+        helm upgrade --install selfcare-${service} \
           selfcare-platform/backend/deploy/helm/${service} \
-          --namespace omobio-prod --create-namespace \
+          --namespace selfcare-prod --create-namespace \
           --set image.tag=$VERSION \
           --set image.repository=$DOCKER_REGISTRY/${service} \
           --set env=prod --set replicaCount=3 \
@@ -360,7 +360,7 @@ deploy:prod:
       done
   environment:
     name: prod
-    url: https://api.omobio.io
+    url: https://api.selfcare.io
   when: manual
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v.*/'

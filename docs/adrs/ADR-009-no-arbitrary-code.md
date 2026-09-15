@@ -1,8 +1,8 @@
-# ADR-009: Config Cannot Execute Arbitrary Code
+﻿# ADR-009: Config Cannot Execute Arbitrary Code
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council, Security Team
+**Deciders**: selfcare Architecture Council, Security Team
 
 ## Context
 

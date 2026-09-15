@@ -1,12 +1,12 @@
-# ADR-012: Industry Pack Abstraction Layer
+﻿# ADR-012: Industry Pack Abstraction Layer
 
 **Status**: ACCEPTED
 **Date**: 2026-09-03
-**Deciders**: OMOBIO Architecture Council
+**Deciders**: selfcare Architecture Council
 
 ## Context
 
-The OMOBIO Selfcare Platform serves multiple industries:
+The Selfcare Platform serves multiple industries:
 - **Telco** (Dialog, Hutch, Airtel) — subscriber management, recharge, bundles
 - **Insurance** (AIA) — policyholder management, premiums, claims
 - **Future**: Banking, Travel, Healthcare
@@ -30,7 +30,7 @@ interfaces. Tenant config binds which pack to use.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  OMOBIO Platform                     │
+│                  selfcare Platform                     │
 │                                                      │
 │  ┌────────────────────────────────────────────────┐ │
 │  │              Industry Pack: Telco               │ │

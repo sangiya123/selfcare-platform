@@ -1,4 +1,4 @@
-# ADR-017: Feature Flag Evaluator Strategy
+﻿# ADR-017: Feature Flag Evaluator Strategy
 
 ## Status
 Accepted — 2026-09-04
@@ -27,11 +27,11 @@ We adopt a **two-tier evaluation** model:
 - This is held in a `LoadingCache<String, CompiledFlagRuleset>` keyed by tenantId
 - TTL: 5 minutes (configurable)
 - On flag mutation (admin creates/updates), the cache is invalidated
-  via Redis pub/sub (`omobio:flag:invalidate`)
+  via Redis pub/sub (`selfcare:flag:invalidate`)
 
 ### Tier 2: Real-time override
 - For emergency kill switches, a Redis lookup is done in parallel
-- Redis key: `omobio:flag:kill:{tenantId}:{flagKey}` → "KILLED"
+- Redis key: `selfcare:flag:kill:{tenantId}:{flagKey}` → "KILLED"
 - If present, evaluation short-circuits to false
 
 ### Evaluation order

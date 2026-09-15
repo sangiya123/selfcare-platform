@@ -1,122 +1,202 @@
 #!/usr/bin/env bash
-# deploy-k8s.sh — Deploy OMOBIO to Docker Desktop Kubernetes
-# Usage: ./scripts/deploy-k8s.sh [--build] [--skip-build]
+# deploy-k8s.sh — Deploy selfcare to Kubernetes (EKS or docker-desktop).
 #
-# Prerequisites:
-#   - Docker Desktop with Kubernetes enabled
-#     (Settings → Kubernetes → Enable Kubernetes → Apply & Restart)
-#   - kubectl connected to docker-desktop context
-#   - Docker images built locally via build-images.sh
+# Usage:
+#   ./scripts/deploy-k8s.sh --env dev [--tag VERSION] [--registry REG] [--namespace NS]
+#                            [--context CTX] [--skip-seed] [--local]
+#
+# Examples:
+#   # EKS dev deploy (from Jenkins)
+#   ./scripts/deploy-k8s.sh --env dev --tag dev-42 --registry ghcr.io/sangiya123
+#
+#   # Local docker-desktop deploy (default namespace = selfcare, no registry)
+#   ./scripts/deploy-k8s.sh --env dev --local
+#
+# Environment overrides:
+#   IMAGE_NAMESPACE   Registry prefix (default: ghcr.io/sangiya123)
+#   VERSION           Image tag (default: latest)
+#   SELFCARE_CONTEXT    kubectl context (default: auto-detect)
+#   SELFCARE_NAMESPACE  Namespace override (default: selfcare-$ENV)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 K8S_DIR="$PLATFORM_DIR/deploy/kubernetes"
+KUBECTL="kubectl"
 
-echo "=============================================="
-echo " OMOBIO Selfcare Platform — K8s Deploy"
-echo "=============================================="
+# --- Defaults ---
+ENV=""
+VERSION="${VERSION:-latest}"
+IMAGE_NAMESPACE="${IMAGE_NAMESPACE:-ghcr.io/sangiya123}"
+SELFCARE_CONTEXT="${SELFCARE_CONTEXT:-}"
+SELFCARE_NAMESPACE="${SELFCARE_NAMESPACE:-}"
+LOCAL_MODE=false
+SKIP_SEED=false
+SKIP_INFRA=false
+CHECK_ONLY=false
 
-# Step 1: Build images
-if [ "${1:-}" = "--build" ]; then
-  echo ""
-  echo "▶ Building Docker images..."
-  "$SCRIPT_DIR/build-images.sh"
-fi
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --env)            ENV="$2";                shift 2 ;;
+    --tag)            VERSION="$2";            shift 2 ;;
+    --registry)       IMAGE_NAMESPACE="$2";    shift 2 ;;
+    --namespace)      SELFCARE_NAMESPACE="$2";   shift 2 ;;
+    --context)        SELFCARE_CONTEXT="$2";     shift 2 ;;
+    --local)          LOCAL_MODE=true;          shift ;;
+    --skip-seed)      SKIP_SEED=true;           shift ;;
+    --skip-infra)     SKIP_INFRA=true;          shift ;;
+    --check-only)     CHECK_ONLY=true;          shift ;;
+    *)                echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
-# Step 2: Switch kubectl context to docker-desktop
-echo ""
-echo "▶ Setting kubectl context to docker-desktop..."
-if ! kubectl config get-contexts docker-desktop &>/dev/null; then
-  echo "ERROR: docker-desktop context not found."
-  echo "Make sure Kubernetes is enabled in Docker Desktop settings."
-  echo "Then run: kubectl config use-context docker-desktop"
+if [ -z "$ENV" ]; then
+  echo "ERROR: --env is required (dev | stg | prod)"
   exit 1
 fi
-kubectl config use-context docker-desktop 2>/dev/null || true
 
-# Step 3: Apply namespace
-echo ""
-echo "▶ Creating namespace..."
-kubectl apply -f "$K8S_DIR/namespace.yaml"
-echo "✓ Namespace 'omobio' created"
-
-# Step 4: Apply secrets
-echo ""
-echo "▶ Applying secrets..."
-kubectl apply -f "$K8S_DIR/secrets.yaml"
-echo "✓ Secrets applied"
-
-# Step 5: Apply config maps
-echo ""
-echo "▶ Applying config maps..."
-kubectl apply -f "$K8S_DIR/configmap.yaml"
-echo "✓ ConfigMaps applied"
-
-# Step 6: Deploy infrastructure
-echo ""
-echo "▶ Deploying infrastructure (MongoDB, Redis, Kafka, MySQL)..."
-kubectl apply -f "$K8S_DIR/infra.yaml"
-echo "✓ Infrastructure deployed"
-
-# Step 7: Wait for infrastructure
-echo ""
-echo "▶ Waiting for MongoDB to be ready..."
-kubectl wait --for=condition=available --timeout=120s deployment/mongodb -n omobio 2>/dev/null || \
-  kubectl rollout status deployment/mongodb -n omobio --timeout=120s
-echo "✓ MongoDB ready"
-
-echo "▶ Waiting for MySQL to be ready..."
-kubectl wait --for=condition=available --timeout=120s deployment/mysql -n omobio 2>/dev/null || \
-  kubectl rollout status deployment/mysql -n omobio --timeout=120s
-echo "✓ MySQL ready"
-
-# Step 8: Seed tenant data
-echo ""
-echo "▶ Seeding dialog-lk tenant config..."
-kubectl apply -f "$K8S_DIR/tenant-seeding-job.yaml"
-# Wait for seeding job to complete
-kubectl wait --for=condition=complete --timeout=60s job/omobio-tenant-seed-dialog -n omobio 2>/dev/null || true
-SEED_LOGS=$(kubectl logs job/omobio-tenant-seed-dialog -n omobio 2>/dev/null || echo "")
-if echo "$SEED_LOGS" | grep -q "seeding complete\|Seeded"; then
-  echo "✓ Tenant dialog-lk seeded"
-else
-  echo "⚠️  Tenant seeding may not have completed — check: kubectl logs job/omobio-tenant-seed-dialog -n omobio"
+# Derive namespace: selfcare-dev / selfcare-stg / selfcare-prod (or selfcare in local mode)
+if [ -z "$SELFCARE_NAMESPACE" ]; then
+  if [ "$LOCAL_MODE" = true ]; then
+    SELFCARE_NAMESPACE="selfcare"
+  else
+    SELFCARE_NAMESPACE="selfcare-${ENV}"
+  fi
 fi
 
-# Step 9: Deploy microservices
-echo ""
-echo "▶ Deploying OMOBIO microservices..."
-kubectl apply -f "$K8S_DIR/services.yaml"
-echo "✓ Microservices deployed"
+# Resolve kubectl context
+if [ -n "$SELFCARE_CONTEXT" ]; then
+  KUBECTL="$KUBECTL --context $SELFCARE_CONTEXT"
+elif [ "$LOCAL_MODE" = true ]; then
+  KUBECTL="$KUBECTL --context docker-desktop"
+fi
 
-# Step 10: Wait for API Gateway
-echo ""
-echo "▶ Waiting for API Gateway to be ready..."
-kubectl rollout status deployment/api-gateway -n omobio --timeout=180s
-echo "✓ API Gateway ready"
+echo "=============================================="
+echo " selfcare — Kubernetes Deploy"
+echo " Env       : $ENV"
+echo " Namespace : $SELFCARE_NAMESPACE"
+echo " Tag       : $VERSION"
+echo " Registry  : $IMAGE_NAMESPACE"
+echo " Context   : $(kubectl config current-context 2>/dev/null || echo auto)"
+echo " Local     : $LOCAL_MODE"
+echo "=============================================="
 
-# Step 11: Check all pods
+# Check-only mode: verify rollout health
+if [ "$CHECK_ONLY" = true ]; then
+  echo ""
+  echo "--- Checking rollout status for namespace $SELFCARE_NAMESPACE ---"
+  for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
+                 account-entitlement-service dashboard-bff product-service usage-service billing-service \
+                 payment-service notification-service content-service journey-service reporting-service \
+                 ai-gateway audit-service insurance-service approval-service; do
+    $KUBECTL rollout status deployment/$SERVICE -n $SELFCARE_NAMESPACE --timeout=5s 2>/dev/null \
+      && echo "OK    $SERVICE" \
+      || echo "FAIL  $SERVICE"
+  done
+  exit 0
+fi
+
+# Step 1: Create / patch namespace
 echo ""
-echo "▶ Checking pod status..."
-kubectl get pods -n omobio
+echo "--- Namespace $SELFCARE_NAMESPACE ---"
+$KUBECTL create namespace "$SELFCARE_NAMESPACE" --dry-run=client -o yaml | $KUBECTL apply -f -
+echo "OK    namespace"
+
+# Step 2: Secrets (registry pull secret + infra creds)
+echo "--- Secrets ---"
+if [ -f "$K8S_DIR/secrets.yaml" ]; then
+  $KUBECTL apply -f "$K8S_DIR/secrets.yaml" -n "$SELFCARE_NAMESPACE" || true
+fi
+
+# If EKS and IMAGE_NAMESPACE contains registry host, create pull secret
+REGISTRY_HOST=$(echo "$IMAGE_NAMESPACE" | cut -d/ -f1)
+if [ "$LOCAL_MODE" = false ] && [ -n "$REGISTRY_HOST" ]; then
+  $KUBECTL create secret docker-registry selfcare-registry-secret \
+    --docker-server="$REGISTRY_HOST" \
+    --docker-username="${DOCKER_USERNAME:-}" \
+    --docker-password="${DOCKER_PASSWORD:-}" \
+    -n "$SELFCARE_NAMESPACE" --dry-run=client -o yaml 2>/dev/null \
+    | $KUBECTL apply -f - 2>/dev/null || true
+fi
+echo "OK    secrets"
+
+# Step 3: ConfigMaps
+echo "--- ConfigMaps ---"
+if [ -f "$K8S_DIR/configmap.yaml" ]; then
+  $KUBECTL apply -f "$K8S_DIR/configmap.yaml" -n "$SELFCARE_NAMESPACE"
+fi
+echo "OK    configmaps"
+
+# Step 4: Infrastructure (MongoDB/MySQL/Redis/Kafka)
+if [ "$SKIP_INFRA" = false ]; then
+  echo "--- Infrastructure (Mongo/MySQL/Redis/Kafka) ---"
+  if [ -f "$K8S_DIR/infra.yaml" ]; then
+    $KUBECTL apply -f "$K8S_DIR/infra.yaml" -n "$SELFCARE_NAMESPACE"
+    # Wait for Mongo
+    echo "Waiting for MongoDB..."
+    $KUBECTL rollout status deployment/mongodb -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
+    echo "Waiting for MySQL..."
+    $KUBECTL rollout status deployment/mysql -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
+    echo "Waiting for Redis..."
+    $KUBECTL rollout status deployment/redis -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
+    echo "OK    infrastructure ready"
+  fi
+else
+  echo "--- Infrastructure: skipped (--skip-infra) ---"
+fi
+
+# Step 5: Seed tenant data (once per namespace)
+if [ "$SKIP_SEED" = false ]; then
+  echo "--- Tenant seed ---"
+  if [ -f "$K8S_DIR/tenant-seeding-job.yaml" ]; then
+    $KUBECTL apply -f "$K8S_DIR/tenant-seeding-job.yaml" -n "$SELFCARE_NAMESPACE" || true
+    $KUBECTL wait --for=condition=complete --timeout=60s \
+      job/selfcare-tenant-seed-dialog -n "$SELFCARE_NAMESPACE" 2>/dev/null || true
+    echo "OK    tenant seed"
+  fi
+else
+  echo "--- Tenant seed: skipped ---"
+fi
+
+# Step 6: Deploy microservices
+echo ""
+echo "--- Deploy microservices ---"
+if [ -f "$K8S_DIR/services.yaml" ]; then
+  $KUBECTL apply -f "$K8S_DIR/services.yaml" -n "$SELFCARE_NAMESPACE"
+fi
+
+# Step 7: Set image tag on each deployment
+echo "--- Set images to $IMAGE_NAMESPACE/*:$VERSION ---"
+for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
+               account-entitlement-service dashboard-bff product-service usage-service billing-service \
+               payment-service notification-service content-service journey-service reporting-service \
+               ai-gateway audit-service insurance-service approval-service; do
+  IMAGE_REF="$IMAGE_NAMESPACE/$SERVICE:$VERSION"
+  $KUBECTL set image deployment/$SERVICE "$SERVICE=$IMAGE_REF" -n "$SELFCARE_NAMESPACE" 2>/dev/null \
+    && echo "SET   $SERVICE → $IMAGE_REF" \
+    || echo "SKIP  $SERVICE (no existing deployment)"
+done
+
+# Step 8: Rollout status
+echo ""
+echo "--- Rollout status ---"
+for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
+               account-entitlement-service dashboard-bff product-service usage-service billing-service \
+               payment-service notification-service content-service journey-service reporting-service \
+               ai-gateway audit-service insurance-service approval-service; do
+  $KUBECTL rollout status deployment/$SERVICE -n "$SELFCARE_NAMESPACE" --timeout=300s 2>/dev/null \
+    && echo "OK    $SERVICE ready" \
+    || echo "WARN  $SERVICE timeout"
+done
 
 echo ""
 echo "=============================================="
-echo "✓ OMOBIO deployed to Docker Desktop Kubernetes"
-echo ""
-echo " Access points (via NodePort):"
-echo "   API Gateway   http://localhost:30080"
-echo "   Prometheus    http://localhost:30090"
-echo "   Grafana      http://localhost:30300  (admin/admin)"
-echo ""
-echo " All services:"
-kubectl get svc -n omobio
+echo " selfcare deployed — env=$ENV namespace=$SELFCARE_NAMESPACE"
 echo ""
 echo " Pods:"
-kubectl get pods -n omobio --no-headers | wc -l | xargs echo " Total pods:"
+$KUBECTL get pods -n "$SELFCARE_NAMESPACE" -o wide
 echo ""
-echo " Tear down:"
-echo "   kubectl delete -f $K8S_DIR/"
+echo " Services:"
+$KUBECTL get svc -n "$SELFCARE_NAMESPACE"
 echo "=============================================="

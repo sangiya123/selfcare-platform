@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for OMOBIO microservices
+﻿# Multi-stage Dockerfile for selfcare microservices
 # Build context: repository root (selfcare-platform)
 # Strategy:
 #   1. Install Maven 3.9.9 (Java 25 compatible — no Alpine package version skew)
@@ -8,7 +8,7 @@
 #   5. Build only the target service module
 #
 # Usage (from selfcare-platform/):
-#   docker build -t omobio/reporting-service:1.0.0 -f backend/reporting-service/Dockerfile .
+#   docker build -t selfcare/reporting-service:1.0.0 -f backend/reporting-service/Dockerfile .
 
 FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /build
@@ -43,7 +43,7 @@ RUN mvn -s backend/settings.xml -f backend/pom.xml -pl ${MODULE} package -Dmaven
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
-RUN addgroup -g 1000 -S omobio && adduser -u 1000 -S omobio -G omobio
+RUN addgroup -g 1000 -S selfcare && adduser -u 1000 -S selfcare -G selfcare
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
@@ -53,7 +53,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 ARG MODULE=reporting-service
 COPY --from=builder /build/backend/${MODULE}/target/${MODULE}-*-SNAPSHOT.jar app.jar
 
-USER omobio
+USER selfcare
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

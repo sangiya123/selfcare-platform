@@ -1,4 +1,4 @@
-# On-Call Runbooks
+﻿# On-Call Runbooks
 
 This directory contains incident response runbooks for the platform.
 
@@ -39,20 +39,20 @@ This directory contains incident response runbooks for the platform.
 
 ```bash
 # Check service health
-kubectl -n omobio-prod get pods -l app=admin-identity-service
-kubectl -n omobio-prod logs -f deploy/admin-identity-service --tail=100
+kubectl -n selfcare-prod get pods -l app=admin-identity-service
+kubectl -n selfcare-prod logs -f deploy/admin-identity-service --tail=100
 
 # Check recent errors
-kubectl -n omobio-prod logs -l app=admin-identity-service --since=10m | grep -i error
+kubectl -n selfcare-prod logs -l app=admin-identity-service --since=10m | grep -i error
 
 # Check metrics
 curl http://admin-identity-service:8082/actuator/metrics/http.server.requests
 
 # Port-forward to debug
-kubectl -n omobio-prod port-forward svc/admin-identity-service 8082:8082
+kubectl -n selfcare-prod port-forward svc/admin-identity-service 8082:8082
 
 # Run a one-off job
-kubectl -n omobio-prod run debug --rm -it --image=alpine -- sh
+kubectl -n selfcare-prod run debug --rm -it --image=alpine -- sh
 ```
 
 ## Dashboards

@@ -3,7 +3,7 @@
 # Region: LK
 # Industry: TELCO
 # Tenant Type: OPERATOR
-# Created by: OMOBIO Platform Team
+# Created by: selfcare Platform Team
 
 env:
   # Tenant identity
@@ -22,8 +22,8 @@ env:
   # Branding
   TENANT_BRAND_COLOR_PRIMARY: "#E20000"
   TENANT_BRAND_COLOR_SECONDARY: "#000000"
-  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/dialog/logo.svg"
-  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/dialog/favicon.ico"
+  TENANT_BRAND_LOGO_URL: "https://assets.selfcare.example/brands/dialog/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.selfcare.example/brands/dialog/favicon.ico"
 
   # Domain configuration
   TENANT_DOMAIN: dialog.lk

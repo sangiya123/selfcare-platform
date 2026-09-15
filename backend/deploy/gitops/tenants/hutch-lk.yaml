@@ -3,7 +3,7 @@
 # Region: LK
 # Industry: TELCO
 # Tenant Type: OPERATOR
-# Created by: OMOBIO Platform Team
+# Created by: selfcare Platform Team
 
 env:
   # Tenant identity
@@ -22,8 +22,8 @@ env:
   # Branding
   TENANT_BRAND_COLOR_PRIMARY: "#FF6B00"
   TENANT_BRAND_COLOR_SECONDARY: "#1A1A1A"
-  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/hutch/logo.svg"
-  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/hutch/favicon.ico"
+  TENANT_BRAND_LOGO_URL: "https://assets.selfcare.example/brands/hutch/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.selfcare.example/brands/hutch/favicon.ico"
 
   # Domain configuration
   TENANT_DOMAIN: hutch.lk

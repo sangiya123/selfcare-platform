@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Launch screen — visible while the React Native runtime boots.
-    Uses brand primary color.
+    Dialog brand: purple background (#65246E) with centered app logo.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/launch_background" />
+    <item>
+        <bitmap
+            android:width="90dp"
+            android:height="90dp"
+            android:gravity="center"
+            android:src="@drawable/splash" />
+    </item>
 </layer-list>

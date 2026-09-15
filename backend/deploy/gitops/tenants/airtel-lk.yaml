@@ -3,7 +3,7 @@
 # Region: LK
 # Industry: TELCO
 # Tenant Type: OPERATOR
-# Created by: OMOBIO Platform Team
+# Created by: selfcare Platform Team
 
 env:
   # Tenant identity
@@ -22,8 +22,8 @@ env:
   # Branding
   TENANT_BRAND_COLOR_PRIMARY: "#ED1C24"
   TENANT_BRAND_COLOR_SECONDARY: "#FFFFFF"
-  TENANT_BRAND_LOGO_URL: "https://assets.omobio.example/brands/airtel/logo.svg"
-  TENANT_BRAND_FAVICON: "https://assets.omobio.example/brands/airtel/favicon.ico"
+  TENANT_BRAND_LOGO_URL: "https://assets.selfcare.example/brands/airtel/logo.svg"
+  TENANT_BRAND_FAVICON: "https://assets.selfcare.example/brands/airtel/favicon.ico"
 
   # Domain configuration
   TENANT_DOMAIN: airtel.lk

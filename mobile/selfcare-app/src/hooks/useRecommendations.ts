@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useRecommendations — fetch ML-based bundle recommendations and churn scores.
  *
  * Returns:
@@ -14,10 +14,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { MMKV } from 'react-native-mmkv';
 import { AIClient, BundleRec, ChurnScore } from '../config/AIClient';
 import { ApiClient } from '../config/ApiClient';
-import { useAuth } from './useAuth';
+import { useAuthStore } from './useAuth';
 import { useTenant } from './useTenant';
 
-const storage = new MMKV({ id: 'omobio-recommendations' });
+const storage = new MMKV({ id: 'selfcare-recommendations' });
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 interface CachedRecs {
@@ -28,7 +28,7 @@ interface CachedRecs {
 
 export function useRecommendations(connectionId: string | null | undefined) {
   const { tenantId } = useTenant();
-  const auth = useAuth();
+  const auth = useAuthStore();
   const [bundles, setBundles] = useState<BundleRec[]>([]);
   const [churnScore, setChurnScore] = useState<ChurnScore | null>(null);
   const [loading, setLoading] = useState(true);

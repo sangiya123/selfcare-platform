@@ -1,15 +1,15 @@
 # STAGING profile overrides
-omobio:
+selfcare:
   security:
     cors:
-      allowed-origins: https://admin.stg.omobio.io
+      allowed-origins: https://admin.stg.selfcare.io
 
 otel:
   enabled: true
 
 logging:
   level:
-    com.omobio: INFO
+    com.selfcare: INFO
 
 spring.jpa.show-sql: false
 spring.jpa.properties.hibernate.format_sql: false

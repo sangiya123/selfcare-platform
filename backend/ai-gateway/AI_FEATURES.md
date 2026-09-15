@@ -1,6 +1,6 @@
-# OMOBIO AI Platform — Complete Feature Set
+# selfcare AI Platform — Complete Feature Set
 
-The OMOBIO AI platform (`ai-gateway` service) provides a comprehensive, multi-tenant
+The selfcare AI platform (`ai-gateway` service) provides a comprehensive, multi-tenant
 AI capability for selfcare. The platform covers the full AI feature set requested.
 
 ## LLM Provider Support
@@ -12,7 +12,7 @@ AI capability for selfcare. The platform covers the full AI feature set requeste
 | **Google AI** | ✅ Stub | gemini-1.5-flash, gemini-1.5-pro, gemini-1.0-pro | — | — |
 | **Fallback** | ✅ Always-on | Template-based, no API | — | — |
 
-Provider routing: per-tenant configurable via `omobio.ai.provider` config key.
+Provider routing: per-tenant configurable via `selfcare.ai.provider` config key.
 Default: anthropic. Router: `LlmProviderRouter`.
 
 ## RAG (Retrieval-Augmented Generation)

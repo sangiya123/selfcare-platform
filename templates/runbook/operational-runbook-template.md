@@ -1,4 +1,4 @@
-# Runbook — <alert or service name>
+﻿# Runbook — <alert or service name>
 
 | Field | Value |
 |---|---|
@@ -69,8 +69,8 @@ service:payment-service AND level:ERROR AND timestamp:>now-15m
 
 ### Recent Events
 
-- `kubectl rollout history deployment/payment-service -n omobio-prod`
-- `kubectl get events -n omobio-prod --sort-by=.lastTimestamp | head -20`
+- `kubectl rollout history deployment/payment-service -n selfcare-prod`
+- `kubectl get events -n selfcare-prod --sort-by=.lastTimestamp | head -20`
 - `argocd app history payment-service-prod`
 
 ## Mitigation
@@ -79,8 +79,8 @@ For each known cause, list the remediation step.
 
 ### Cause 1: Recent deploy introduced a regression
 
-1. **Check rollout status:** `kubectl rollout status deployment/payment-service -n omobio-prod`
-2. **Roll back:** `kubectl rollout undo deployment/payment-service -n omobio-prod`
+1. **Check rollout status:** `kubectl rollout status deployment/payment-service -n selfcare-prod`
+2. **Roll back:** `kubectl rollout undo deployment/payment-service -n selfcare-prod`
 3. **Verify:** error rate returns to baseline within 2 minutes
 4. **Page on-call engineer** for the team that shipped the deploy
 

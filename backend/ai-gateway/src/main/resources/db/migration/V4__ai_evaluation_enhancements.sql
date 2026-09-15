@@ -1,5 +1,5 @@
 -- V4__ai_evaluation_enhancements.sql
--- OMOBIO Selfcare Platform — ai-gateway
+-- Selfcare Platform — ai-gateway
 -- Adds multilingual quality, red-team cases, and per-use-case regression threshold
 -- to AI evaluation. Per AI governance spec:
 -- "Every AI use case ships with a versioned evaluation set, baseline score,

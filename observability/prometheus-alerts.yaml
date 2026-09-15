@@ -1,26 +1,26 @@
-# Prometheus alerting rules for OMOBIO Selfcare Platform
+﻿# Prometheus alerting rules for Selfcare Platform
 # Apply via: kubectl apply -f prometheus-alerts.yaml
 
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: omobio-platform-alerts
+  name: selfcare-platform-alerts
   labels:
-    app: omobio-platform
-    prometheus: omobio
+    app: selfcare-platform
+    prometheus: selfcare
 spec:
   groups:
     - name: platform-availability
       interval: 30s
       rules:
         - alert: ServiceDown
-          expr: up{job=~"omobio-.*"} == 0
+          expr: up{job=~"selfcare-.*"} == 0
           for: 1m
           labels:
             severity: critical
             team: platform
           annotations:
-            summary: "OMOBIO service {{ $labels.job }} is down"
+            summary: "selfcare service {{ $labels.job }} is down"
             description: "Service {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
 
         - alert: HighErrorRate
@@ -163,8 +163,8 @@ spec:
       rules:
         - alert: HighMemoryUsage
           expr: |
-            (container_memory_working_set_bytes{pod=~"omobio-.*"}
-            / container_spec_memory_limit_bytes{pod=~"omobio-.*"}) > 0.85
+            (container_memory_working_set_bytes{pod=~"selfcare-.*"}
+            / container_spec_memory_limit_bytes{pod=~"selfcare-.*"}) > 0.85
           for: 10m
           labels:
             severity: warning
@@ -174,7 +174,7 @@ spec:
             description: "Pod memory usage > 85% of limit for 10 minutes."
 
         - alert: PodCrashLooping
-          expr: rate(kube_pod_container_status_restarts_total{pod=~"omobio-.*"}[15m]) > 0
+          expr: rate(kube_pod_container_status_restarts_total{pod=~"selfcare-.*"}[15m]) > 0
           for: 5m
           labels:
             severity: critical
@@ -324,7 +324,7 @@ spec:
       interval: 30s
       rules:
         - alert: KafkaConsumerLagHigh
-          expr: sum(kafka_consumergroup_lag{topic=~"omobio-.*"}) by (consumergroup, topic) > 10000
+          expr: sum(kafka_consumergroup_lag{topic=~"selfcare-.*"}) by (consumergroup, topic) > 10000
           for: 10m
           labels:
             severity: warning
@@ -334,7 +334,7 @@ spec:
             description: "Consumer is falling behind; scale consumers or check downstream sink health."
 
         - alert: KafkaConsumerLagCritical
-          expr: sum(kafka_consumergroup_lag{topic=~"omobio-.*"}) by (consumergroup, topic) > 100000
+          expr: sum(kafka_consumergroup_lag{topic=~"selfcare-.*"}) by (consumergroup, topic) > 100000
           for: 5m
           labels:
             severity: critical

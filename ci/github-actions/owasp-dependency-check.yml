@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — OWASP Dependency-Check
+﻿# Selfcare Platform — OWASP Dependency-Check
 #
 # Scans all Maven dependencies (backend) and npm packages (admin, mobile)
 # for known CVEs. Fails the build on any Critical/High vulnerability
@@ -137,14 +137,14 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+          cache-dependency-path: selfcare-platform/admin/selfcare-admin/package-lock.json
 
       - name: Install dependencies
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npm ci
 
       - name: Run npm audit (high+ critical fail)
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: |
           npm audit --audit-level=high --json > npm-audit.json || EXIT=$?
           if [ -f npm-audit.json ]; then
@@ -163,7 +163,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: npm-audit-admin
-          path: selfcare-platform/admin/selfcare-studio/npm-audit.json
+          path: selfcare-platform/admin/selfcare-admin/npm-audit.json
           retention-days: 30
 
   # ==========================================

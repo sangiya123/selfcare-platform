@@ -1,12 +1,12 @@
-@echo off
-REM start-local.bat — Start the full OMOBIO platform via docker-compose
+﻿@echo off
+REM start-local.bat — Start the full selfcare platform via docker-compose
 REM Usage: scripts\start-local.bat
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0.."
 
 echo ==============================================
-echo  OMOBIO - Local Stack
+echo  selfcare - Local Stack
 echo ==============================================
 
 echo.
@@ -17,7 +17,7 @@ if errorlevel 1 goto :err
 echo.
 echo [2/4] Waiting for MongoDB...
 :wait_mongo
-docker exec omobio-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>nul | findstr /C:"1" >nul
+docker exec selfcare-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>nul | findstr /C:"1" >nul
 if errorlevel 1 (
   timeout /t 2 /nobreak >nul
   goto :wait_mongo
@@ -41,7 +41,7 @@ echo API Gateway ready.
 
 echo.
 echo ==============================================
-echo  OMOBIO is running.
+echo  selfcare is running.
 echo   API Gateway: http://localhost:8080
 echo   Grafana:    http://localhost:3000
 echo   Prometheus: http://localhost:9090

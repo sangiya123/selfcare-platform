@@ -1,28 +1,94 @@
-{{- if .Values.enabled | default true }}
+{{- range $name, $svc := .Values.services }}
+{{- $render := include "selfcare.renderService" (dict "name" $name "Values" $.Values) }}
+{{- if eq $render "true" }}
+{{- $svcObj := merge (deepCopy $.Values.defaultService) $svc }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "omobio.fullname" . }}
-  namespace: {{ include "omobio.namespace" . }}
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "omobio.labels" . | nindent 4 }}
-    app.omobio.io/service: {{ include "omobio.name" . }}
-  {{- with .Values.service.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- include "selfcare.labels" $ | nindent 4 }}
+    {{- include "selfcare.serviceLabels" (dict "name" $name "tenant" $svcObj.tenant "industry" $svcObj.industry) | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ $svcObj.service.type | default "ClusterIP" }}
   ports:
-    - port: {{ .Values.service.port }}
+    - port: {{ $svcObj.port }}
       targetPort: http
       protocol: TCP
       name: http
-    {{- if .Values.service.extraPorts }}
-    {{- toYaml .Values.service.extraPorts | nindent 4 }}
-    {{- end }}
   selector:
-    {{- include "omobio.selectorLabels" . | nindent 4 }}
-  sessionAffinity: None
-  publishNotReadyAddresses: false
+    {{- include "selfcare.selectorLabels" (dict "name" $name) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- if and .Values.ingress.enabled (index .Values.services "api-gateway") }}
+---
+# API Gateway Ingress - the single public entry point
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: selfcare-api-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "selfcare.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | default "letsencrypt-prod" | quote }}
+    {{- end }}
+    {{- if .Values.ingress.waf }}
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    {{- end }}
+    {{- if .Values.ingress.rateLimit }}
+    nginx.ingress.kubernetes.io/limit-rps: {{ .Values.ingress.rateLimit | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Release.Namespace }}-tls
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+{{- end }}
+{{- if and .Values.ingress.enabled (index .Values.services "admin-identity-service") }}
+---
+# Admin Portal Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: selfcare-admin-portal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "selfcare.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | default "letsencrypt-prod" | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.adminHost | default (printf "admin.%s" .Values.ingress.host) }}
+      secretName: {{ .Release.Namespace }}-admin-tls
+  rules:
+    - host: {{ .Values.ingress.adminHost | default (printf "admin.%s" .Values.ingress.host) }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: selfcare-admin-portal
+                port:
+                  number: 80
 {{- end }}

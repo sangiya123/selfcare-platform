@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AuthSDK Tests
  *
  * Tests OTP send/verify, token refresh, and secure storage.
@@ -26,7 +26,7 @@ describe('AuthSDK', () => {
   const MSISDN = '+94771234567';
 
   beforeEach(() => {
-    const mmkv = new MMKV({ id: 'omobio-auth' });
+    const mmkv = new MMKV({ id: 'selfcare-auth' });
     mmkv.clearAll();
 
     mockedAxios.create.mockReturnValue({
@@ -35,6 +35,14 @@ describe('AuthSDK', () => {
     } as any);
 
     auth = new AuthSDK(TENANT_ID, BASE_URL);
+    // Runtime injects endpoints from manifest services.auth (DB-authored);
+    // mirror that contract here with the canonical backend paths.
+    auth.setEndpoints({
+      otp: '/api/v1/auth/otp',
+      otpVerify: '/api/v1/auth/otp/verify',
+      refresh: '/api/v1/auth/refresh',
+      signout: '/api/v1/auth/signout',
+    });
   });
 
   afterEach(() => {
@@ -59,7 +67,7 @@ describe('AuthSDK', () => {
 
       expect(postMock).toHaveBeenCalledWith(
         `${BASE_URL}/api/v1/auth/otp`,
-        { msisdn: MSISDN, channel: 'SMS' },
+        { identifier: MSISDN, channel: 'SMS' },
         { headers: { 'X-Tenant-Id': TENANT_ID } }
       );
       expect(result.success).toBe(true);
@@ -90,8 +98,8 @@ describe('AuthSDK', () => {
 
       await auth.sendOtp(MSISDN);
 
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      const stored = mmkv.getString('omobio_otp_correlation');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      const stored = mmkv.getString('selfcare_otp_correlation');
       expect(stored).toBe('corr-persist-123');
     });
 
@@ -105,15 +113,15 @@ describe('AuthSDK', () => {
 
       await auth.sendOtp(MSISDN);
 
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      expect(mmkv.contains('omobio_otp_correlation')).toBe(false);
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      expect(mmkv.contains('selfcare_otp_correlation')).toBe(false);
     });
   });
 
   describe('OTP verify', () => {
     it('verifies OTP with correlation ID from storage', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'corr-from-storage');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'corr-from-storage');
 
       const postMock = jest.fn().mockResolvedValue({
         data: {
@@ -132,7 +140,7 @@ describe('AuthSDK', () => {
 
       expect(postMock).toHaveBeenCalledWith(
         `${BASE_URL}/api/v1/auth/otp/verify`,
-        { msisdn: MSISDN, otpCode: '123456', correlationId: 'corr-from-storage' },
+        { identifier: MSISDN, code: '123456', correlationId: 'corr-from-storage', deviceId: expect.any(String), deviceDescription: 'selfcare App' },
         { headers: { 'X-Tenant-Id': TENANT_ID } }
       );
       expect(result.success).toBe(true);
@@ -140,8 +148,8 @@ describe('AuthSDK', () => {
     });
 
     it('persists tokens to secure storage on successful verify', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'corr-1');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'corr-1');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -156,14 +164,14 @@ describe('AuthSDK', () => {
 
       await auth.verifyOtp(MSISDN, '123456');
 
-      expect(mmkv.getString('omobio_access_token')).toBe('new-access');
-      expect(mmkv.getString('omobio_refresh_token')).toBe('new-refresh');
-      expect(mmkv.getString('omobio_session_id')).toBe('new-session');
+      expect(mmkv.getString('selfcare_access_token')).toBe('new-access');
+      expect(mmkv.getString('selfcare_refresh_token')).toBe('new-refresh');
+      expect(mmkv.getString('selfcare_session_id')).toBe('new-session');
     });
 
     it('clears correlation ID after successful verify', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'corr-to-clear');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'corr-to-clear');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -178,12 +186,12 @@ describe('AuthSDK', () => {
 
       await auth.verifyOtp(MSISDN, '123456');
 
-      expect(mmkv.contains('omobio_otp_correlation')).toBe(false);
+      expect(mmkv.contains('selfcare_otp_correlation')).toBe(false);
     });
 
     it('emits authenticated event on successful verify', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'corr-evt');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'corr-evt');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -200,8 +208,8 @@ describe('AuthSDK', () => {
     });
 
     it('does not persist tokens on failed verify', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'corr-fail');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'corr-fail');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -211,16 +219,16 @@ describe('AuthSDK', () => {
 
       await auth.verifyOtp(MSISDN, 'wrong');
 
-      expect(mmkv.contains('omobio_access_token')).toBe(false);
-      expect(mmkv.contains('omobio_refresh_token')).toBe(false);
+      expect(mmkv.contains('selfcare_access_token')).toBe(false);
+      expect(mmkv.contains('selfcare_refresh_token')).toBe(false);
     });
   });
 
   describe('Token refresh', () => {
     it('refreshes tokens using stored refresh token', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_refresh_token', 'old-refresh-token');
-      mmkv.set('omobio_access_token', 'old-access-token');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_refresh_token', 'old-refresh-token');
+      mmkv.set('selfcare_access_token', 'old-access-token');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -239,8 +247,8 @@ describe('AuthSDK', () => {
         { refreshToken: 'old-refresh-token' },
         { headers: { 'X-Tenant-Id': TENANT_ID } }
       );
-      expect(mmkv.getString('omobio_access_token')).toBe('new-access');
-      expect(mmkv.getString('omobio_refresh_token')).toBe('new-refresh');
+      expect(mmkv.getString('selfcare_access_token')).toBe('new-access');
+      expect(mmkv.getString('selfcare_refresh_token')).toBe('new-refresh');
     });
 
     it('throws error when no refresh token available', async () => {
@@ -248,8 +256,8 @@ describe('AuthSDK', () => {
     });
 
     it('emits token_refreshed event on successful refresh', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_refresh_token', 'rt');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_refresh_token', 'rt');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: {
@@ -266,10 +274,10 @@ describe('AuthSDK', () => {
     });
 
     it('clears session and emits session_expired on 401', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_refresh_token', 'expired-rt');
-      mmkv.set('omobio_access_token', 'expired-at');
-      mmkv.set('omobio_session_id', 'expired-s');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_refresh_token', 'expired-rt');
+      mmkv.set('selfcare_access_token', 'expired-at');
+      mmkv.set('selfcare_session_id', 'expired-s');
 
       const error = new Error('Unauthorized') as any;
       error.response = { status: 401 };
@@ -281,8 +289,8 @@ describe('AuthSDK', () => {
       await expect(auth.refreshTokens()).rejects.toThrow();
 
       expect(listener).toHaveBeenCalledWith('session_expired');
-      expect(mmkv.contains('omobio_access_token')).toBe(false);
-      expect(mmkv.contains('omobio_refresh_token')).toBe(false);
+      expect(mmkv.contains('selfcare_access_token')).toBe(false);
+      expect(mmkv.contains('selfcare_refresh_token')).toBe(false);
     });
   });
 
@@ -292,18 +300,18 @@ describe('AuthSDK', () => {
     });
 
     it('returns true when access token exists in storage', () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_access_token', 'some-token');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_access_token', 'some-token');
       expect(auth.isAuthenticated()).toBe(true);
     });
   });
 
   describe('signOut()', () => {
     it('invalidates session on server', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_access_token', 'at');
-      mmkv.set('omobio_refresh_token', 'rt');
-      mmkv.set('omobio_session_id', 'sess-id');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_access_token', 'at');
+      mmkv.set('selfcare_refresh_token', 'rt');
+      mmkv.set('selfcare_session_id', 'sess-id');
 
       const postMock = jest.fn().mockResolvedValue({ data: {} });
       mockedAxios.post = postMock as any;
@@ -323,23 +331,23 @@ describe('AuthSDK', () => {
     });
 
     it('clears local session after sign out', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_access_token', 'at');
-      mmkv.set('omobio_refresh_token', 'rt');
-      mmkv.set('omobio_session_id', 's');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_access_token', 'at');
+      mmkv.set('selfcare_refresh_token', 'rt');
+      mmkv.set('selfcare_session_id', 's');
 
       mockedAxios.post = jest.fn().mockResolvedValue({}) as any;
 
       await auth.signOut();
 
-      expect(mmkv.contains('omobio_access_token')).toBe(false);
-      expect(mmkv.contains('omobio_refresh_token')).toBe(false);
-      expect(mmkv.contains('omobio_session_id')).toBe(false);
+      expect(mmkv.contains('selfcare_access_token')).toBe(false);
+      expect(mmkv.contains('selfcare_refresh_token')).toBe(false);
+      expect(mmkv.contains('selfcare_session_id')).toBe(false);
     });
 
     it('emits signed_out event', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_session_id', 's');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_session_id', 's');
 
       mockedAxios.post = jest.fn().mockResolvedValue({}) as any;
 
@@ -352,16 +360,16 @@ describe('AuthSDK', () => {
     });
 
     it('clears local session even if server call fails', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_access_token', 'at');
-      mmkv.set('omobio_session_id', 's');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_access_token', 'at');
+      mmkv.set('selfcare_session_id', 's');
 
       mockedAxios.post = jest.fn().mockRejectedValue(new Error('Network')) as any;
 
       await auth.signOut();
 
       // Best-effort: local cleanup should still happen
-      expect(mmkv.contains('omobio_access_token')).toBe(false);
+      expect(mmkv.contains('selfcare_access_token')).toBe(false);
     });
   });
 
@@ -380,8 +388,8 @@ describe('AuthSDK', () => {
 
   describe('auth listeners', () => {
     it('supports multiple listeners', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'c');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'c');
 
       mockedAxios.post = jest.fn().mockResolvedValue({
         data: { data: { success: true, accessToken: 'a', refreshToken: 'r', sessionId: 's' } },
@@ -399,9 +407,9 @@ describe('AuthSDK', () => {
     });
 
     it('supports unsubscribing via returned function', async () => {
-      const mmkv = new MMKV({ id: 'omobio-auth' });
-      mmkv.set('omobio_otp_correlation', 'c');
-      mmkv.set('omobio_session_id', 's');
+      const mmkv = new MMKV({ id: 'selfcare-auth' });
+      mmkv.set('selfcare_otp_correlation', 'c');
+      mmkv.set('selfcare_session_id', 's');
 
       mockedAxios.post = jest.fn().mockResolvedValue({}) as any;
 

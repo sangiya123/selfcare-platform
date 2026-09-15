@@ -1,4 +1,4 @@
-# OMOBIO Dashboard BFF
+# selfcare Dashboard BFF
 spring:
   application:
     name: dashboard-bff
@@ -8,11 +8,11 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:omobio}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
     mongodb:
       host: ${MONGO_HOST:localhost}
       port: ${MONGO_PORT:27017}
-      database: ${MONGO_DATABASE:omobio_config}
+      database: ${MONGO_DATABASE:selfcare_config}
   webflux:
     base-path: /
 
@@ -27,16 +27,16 @@ management:
 
 logging:
   level:
-    com.omobio: ${LOG_LEVEL:INFO}
+    com.selfcare: ${LOG_LEVEL:INFO}
   pattern:
     level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
 
-omobio:
+selfcare:
   security:
     jwt:
       jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
-      issuer: ${JWT_ISSUER:omobio-selfcare-platform}
-      audience: ${JWT_AUDIENCE:omobio-selfcare-platform}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
   otel:
     enabled: ${OTEL_ENABLED:false}
     service-name: dashboard-bff

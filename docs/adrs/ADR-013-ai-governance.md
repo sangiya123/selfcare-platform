@@ -1,4 +1,4 @@
-# ADR-013: AI Governance, Risk Tiers, and Release Gate
+﻿# ADR-013: AI Governance, Risk Tiers, and Release Gate
 
 ## Status
 
@@ -161,6 +161,6 @@ user confirmation before the action is executed (per spec).
 - `Planning doc/02_requirements/02_Non_Functional_Requirements.md` (PII masking)
 - ADR-009 (no arbitrary code in config) — also relevant: the prompt
   template registry applies the same principle
-- `backend/ai-gateway/src/main/java/com/omobio/ai/service/AiGovernanceService.java`
-- `backend/ai-gateway/src/main/java/com/omobio/ai/service/PiiMaskingService.java`
-- `backend/ai-gateway/src/main/java/com/omobio/ai/service/AiEvaluationService.java`
+- `backend/ai-gateway/src/main/java/com/selfcare/ai/service/AiGovernanceService.java`
+- `backend/ai-gateway/src/main/java/com/selfcare/ai/service/PiiMaskingService.java`
+- `backend/ai-gateway/src/main/java/com/selfcare/ai/service/AiEvaluationService.java`

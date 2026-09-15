@@ -1,7 +1,7 @@
-/**
+﻿/**
  * ActionEngine Tests
  *
- * Tests dispatch of all 18 action types supported by the OMOBIO Selfcare platform.
+ * Tests dispatch of all 18 action types supported by the Selfcare platform.
  *
  * Action types (18 total):
  * 1. NAVIGATE
@@ -99,6 +99,16 @@ describe('ActionEngine', () => {
   });
 
   describe('OPEN_URL', () => {
+    let openUrlSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    });
+
+    afterEach(() => {
+      openUrlSpy.mockRestore();
+    });
+
     it('opens external URL via Linking', async () => {
       const action: any = {
         type: 'OPEN_URL',
@@ -106,7 +116,7 @@ describe('ActionEngine', () => {
       };
 
       await engine.execute(action);
-      expect(Linking.openURL).toHaveBeenCalledWith('https://example.com/terms');
+      expect(openUrlSpy).toHaveBeenCalledWith('https://example.com/terms');
     });
 
     it('opens tel: URL for call action', async () => {
@@ -116,7 +126,7 @@ describe('ActionEngine', () => {
       };
 
       await engine.execute(action);
-      expect(Linking.openURL).toHaveBeenCalledWith('tel:+94112345678');
+      expect(openUrlSpy).toHaveBeenCalledWith('tel:+94112345678');
     });
   });
 
@@ -324,15 +334,21 @@ describe('ActionEngine', () => {
   });
 
   describe('error handling', () => {
-    it('throws when CALL_API fails', async () => {
+    it('logs and swallows CALL_API failures (fire-and-forget)', async () => {
       mockSdk.api.post.mockRejectedValueOnce(new Error('API down'));
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const action: any = {
         type: 'CALL_API',
         payload: { endpoint: '/api/v1/test' },
       };
 
-      await expect(engine.execute(action)).rejects.toThrow('API down');
+      await expect(engine.execute(action)).resolves.toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('action CALL_API failed'),
+        expect.any(Error)
+      );
+      errorSpy.mockRestore();
     });
   });
 });

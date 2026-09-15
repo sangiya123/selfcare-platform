@@ -1,5 +1,5 @@
 # DEV profile overrides
-omobio:
+selfcare:
   security:
     cors:
       allowed-origins: http://localhost:3000,http://localhost:8081,http://localhost:19006
@@ -9,7 +9,7 @@ otel:
 
 logging:
   level:
-    com.omobio: DEBUG
+    com.selfcare: DEBUG
     org.springframework.web: DEBUG
 
 spring.jpa.show-sql: true

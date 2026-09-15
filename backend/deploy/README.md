@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Deployment
+# Selfcare Platform — Deployment
 
 This directory contains the Helm chart, Docker Compose, and deployment
 infrastructure for the platform.
@@ -23,12 +23,12 @@ docker-compose -f docker-compose.dev.yml up -d
 
 | Service | Port | Credentials |
 |---|---|---|
-| MySQL | 3306 | root / omobio |
-| MongoDB | 27017 | omobio / omobio |
+| MySQL | 3306 | root / selfcare |
+| MongoDB | 27017 | selfcare / selfcare |
 | Redis | 6379 | (no password) |
 | Kafka | 9092 | (no auth) |
 | Prometheus | 9090 | - |
-| Grafana | 3000 | admin / omobio |
+| Grafana | 3000 | admin / selfcare |
 | Jaeger | 16686 | - |
 
 ## Helm chart
@@ -37,19 +37,19 @@ The chart deploys a single service instance. Use it to deploy to Kubernetes.
 
 ```bash
 # Install with default values
-helm install omobio-customer-identity \
+helm install selfcare-customer-identity \
     backend/deploy/helm/ \
-    --namespace omobio-stg \
+    --namespace selfcare-stg \
     --values backend/deploy/helm/values/customer-identity-values.yaml
 
 # Upgrade
-helm upgrade omobio-customer-identity \
+helm upgrade selfcare-customer-identity \
     backend/deploy/helm/ \
-    --namespace omobio-stg \
+    --namespace selfcare-stg \
     --values backend/deploy/helm/values/customer-identity-values.yaml
 
 # Uninstall
-helm uninstall omobio-customer-identity --namespace omobio-stg
+helm uninstall selfcare-customer-identity --namespace selfcare-stg
 ```
 
 ### Per-service values files

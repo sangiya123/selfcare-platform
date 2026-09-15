@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO AI Gateway",
-  "uid": "omobio-ai-gateway",
+﻿{
+  "title": "selfcare AI Gateway",
+  "uid": "selfcare-ai-gateway",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Model traffic, tokens, cost, RAG, tool-calling, and safety metrics for the AI gateway. Runbook: https://runbooks.omobio.local/ai-gateway",
-  "tags": ["omobio", "ai", "llm", "rag", "safety"],
+  "description": "Model traffic, tokens, cost, RAG, tool-calling, and safety metrics for the AI gateway. Runbook: https://runbooks.selfcare.local/ai-gateway",
+  "tags": ["selfcare", "ai", "llm", "rag", "safety"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -100,7 +100,7 @@
       "id": 2,
       "type": "stat",
       "title": "Cost (USD, last 1h)",
-      "description": "Total cost in USD over the last hour. Runbook: https://runbooks.omobio.local/ai-cost",
+      "description": "Total cost in USD over the last hour. Runbook: https://runbooks.selfcare.local/ai-cost",
       "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
       "datasource": "Prometheus",
       "targets": [

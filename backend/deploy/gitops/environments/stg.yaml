@@ -13,7 +13,7 @@ env:
   ENV_PURPOSE: "Pre-production validation, integration tests, UAT"
 
   # Cluster
-  CLUSTER_URL: https://stg-cluster.omobio.example.com
+  CLUSTER_URL: https://stg-cluster.selfcare.example.com
   CLUSTER_NAME: stg-cluster
   CLUSTER_REGION: ap-southeast-1
   CLUSTER_ENVIRONMENT: stg
@@ -23,8 +23,8 @@ env:
   DEFAULT_IMAGE_TAG: "rc-latest"  # Release candidate
   DEFAULT_TARGET_REVISION: "main"  # Track main branch
   IMAGE_PULL_POLICY: Always
-  IMAGE_REGISTRY: ghcr.io/omobio
-  IMAGE_REPOSITORY: omobio/selfcare-platform
+  IMAGE_REGISTRY: ghcr.io/sangiya123
+  IMAGE_REPOSITORY: sangiya123/selfcare-platform
 
   # Auto-sync
   AUTO_SYNC_ENABLED: "true"  # Auto-sync enabled

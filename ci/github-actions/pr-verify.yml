@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — PR Verification (Merge Gate)
+﻿# Selfcare Platform — PR Verification (Merge Gate)
 #
 # Runs on every PR to main. Aggregates all the per-stage checks and
 # posts a single PR comment. Blocks merge if any check fails.
@@ -205,23 +205,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: selfcare-platform/admin/selfcare-studio/package-lock.json
+          cache-dependency-path: selfcare-platform/admin/selfcare-admin/package-lock.json
 
       - name: Install
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npm ci
 
       - name: TypeScript check
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npx tsc --noEmit
 
       - name: Lint
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npx eslint . --ext .ts,.tsx --max-warnings 0
         continue-on-error: true
 
       - name: Vitest
-        working-directory: selfcare-platform/admin/selfcare-studio
+        working-directory: selfcare-platform/admin/selfcare-admin
         run: npx vitest run --coverage
 
       - name: Upload coverage
@@ -299,7 +299,7 @@ jobs:
         image: mysql:8
         ports: ['3306:3306']
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: Selfcare_My5ql_R00t_Pa55w0rd!2026
           MYSQL_DATABASE: selfcare_test
     steps:
       - uses: actions/checkout@v4
@@ -320,10 +320,10 @@ jobs:
         working-directory: selfcare-platform/tests/conformance
         run: mvn -B test
         env:
-          OMOBIO_TEST_GATEWAY_URL: http://localhost:8080
-          OMOBIO_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
-          OMOBIO_TEST_REDIS_URL: redis://localhost:6379
-          OMOBIO_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
+          SELFCARE_TEST_GATEWAY_URL: http://localhost:8080
+          SELFCARE_TEST_DB_URL: jdbc:mysql://localhost:3306/selfcare_test
+          SELFCARE_TEST_REDIS_URL: redis://localhost:6379
+          SELFCARE_TEST_MONGO_URL: mongodb://localhost:27017/selfcare_test
 
   # ==========================================
   # License compliance

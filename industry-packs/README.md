@@ -1,6 +1,6 @@
 # Industry Packs
 
-Per-industry provider implementations. The OMOBIO platform is **multi-industry**:
+Per-industry provider implementations. The selfcare platform is **multi-industry**:
 the same kernel serves clients from different verticals. Each vertical has its
 own **industry pack** under `industry-packs/`:
 
@@ -28,7 +28,7 @@ industry-packs/
 │   │   ├── theme/dialog-theme.json
 │   │   └── providers/
 │   │       ├── pom.xml
-│   │       └── src/main/java/com/omobio/dialog/provider/
+│   │       └── src/main/java/com/selfcare/dialog/provider/
 │   │           ├── DialogAuthProvider.java
 │   │           ├── DialogBalanceProvider.java
 │   │           ├── DialogProductCatalogProvider.java
@@ -46,7 +46,7 @@ industry-packs/
     └── aia/                         # AIA — multi-country insurance client
         └── providers/
             ├── pom.xml
-            └── src/main/java/com/omobio/aia/provider/
+            └── src/main/java/com/selfcare/aia/provider/
                 └── AIAInsuranceProvider.java
 ```
 
@@ -63,10 +63,10 @@ and `credentials` map.
 
 ## Switching environments
 
-The platform reads `OMOBIO_ENV` (or `SPRING_PROFILES_ACTIVE`). Set it once and the entire stack picks up the right platform config from `.env.<env>`.
+The platform reads `SELFCARE_ENV` (or `SPRING_PROFILES_ACTIVE`). Set it once and the entire stack picks up the right platform config from `.env.<env>`.
 
 ```bash
-export OMOBIO_ENV=dev
+export SELFCARE_ENV=dev
 make backend-run
 ```
 

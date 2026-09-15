@@ -1,4 +1,5 @@
-import { SecureStorage } from '../src/services/SecureStorage';
+import { Platform } from 'react-native';
+import { SecureStorage } from '../../src/services/SecureStorage';
 
 /**
  * Tests for SecureStorage and related security helpers.
@@ -7,6 +8,8 @@ import { SecureStorage } from '../src/services/SecureStorage';
  */
 describe('SecureStorage', () => {
   beforeEach(async () => {
+    // Exercise the EncryptedStorage (Android) path deterministically in Jest.
+    (Platform as any).OS = 'android';
     // Wipe before each test
     await SecureStorage.clear();
   });
@@ -59,7 +62,7 @@ describe('SecureStorage', () => {
   });
 });
 
-import { Crypto } from '../src/utils/crypto';
+import { Crypto } from '../../src/utils/crypto';
 
 describe('Crypto helpers', () => {
   it('sha256 produces 64 hex chars', async () => {
@@ -112,7 +115,7 @@ describe('Crypto helpers', () => {
   });
 });
 
-import ConsentManager from '../src/services/ConsentManager';
+import ConsentManager from '../../src/services/ConsentManager';
 
 describe('ConsentManager', () => {
   beforeEach(async () => {

@@ -1,4 +1,4 @@
-# ADR-025: API Standards — Error Envelope, Versioning, and Conventions
+﻿# ADR-025: API Standards — Error Envelope, Versioning, and Conventions
 
 ## Status
 Accepted — 2026-09-04
@@ -41,7 +41,7 @@ Every error response (HTTP 4xx / 5xx) follows this schema:
 
 ### 2. API versioning
 - Version in URL path: `/api/v1/...`
-- Header `Accept: application/vnd.omobio.v1+json`
+- Header `Accept: application/vnd.selfcare.v1+json`
 - Breaking changes require a new major version
 - Non-breaking additions: add to response, add new optional parameters
 - Deprecation: `Deprecation: true` + `Sunset: <date>` headers + `X-Api-Deprecated: true`
@@ -71,7 +71,7 @@ Every error response (HTTP 4xx / 5xx) follows this schema:
 
 ### 6. Content negotiation
 - Default: `application/json`
-- Optional: `Accept: application/vnd.omobio.v1+json`
+- Optional: `Accept: application/vnd.selfcare.v1+json`
 - File downloads: `Accept: text/csv`, `application/pdf`
 
 ### 7. Correlation ID

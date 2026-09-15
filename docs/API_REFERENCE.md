@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — API Reference
+﻿# Selfcare Platform — API Reference
 
 This document covers the public HTTP API. Internal service-to-service calls
 follow the same conventions but are not part of the public contract.
@@ -6,7 +6,7 @@ follow the same conventions but are not part of the public contract.
 ## Base URL
 
 ```
-https://api.omobio.io
+https://api.selfcare.io
 ```
 
 All endpoints are prefixed with `/api/v1`. Industry-specific endpoints live

@@ -1,10 +1,10 @@
-{
-  "title": "OMOBIO Payment Service",
-  "uid": "omobio-payment",
+﻿{
+  "title": "selfcare Payment Service",
+  "uid": "selfcare-payment",
   "schemaVersion": 39,
   "version": 1,
-  "description": "Transaction success/failure rates, reconciliation status, provider latency, and refund metrics for the payment service. Runbook: https://runbooks.omobio.local/payment-service",
-  "tags": ["omobio", "payment", "transactions", "reconciliation"],
+  "description": "Transaction success/failure rates, reconciliation status, provider latency, and refund metrics for the payment service. Runbook: https://runbooks.selfcare.local/payment-service",
+  "tags": ["selfcare", "payment", "transactions", "reconciliation"],
   "timezone": "browser",
   "refresh": "30s",
   "time": {
@@ -288,7 +288,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Pending Transactions Trend",
-      "description": "Count of in-flight pending transactions. Runbook: https://runbooks.omobio.local/pending-payments",
+      "description": "Count of in-flight pending transactions. Runbook: https://runbooks.selfcare.local/pending-payments",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
       "datasource": "Prometheus",
       "targets": [

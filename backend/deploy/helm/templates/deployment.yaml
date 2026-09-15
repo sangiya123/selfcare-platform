@@ -1,128 +1,149 @@
-{{- if .Values.enabled | default true }}
+{{- range $name, $svc := .Values.services }}
+{{- $render := include "selfcare.renderService" (dict "name" $name "Values" $.Values) }}
+{{- if eq $render "true" }}
+{{- $svcObj := merge (deepCopy $.Values.defaultService) $svc }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "omobio.fullname" . }}
-  namespace: {{ include "omobio.namespace" . }}
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "omobio.labels" . | nindent 4 }}
-    app.omobio.io/service: {{ include "omobio.name" . }}
-    app.omobio.io/tenant: {{ include "omobio.tenantId" . }}
-  {{- if .Values.annotations }}
+    {{- include "selfcare.labels" $ | nindent 4 }}
+    {{- include "selfcare.serviceLabels" (dict "name" $name "tenant" $svcObj.tenant "industry" $svcObj.industry "tier" $svcObj.tier) | nindent 4 }}
   annotations:
-    {{- toYaml .Values.annotations | nindent 4 }}
-  {{- end }}
+    checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
 spec:
-  replicas: {{ .Values.replicaCount }}
-  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 5 }}
+  {{- if not $.Values.deploy.isolated }}
+  replicas: {{ $svcObj.replicas | default $.Values.autoscaling.minReplicas | default 1 }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
-      {{- include "omobio.selectorLabels" . | nindent 6 }}
+      {{- include "selfcare.selectorLabels" (dict "name" $name) | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "omobio.podLabels" . | nindent 8 }}
+        {{- include "selfcare.serviceLabels" (dict "name" $name "tenant" $svcObj.tenant "industry" $svcObj.industry "tier" $svcObj.tier) | nindent 8 }}
+        {{- if $.Values.observability.prometheus.enabled }}
+        {{ $.Values.observability.prometheus.podMonitorSelector | default "metrics" }}: "true"
+        {{- end }}
+      {{- if or $.Values.istio.injection.enabled $.Values.linkerd.injection.enabled }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ .Values.service.port }}"
-        prometheus.io/path: "/actuator/prometheus"
-    spec:
-      serviceAccountName: {{ include "omobio.serviceAccountName" . }}
-      {{- if .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
-      {{- else if .Values.imagePullSecret }}
-      imagePullSecrets:
-        - name: {{ .Values.imagePullSecret }}
+        {{- if $.Values.istio.injection.enabled }}
+        sidecar.istio.io/inject: "true"
+        {{- end }}
+        {{- if $.Values.linkerd.injection.enabled }}
+        linkerd.io/inject: enabled
+        {{- end }}
       {{- end }}
+    spec:
+      serviceAccountName: {{ $name }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.initContainers }}
-      initContainers:
-        {{- toYaml .Values.initContainers | nindent 8 }}
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+        {{- if $svcObj.securityContext }}
+        {{- toYaml $svcObj.securityContext | nindent 8 }}
+        {{- end }}
+      {{- if $.Values.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ $.Values.imagePullSecret }}
+      {{- end }}
+      {{- if $svcObj.priorityClassName }}
+      priorityClassName: {{ $svcObj.priorityClassName }}
       {{- end }}
       containers:
-        - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ include "omobio.imageTag" . }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: {{ $name }}
+          image: {{ include "selfcare.image" (dict "name" $name "value" $svcObj "Values" $.Values) | quote }}
+          imagePullPolicy: {{ $svcObj.image.pullPolicy | default $.Values.image.pullPolicy | quote }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ $svcObj.port }}
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "omobio.fullname" . }}-env
+                name: selfcare-config-behavior
+            - secretRef:
+                name: selfcare-infra-creds
+            {{- if $svcObj.envFrom }}
+            {{- toYaml $svcObj.envFrom | nindent 12 }}
+            {{- end }}
           env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            {{- if .Values.secrets.jwtSigningKey }}
-            - name: JWT_SIGNING_KEY_REF
-              value: "{{ .Values.secrets.jwtSigningKey }}"
+            {{- if $svcObj.port }}
+            - name: SERVER_PORT
+              value: {{ $svcObj.port | quote }}
             {{- end }}
-            {{- if .Values.secrets.databasePassword }}
-            - name: DB_PASSWORD_REF
-              value: "{{ .Values.secrets.databasePassword }}"
+            - name: SELF_SERVICE
+              value: {{ $name | quote }}
+            {{- include "selfcare.sharedEnv" $ | indent 12 }}
+            {{- $mergedEnv := merge (deepCopy $.Values.defaultService.env) $svcObj.env }}
+            {{- range $ek, $ev := $mergedEnv }}
+            - name: {{ $ek | quote }}
+              value: {{ $ev | quote }}
             {{- end }}
-            {{- if .Values.secrets.redisPassword }}
-            - name: REDIS_PASSWORD_REF
-              value: "{{ .Values.secrets.redisPassword }}"
-            {{- end }}
-            {{- range .Values.extraEnvVars }}
-            - name: {{ .name }}
-              value: {{ .value | quote }}
-            {{- end }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
-          readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- if $svcObj.startupProbe }}
           startupProbe:
-            {{- if .Values.startupProbe }}
-            {{- toYaml .Values.startupProbe | nindent 12 }}
-            {{- else }}
             httpGet:
-              path: /actuator/health/liveness
-              port: {{ .Values.service.port }}
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            failureThreshold: 30
-            {{- end }}
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          {{- if .Values.volumeMounts }}
-          volumeMounts:
-            {{- toYaml .Values.volumeMounts | nindent 12 }}
+              path: {{ $svcObj.startupProbe.path | default "/actuator/health" }}
+              port: http
+            periodSeconds: {{ $svcObj.startupProbe.periodSeconds | default 10 }}
+            failureThreshold: {{ $svcObj.startupProbe.failureThreshold | default 30 }}
           {{- end }}
-      {{- if .Values.volumes }}
+          livenessProbe:
+            httpGet:
+              path: {{ $svcObj.livenessProbe.path | default "/actuator/health" }}
+              port: http
+            initialDelaySeconds: {{ $svcObj.livenessProbe.initialDelaySeconds | default 60 }}
+            periodSeconds: {{ $svcObj.livenessProbe.periodSeconds | default 15 }}
+            timeoutSeconds: {{ $svcObj.livenessProbe.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svcObj.livenessProbe.failureThreshold | default 3 }}
+          readinessProbe:
+            httpGet:
+              path: {{ $svcObj.readinessProbe.path | default "/actuator/health" }}
+              port: http
+            initialDelaySeconds: {{ $svcObj.readinessProbe.initialDelaySeconds | default 20 }}
+            periodSeconds: {{ $svcObj.readinessProbe.periodSeconds | default 10 }}
+            timeoutSeconds: {{ $svcObj.readinessProbe.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svcObj.readinessProbe.failureThreshold | default 3 }}
+          resources:
+            {{- if $svcObj.resources }}
+            {{- toYaml $svcObj.resources | nindent 12 }}
+            {{- else }}
+            requests:
+              cpu: {{ $.Values.resources.requests.cpu | default "250m" }}
+              memory: {{ $.Values.resources.requests.memory | default "512Mi" }}
+            limits:
+              cpu: {{ $.Values.resources.limits.cpu | default "1000m" }}
+              memory: {{ $.Values.resources.limits.memory | default "1Gi" }}
+            {{- end }}
+          {{- with $svcObj.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- if $svcObj.sidecars }}
+        {{- toYaml $svcObj.sidecars | nindent 8 }}
+        {{- end }}
+      {{- with $svcObj.volumes }}
       volumes:
-        {{- toYaml .Values.volumes | nindent 8 }}
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
+      {{- if $.Values.topologySpreadZone | and (not $.Values.deploy.isolated) }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: {{ $.Values.topologySpreadZone }}
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "selfcare.selectorLabels" (dict "name" $name) | nindent 14 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- if and $.Values.tolerations (not $.Values.deploy.isolated) }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $.Values.tolerations | nindent 8 }}
       {{- end }}
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
+{{- end }}
 {{- end }}

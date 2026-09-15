@@ -1,5 +1,5 @@
 -- V2__audit_config.sql
--- OMOBIO Selfcare Platform — audit-service
+-- Selfcare Platform — audit-service
 -- Audit retention configuration table (platform-wide, no per-tenant for now)
 --
 -- Retention policy:

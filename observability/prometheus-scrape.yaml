@@ -1,7 +1,7 @@
-# Prometheus scrape config additions for the OMOBIO platform.
+﻿# Prometheus scrape config additions for the selfcare platform.
 # Place this in your prometheus.yml under scrape_configs or merge with the main config.
 
-- job_name: 'omobio-backend'
+- job_name: 'selfcare-backend'
   metrics_path: '/actuator/prometheus'
   scrape_interval: 30s
   scrape_timeout: 10s
@@ -10,7 +10,7 @@
   relabel_configs:
     - source_labels: [__meta_kubernetes_pod_label_app]
       action: keep
-      regex: 'omobio-.*'
+      regex: 'selfcare-.*'
     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
       action: replace
       target_label: __address__
@@ -20,11 +20,11 @@
     - source_labels: [__meta_kubernetes_pod_name]
       target_label: pod
 
-- job_name: 'omobio-mobile'
+- job_name: 'selfcare-mobile'
   # Mobile clients don't expose metrics; this is a placeholder
   # for the analytics pipeline that aggregates mobile events
 
-- job_name: 'omobio-ai-gateway'
+- job_name: 'selfcare-ai-gateway'
   metrics_path: '/actuator/prometheus'
   scrape_interval: 15s  # Higher frequency for AI monitoring
   static_configs:
@@ -37,7 +37,7 @@
 # Recording rules for common SLOs
 # Place in a separate file and reference from prometheus.yml
 groups:
-  - name: omobio_slo
+  - name: selfcare_slo
     interval: 30s
     rules:
       - record: ai_gateway:chat_p99_latency_seconds

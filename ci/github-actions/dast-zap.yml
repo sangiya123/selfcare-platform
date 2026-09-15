@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — DAST / API Security Scan (OWASP ZAP)
+﻿# Selfcare Platform — DAST / API Security Scan (OWASP ZAP)
 #
 # Runs OWASP ZAP against deployed staging environment to detect runtime
 # vulnerabilities that static analysis can't find:
@@ -32,7 +32,7 @@ on:
       target_url:
         description: 'Base URL to scan (default: stg)'
         required: false
-        default: 'https://api.stg.omobio.io'
+        default: 'https://api.stg.selfcare.io'
         type: string
       scan_type:
         description: 'baseline (full) or api (OpenAPI-targeted)'
@@ -49,7 +49,7 @@ on:
         type: string
 
 env:
-  TARGET_URL: ${{ inputs.target_url || 'https://api.stg.omobio.io' }}
+  TARGET_URL: ${{ inputs.target_url || 'https://api.stg.selfcare.io' }}
   SCAN_TYPE: ${{ inputs.scan_type || 'baseline' }}
   MAX_DURATION: ${{ inputs.max_duration || '60' }}
 

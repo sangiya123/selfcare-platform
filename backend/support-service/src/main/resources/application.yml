@@ -1,0 +1,37 @@
+# selfcare Support Service
+spring:
+  application:
+    name: support-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:Selfcare_R3d1s_Pa55w0rd!2026}
+
+server:
+  port: ${SUPPORT_SERVICE_PORT:8098}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.selfcare: ${LOG_LEVEL:INFO}
+  pattern:
+    level: "%5p [tenant=%X{tenantId} correlation=%X{correlationId}]"
+
+selfcare:
+  security:
+    jwt:
+      jwks-uri: ${JWT_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+      issuer: ${JWT_ISSUER:selfcare-platform}
+      audience: ${JWT_AUDIENCE:selfcare-platform}
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    service-name: support-service
+    endpoint: ${OTEL_ENDPOINT:http://localhost:4317}

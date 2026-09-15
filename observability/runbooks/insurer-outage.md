@@ -1,4 +1,4 @@
-# Runbook: Insurer Outage (e.g. AIA API down)
+﻿# Runbook: Insurer Outage (e.g. AIA API down)
 
 ## Overview
 This runbook covers scenarios where an insurer provider (AIA, etc.) API is
@@ -47,7 +47,7 @@ db.client_integrations.updateOne(
 ```
 Then invalidate Redis cache:
 ```bash
-redis-cli DEL "omobio:aia-lk:integration:insurance"
+redis-cli DEL "selfcare:aia-lk:integration:insurance"
 ```
 
 ### D. Cross-region latency spike
@@ -57,7 +57,7 @@ redis-cli DEL "omobio:aia-lk:integration:insurance"
 ## Mock mode
 For non-production tenants, mock mode can be enabled as a stopgap:
 ```yaml
-omobio:
+selfcare:
   aia:
     mock-mode: true
 ```

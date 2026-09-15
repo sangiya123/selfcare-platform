@@ -1,4 +1,4 @@
-# OMOBIO Selfcare Platform — Troubleshooting Guide
+﻿# Selfcare Platform — Troubleshooting Guide
 
 This guide covers the most common issues and how to resolve them.
 
@@ -33,9 +33,9 @@ Cached manifest in service, Redis, or mobile app.
 
 ### Fix
 1. **Service cache**: The L1 cache TTL is 5 minutes. Wait, or restart.
-2. **Redis cache**: Check `omobio:config:{tenantId}:*` keys.
+2. **Redis cache**: Check `selfcare:config:{tenantId}:*` keys.
    ```bash
-   redis-cli DEL omobio:config:dialog-lk
+   redis-cli DEL selfcare:config:dialog-lk
    ```
 3. **Mobile cache**: The app uses ETag-based conditional GET.
    Force refresh:
@@ -88,7 +88,7 @@ Tenant or user rate limit exceeded.
 
 ### Fix
 1. **Wait** — limits reset every minute
-2. **Admin**: Adjust limits in `omobio.ai.rate-limit.*` config
+2. **Admin**: Adjust limits in `selfcare.ai.rate-limit.*` config
 3. **Admin**: Use a different tenant for testing
 
 ## 6. Step-up auth not working
@@ -129,7 +129,7 @@ A user from tenant A sees tenant B's data.
 1. **Page the on-call engineer**
 2. Disable cross-tenant access in the api-gateway:
    ```bash
-   curl -X PATCH https://api.omobio.com/admin/tenants/{id}/lockdown
+   curl -X PATCH https://api.selfcare.com/admin/tenants/{id}/lockdown
    ```
 3. Investigate: which service, which query, which user
 4. Run conformance test: `mvn test -Dtest=TenantIsolationTest`
@@ -178,7 +178,7 @@ AI responds with "I tried to do X but couldn't".
 The downstream service the tool calls is down, or the tool is not permitted.
 
 ### Fix
-1. Check tool permissions in `omobio:ai:tools:{tenantId}:{userId}`
+1. Check tool permissions in `selfcare:ai:tools:{tenantId}:{userId}`
 2. Verify the target service is healthy (e.g., `usage-service`, `product-service`)
 3. Check the audit log for the failed tool call
 4. APPROVAL-requiring tools will return "PENDING_APPROVAL" — that's expected

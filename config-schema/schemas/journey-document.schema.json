@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://omobio.example.com/schemas/journey-document.schema.json",
+  "$id": "https://selfcare.example.com/schemas/journey-document.schema.json",
   "title": "JourneyDocument",
-  "description": "Defines a multi-step user journey (a flow of screens, API calls, and branching logic) for the OMOBIO Selfcare Platform. Used by the journey orchestrator to render and execute flows server-driven.",
+  "description": "Defines a multi-step user journey (a flow of screens, API calls, and branching logic) for the Selfcare Platform. Used by the journey orchestrator to render and execute flows server-driven.",
   "type": "object",
   "required": [
     "schemaVersion",
