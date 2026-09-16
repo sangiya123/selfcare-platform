@@ -212,6 +212,7 @@ services:
       - "50000:50000"
     env_file:
       - ci/.env.ci
+    user: root
     environment:
       JAVA_OPTS: >-
         -Djenkins.install.runSetupWizard=false
