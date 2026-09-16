@@ -124,7 +124,7 @@ pipeline {
                     }
                 }
                 stages {
-                    stage("test-${SERVICE}") {
+                    stage('Unit tests') {
                         steps {
                             dir('selfcare-platform/backend') {
                                 sh "mvn -B -pl ${SERVICE} -am test"
@@ -355,8 +355,6 @@ pipeline {
                     steps {
                         sh '''
                             echo "$DEV_KUBECONFIG" | base64 -d > ~/.kube/config 2>/dev/null || true
-                            helm upgrade --install --atomic --namespace selfcare-dev --create-namespace \
-                                --set deploy.isolated=true
                         '''
                         script {
                             deployAllTo('dev')
