@@ -155,7 +155,7 @@ pipeline {
                     stage('Unit tests') {
                         steps {
                             dir('selfcare-platform/backend') {
-                                sh "mvn -B -pl ${SERVICE} -am test"
+                                sh "mvn -B -pl ${SERVICE} test"
                             }
                         }
                         post {
