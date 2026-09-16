@@ -3,8 +3,13 @@ FROM jenkins/jenkins:lts-jdk21
 USER root
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl docker.io git jq nodejs npm \
+    && apt-get install -y --no-install-recommends ca-certificates curl git jq nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Docker CLI (Debian's docker.io package doesn't ship the CLI in trixie)
+RUN curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-29.8.1.tgz" -o /tmp/docker.tgz \
+    && tar -xzf /tmp/docker.tgz -C /usr/local/bin --strip-components=1 docker/docker \
+    && rm -rf /tmp/docker.tgz
 
 # Temurin JDK 25 (backend modules compile against Java 25)
 RUN curl -fsSL "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse" -o /tmp/jdk25.tar.gz \
