@@ -291,7 +291,7 @@ pipeline {
         stage('Docker Build') {
             when {
                 anyOf {
-                    branch 'main'
+                    expression { return (env.GIT_BRANCH ?: '').contains('main') }
                     buildingTag()
                 }
             }
@@ -340,7 +340,7 @@ pipeline {
             when {
                 expression { return params.RUN_SECURITY_SCAN }
                 anyOf {
-                    branch 'main'
+                    expression { return (env.GIT_BRANCH ?: '').contains('main') }
                     buildingTag()
                 }
             }
@@ -374,7 +374,7 @@ pipeline {
                         anyOf {
                             allOf {
                                 not { buildingTag() }
-                                branch 'main'
+                                expression { return (env.GIT_BRANCH ?: '').contains('main') }
                                 expression { return params.DEPLOY_ENV == 'none' || params.DEPLOY_ENV == 'dev' }
                             }
                             expression { return params.DEPLOY_ENV == 'dev' }
@@ -396,7 +396,7 @@ pipeline {
                         anyOf {
                             allOf {
                                 not { buildingTag() }
-                                branch 'main'
+                                expression { return (env.GIT_BRANCH ?: '').contains('main') }
                                 expression { return params.DEPLOY_ENV == 'none' || params.DEPLOY_ENV == 'stg' }
                             }
                             expression { return params.DEPLOY_ENV == 'stg' }
