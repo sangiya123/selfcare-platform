@@ -95,6 +95,14 @@ pipeline {
                     docker --version
                 '''
                 dir('selfcare-platform/backend') {
+                    sh 'mvn -B -f pom.xml -N install -DskipTests -Djacoco.skip=true -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true'
+                    sh 'mvn -B -f pom.xml -pl platform-common install -DskipTests -Djacoco.skip=true -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true'
+                }
+                dir('selfcare-platform/industry-packs') {
+                    sh 'mvn -B -f telco/pom.xml install -Dmaven.test.skip=true -Djacoco.skip=true'
+                    sh 'mvn -B -f insurance/pom.xml install -Dmaven.test.skip=true -Djacoco.skip=true'
+                }
+                dir('selfcare-platform/backend') {
                     sh 'mvn -B -T 1C package -Dmaven.test.skip=true -Djacoco.skip=true -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true'
                 }
                 dir('selfcare-platform/admin/selfcare-admin') {
