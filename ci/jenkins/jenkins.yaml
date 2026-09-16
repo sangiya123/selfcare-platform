@@ -31,11 +31,19 @@ credentials:
               scope: GLOBAL
               id: "sonar-token"
               secret: "${SONAR_TOKEN}"
+          - string:
+              scope: GLOBAL
+              id: "docker-registry-url"
+              secret: "${DOCKER_REGISTRY_URL:-selfcare}"
           - usernamePassword:
               scope: GLOBAL
               id: "docker-registry"
               username: "${DOCKER_REGISTRY_USER:-}"
               password: "${DOCKER_REGISTRY_PASSWORD:-}"
+          - string:
+              scope: GLOBAL
+              id: "github-token"
+              secret: "${GITHUB_TOKEN}"
           - string:
               scope: GLOBAL
               id: "argocd-token"
