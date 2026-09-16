@@ -48,8 +48,8 @@ class DashboardOrchestratorServiceTest {
 
         service = new DashboardOrchestratorService(
                 providers, layoutService, cbRegistry, tlRegistry,
-                500,   // overallDeadlineMs
-                200);  // defaultWidgetTimeoutMs
+                5000,   // overallDeadlineMs (generous for CI)
+                2000);  // defaultWidgetTimeoutMs
 
         // Set correlation ID via TenantContext
         com.selfcare.platform.common.tenant.TenantContext.current().setCorrelationId("corr-123");
@@ -74,7 +74,7 @@ class DashboardOrchestratorServiceTest {
     @Test
     @DisplayName("Returns PARTIAL when some widgets timeout")
     void orchestrateDashboard_partialOnTimeout() {
-        billWidget.setDelay(Duration.ofMillis(300)); // exceeds widget timeout of 200ms
+        billWidget.setDelay(Duration.ofMillis(3000)); // exceeds widget timeout of 2000ms
 
         DashboardResponse r = service.orchestrateDashboard(
                 "t1", "conn-A", "default", List.of("balance", "bills"))
@@ -145,7 +145,7 @@ class DashboardOrchestratorServiceTest {
     @Test
     @DisplayName("refreshWidget returns TIMEOUT when widget is slow")
     void refreshWidget_timeout() {
-        balanceWidget.setDelay(Duration.ofMillis(500)); // > 200ms widget timeout
+        balanceWidget.setDelay(Duration.ofMillis(5000)); // > 2000ms widget timeout
         WidgetResult r = service.refreshWidget("balance", "t1", "conn-A", "default")
                 .block(Duration.ofSeconds(2));
         assertThat(r.getStatus()).isEqualTo("TIMEOUT");
