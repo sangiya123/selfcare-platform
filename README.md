@@ -1,6 +1,10 @@
 # Selfcare Platform — Local Deployment
 
-This guide covers running the full selfcare platform locally on Docker Desktop.
+This guide covers running the selfcare platform locally on Docker Desktop.
+The architecture is split: **stateful infrastructure** (MongoDB/Redis/MySQL/
+Kafka + admin UIs) runs in Docker Compose; the **19 microservices, admin
+portal, Jenkins and SonarQube run on Kubernetes**, deployed one-by-one via
+Helm/Jenkins.
 
 ## Prerequisites
 
@@ -12,26 +16,31 @@ This guide covers running the full selfcare platform locally on Docker Desktop.
 
 ## Quick Start (5 minutes)
 
-### Option A: Docker Compose (recommended first)
+### Option A: Docker Compose (infrastructure only — recommended first)
+
+Stateful infrastructure lives OUTSIDE Kubernetes. Microservices run on K8s
+(see Option B) and are deployed ONE BY ONE by the Jenkins pipeline.
 
 ```bash
-# 1. Build all images and start the platform
-./scripts/build-images.sh
+# 1. Start infrastructure (MongoDB, Mongo Express, Redis, MySQL, PHPMyAdmin, Zookeeper, Kafka)
 ./scripts/start-local.sh
 ```
 
 or on Windows:
 ```cmd
-scripts\build-images.bat
 scripts\start-local.bat
 ```
 
 This starts:
-- **Infrastructure**: MongoDB, Redis, Kafka, MySQL, Zookeeper
-- **19 microservices** with the dialog-lk tenant seeded
-- **Prometheus + Grafana** for monitoring
+- **Infrastructure**: MongoDB, Mongo Express, Redis, MySQL, PHPMyAdmin, Zookeeper, Kafka
+- **Admin UIs**: Mongo Express on http://localhost:8081, PHPMyAdmin on http://localhost:8080
+- The dialog-lk tenant is seeded on first Mongo boot
 
-### Option B: Kubernetes (Docker Desktop)
+> The 19 microservices and the admin portal are NOT here — they run on
+> Kubernetes and are deployed by `./scripts/deploy-k8s.sh` or, in production,
+> by the Jenkins pipeline (`ci/jenkins/Jenkinsfile`).
+
+### Option B: Kubernetes (Docker Desktop) — microservices
 
 ```bash
 # 1. Enable Kubernetes in Docker Desktop first
@@ -40,10 +49,22 @@ This starts:
 # 2. Confirm K8s context
 kubectl config use-context docker-desktop
 
-# 3. Build images and deploy
-./scripts/build-images.sh
-./scripts/deploy-k8s.sh
+# 3. Start infra (Option A, left running), then deploy microservices one-by-one
+./scripts/deploy-k8s.sh --env dev --local
 ```
+
+Optional: deploy a single microservice at a time (true one-by-one promotion):
+
+```bash
+./scripts/deploy-k8s.sh --env dev --local --service config-tenant-service
+```
+
+The full CI/CD (Jenkins + SonarQube on K8s) is described in
+`ci/helm/values.yaml` and `ci/README.md`. The complete pipeline —
+Compile → Unit Test → JaCoCo → SonarQube → Semgrep → Gitleaks →
+Dependency Scan → Docker Build → Trivy → Deploy DEV → API Automation → ZAP →
+SIT → Regression → UAT → Canary → Sentry/Grafana Monitoring — is defined in
+`ci/jenkins/Jenkinsfile`.
 
 ## Access Points
 
@@ -53,8 +74,8 @@ Once running, the platform is accessible at:
 |---|---|---|
 | **API Gateway** | http://localhost:8080 | All requests enter here |
 | **Swagger UI** | http://localhost:8080/swagger-ui.html | Auto-generated API docs |
-| **Grafana** | http://localhost:3000 | admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026 |
-| **Prometheus** | http://localhost:9090 | Metrics & alerts |
+| **Mongo Express** | http://localhost:8081 | admin / Selfcare_M0ng0Expr3ss_Pa55w0rd!2026 |
+| **PHPMyAdmin** | http://localhost:8080 | server: mysql, user: selfcare |
 | **MongoDB** | localhost:27017 | selfcare / Selfcare_M0ng0_Db_Pa55w0rd!2026 |
 | **MySQL** | localhost:3306 | selfcare / Selfcare_My5ql_Db_Pa55w0rd!2026 |
 | **Redis** | localhost:6379 | password: Selfcare_R3d1s_Pa55w0rd!2026 |
@@ -85,14 +106,13 @@ For Kubernetes, replace `localhost:8080` with `localhost:30080`, etc.
 | Audit | http://localhost:30080/api/v1/audit/** | 8095 |
 | Insurance | http://localhost:30080/api/v1/insurance/** | 8096 |
 | Approval | http://localhost:30080/api/v1/approval/** | 8097 |
-| Grafana | http://localhost:30300 | admin / Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026 |
-| Prometheus | http://localhost:30090 | |
+| Support | http://localhost:30080/api/v1/support/** | 8098 |
 
 Direct per-service access (port-forward):
 
 ```bash
-kubectl port-forward -n selfcare svc/customer-identity-service 8081:8081
-kubectl port-forward -n selfcare svc/product-service 8086:8086
+kubectl port-forward -n selfcare-dev svc/customer-identity-service 8081:8081
+kubectl port-forward -n selfcare-dev svc/product-service 8086:8086
 ```
 
 ## Tenant: dialog-lk
@@ -110,51 +130,58 @@ is loaded from MongoDB on first boot:
 To add another tenant (e.g. Hutch, AIA), insert another row in `tenants` and the
 corresponding config documents.
 
-## Production Deployment (AWS EKS)
+## Production Deployment (AWS EKS / on-prem Kubernetes)
 
-For production deployment to AWS EKS via CI/CD, see:
+For production deployment via CI/CD:
 
-- `.github/workflows/release-deploy.yml` — full release pipeline
-- `backend/deploy/helm/values/` — per-environment Helm values
+- `ci/jenkins/Jenkinsfile` — full pipeline (Compile → Unit Test → JaCoCo →
+  SonarQube → Semgrep → Gitleaks → Dependency Scan → Docker Build → Trivy →
+  Deploy DEV → API Automation → ZAP → SIT → Regression → UAT → Canary →
+  Sentry/Grafana Monitoring); deploys microservices ONE BY ONE
+- `backend/deploy/helm/values/` — per-environment Helm values (dev/stg/reg/prod)
+- `ci/helm/` — Kubernetes chart for Jenkins + SonarQube
 - `backend/deploy/gitops/applicationset.yaml` — ArgoCD ApplicationSet
 
 The release pipeline:
 1. Builds images in CI (GitHub Actions or Jenkins)
 2. Signs with cosign (keyless, GitHub OIDC)
 3. Generates SLSA L3 provenance
-4. Pushes to ECR
-5. Updates Helm values + ArgoCD ApplicationSet
-6. ArgoCD deploys to EKS (dev → stg → reg → prod)
+4. Pushes to registry
+5. Deploys each microservice one-by-one via `scripts/deploy-k8s.sh` /
+   Jenkins (Helm, `deploy.isolated=true`), promoting dev → stg → reg → prod
 
 ## Useful Commands
 
 ```bash
-# View all running services
+# View all running infra services
 docker compose ps
 
-# Tail logs
-docker compose logs -f api-gateway
-docker compose logs -f payment-service
+# Tail infra logs
+docker compose logs -f kafka
+docker compose logs -f mongodb
 
-# Restart a single service
-docker compose restart api-gateway
+# Restart a single infra service
+docker compose restart mysql
 
 # Open a shell in a container
-docker exec -it selfcare-mongodb mongosh
-docker exec -it selfcare-mysql mysql -uselfcare -pSelfcare_My5ql_Db_Pa55w0rd!2026
+docker exec -it selfcare-infra-mongodb mongosh
+docker exec -it selfcare-infra-mysql mysql -uselfcare -pSelfcare_My5ql_Db_Pa55w0rd!2026
 
 # Check tenant config
-docker exec -it selfcare-mongodb mongosh \
+docker exec -it selfcare-infra-mongodb mongosh \
   mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin \
   --eval "db.tenants.find().pretty()"
 
-# Tear down everything
+# Tear down everything (infra + volumes)
 docker compose down -v
 
+# Deploy microservices to K8s (one-by-one)
+./scripts/deploy-k8s.sh --env dev --local
+
 # Kubernetes equivalents
-kubectl get pods -n selfcare
-kubectl logs -n selfcare -l app=api-gateway
-kubectl port-forward -n selfcare svc/api-gateway 8080:8080
+kubectl get pods -n selfcare-dev
+kubectl logs -n selfcare-dev deployment/api-gateway
+kubectl port-forward -n selfcare-dev svc/api-gateway 8080:8080
 ```
 
 ## Health Checks
@@ -170,20 +197,29 @@ Each service exposes Spring Actuator endpoints:
 
 ## Troubleshooting
 
+### Microservice pods fail to start / 502 from API gateway
+- Check microservice pods: `kubectl get pods -n selfcare-dev`
+- Check infra is running (compose): `docker compose ps`
+- Check service logs: `kubectl logs -n selfcare-dev deployment/<service>`
+- Verify tenant header is set: `X-Tenant-Id: dialog-lk`
+- In local (docker-desktop) mode, services reach infra via the compose host —
+  ensure the infra cluster services point at the correct producer addresses
+
 ### "Cannot connect to MongoDB"
 ```bash
 docker compose logs mongodb
-docker exec selfcare-mongodb mongosh --eval "db.adminCommand('ping')"
+docker exec selfcare-infra-mongodb mongosh --eval "db.adminCommand('ping')"
 ```
 
-> **Spring Boot 4.1.1 note:** the MongoDB property prefix is `spring.mongodb.*`,
-> not `spring.data.mongodb.*`. Config is injected cluster-wide from the
-> `selfcare-config` ConfigMap (SPRING_MONGODB_HOST / _PORT / _URI / ...). If pods
-> log `hosts=[localhost:27017]`, those env keys are missing from the ConfigMap.
+> **Spring Boot 4.1 note:** the MongoDB property prefix is `spring.mongodb.*`,
+> not `spring.data.mongodb.*`. Config is injected per-service from the Helm
+> chart / Sealed Secret (SPRING_MONGODB_URI / ...). If pods log
+> `hosts=[localhost:27017]`, those env keys are missing.
 
 ### "API Gateway returns 502"
-- Check upstream service health: `docker compose ps`
-- Check API Gateway logs: `docker compose logs api-gateway`
+- Check infra containers: `docker compose ps`
+- Check microservice pods/health in K8s: `kubectl get pods -n selfcare-dev`
+- Check API Gateway logs: `kubectl logs -n selfcare-dev deployment/api-gateway`
 - Verify tenant header is set: `X-Tenant-Id: dialog-lk`
 
 ### "Build fails with Maven errors"

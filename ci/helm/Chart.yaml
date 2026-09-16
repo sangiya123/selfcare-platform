@@ -1,0 +1,9 @@
+apiVersion: v2
+name: selfcare-ci
+description: Selfcare Platform CI stack on Kubernetes — Jenkins (CAS) + SonarQube
+type: application
+version: 0.1.0
+appVersion: "1.0"
+kubeVersion: ">= 1.25.0"
+maintainers:
+  - name: selfcare-platform

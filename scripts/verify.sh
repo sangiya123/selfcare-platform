@@ -69,7 +69,7 @@ done
 # 3. Verify tenant config in MongoDB
 echo ""
 echo "=== MongoDB tenant config ==="
-docker exec selfcare-mongodb mongosh --quiet \
+docker exec selfcare-infra-mongodb mongosh --quiet \
   mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin \
   --eval "db.tenants.findOne({tenantId: 'dialog-lk'}, {displayName: 1, industry: 1, country: 1, currency: 1})" 2>/dev/null || echo "  (could not query MongoDB)"
 

@@ -1,18 +1,21 @@
 ﻿#!/usr/bin/env bash
-# start-local.sh — Start the full selfcare platform via docker-compose
+# start-local.sh — Start selfcare infrastructure (docker-compose) + deploy app to Kubernetes
 # Usage: ./scripts/start-local.sh [--build] [--skip-build]
 #
 # This starts:
-#   Infrastructure: MongoDB, Redis, Kafka, MySQL, Zookeeper
-#   Services:      All 19 selfcare microservices
-#   Observability:  Prometheus, Grafana
+#   Infrastructure: MongoDB, Mongo Express, Redis, MySQL, PHPMyAdmin, Kafka (docker compose)
+#   Application:     Deployed to Kubernetes by the Jenkins pipeline (ci/jenkins/Jenkinsfile).
+#                    For a manual local K8s deploy see ./scripts/deploy-k8s.sh --env dev --local
+#
+# The stateful infra stays local/private. It is never exposed to the public cloud.
 #
 # Access points:
-#   API Gateway:     http://localhost:8080
-#   Grafana:         http://localhost:3000  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)
-#   Prometheus:       http://localhost:9090
-#   MongoDB:          localhost:27017  (selfcare/Selfcare_M0ng0_Db_Pa55w0rd!2026)
-#   Kafka:            localhost:9092
+#   Mongo Express:   http://localhost:8081  (admin / Selfcare_M0ng0Expr3ss_Pa55w0rd!2026)
+#   PHPMyAdmin:      http://localhost:8080  (server: mysql, user: selfcare)
+#   MongoDB:         localhost:27017  (selfcare/Selfcare_M0ng0_Db_Pa55w0rd!2026)
+#   MySQL:           localhost:3306  (selfcare/Selfcare_My5ql_Db_Pa55w0rd!2026)
+#   Redis:           localhost:6379  (Selfcare_R3d1s_Pa55w0rd!2026)
+#   Kafka:           localhost:9092
 
 set -euo pipefail
 
@@ -20,28 +23,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "=============================================="
-echo " Selfcare Platform — Local Start"
+echo " Selfcare Platform — Local Infra Start"
 echo "=============================================="
 
 cd "$PLATFORM_DIR"
 
-# Step 1: Build images if requested
-if [ "${1:-}" = "--build" ]; then
-  echo ""
-  echo "▶ Building Docker images..."
-  "$SCRIPT_DIR/build-images.sh"
-fi
-
-# Step 2: Start infrastructure first
+# Step 1: Start infrastructure
 echo ""
-echo "▶ Starting infrastructure (MongoDB, Redis, Kafka, MySQL)..."
-docker compose up -d mongodb redis kafka zookeeper mysql
+echo "▶ Starting infrastructure (MongoDB, Mongo Express, Redis, MySQL, PHPMyAdmin, Kafka)..."
+docker compose up -d
 
 # Wait for MongoDB to be ready
 echo ""
 echo "▶ Waiting for MongoDB to be ready..."
 for i in {1..30}; do
-  if docker exec selfcare-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q "1"; then
+  if docker exec selfcare-infra-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q "1"; then
     echo "✓ MongoDB ready"
     break
   fi
@@ -49,48 +45,34 @@ for i in {1..30}; do
   sleep 2
 done
 
-# Step 3: Seed tenant data
+# Step 2: Seed tenant data
 echo ""
 echo "▶ Seeding dialog-lk tenant config into MongoDB..."
-docker exec selfcare-mongodb mongosh --quiet \
+docker exec selfcare-infra-mongodb mongosh --quiet \
   mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@localhost:27017/selfcare_config?authSource=admin \
   --file /docker-entrypoint-initdb.d/01-tenant-dialog.js \
   2>/dev/null || echo "  (seed script may have already run — continuing)"
 
-# Step 4: Start all services
+# Step 3: infra status
 echo ""
-echo "▶ Starting all selfcare microservices..."
-docker compose up -d
-
-# Wait for API Gateway to be ready
-echo ""
-echo "▶ Waiting for API Gateway..."
-for i in {1..30}; do
-  if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
-    echo "✓ API Gateway ready"
-    break
-  fi
-  echo "  waiting... ($i/30)"
-  sleep 5
-done
+echo "▶ Infrastructure status:"
+docker compose ps
 
 echo ""
 echo "=============================================="
-echo "✓ Selfcare Platform is running"
+echo "✓ Selfcare infrastructure is running (private, local only)"
 echo ""
-echo " Endpoints:"
-echo "   API Gateway     http://localhost:8080"
-echo "   Swagger UI      http://localhost:8080/swagger-ui.html"
-echo "   Grafana        http://localhost:3000  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)"
-echo "   Prometheus     http://localhost:9090"
-echo "   Kafka UI       http://localhost:8080/kafka-ui (if enabled)"
+echo " Stateful infra endpoints:"
+echo "   Mongo Express http://localhost:8081  (admin / Selfcare_M0ng0Expr3ss_Pa55w0rd!2026)"
+echo "   PHPMyAdmin    http://localhost:8080  (server: mysql, user: selfcare)"
 echo ""
-echo " Docker status:"
-docker compose ps
+echo " Application (microservices + admin portal) deploys to Kubernetes:"
+echo "   -> via Jenkins: ci/jenkins/Jenkinsfile (helm chart backend/deploy/helm)"
+echo "   -> manual local: ./scripts/deploy-k8s.sh --env dev --local"
+echo "   -> portal:       helm upgrade selfcare-admin admin/selfcare-admin/deploy/helm"
 echo ""
-echo " Logs:"
-echo "   docker compose logs -f api-gateway"
-echo ""
-echo " Stop:"
+echo " Container logs:"
+echo "   docker compose logs -f kafka"
+echo " Stop infra:"
 echo "   docker compose down"
 echo "=============================================="

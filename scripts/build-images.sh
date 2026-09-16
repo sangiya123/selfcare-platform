@@ -55,6 +55,7 @@ SERVICES=(
   dashboard-bff
   product-service
   usage-service
+  support-service
   billing-service
   payment-service
   notification-service

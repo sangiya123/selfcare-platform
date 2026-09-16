@@ -16,8 +16,8 @@
 def serviceNames = [
     'api-gateway', 'config-tenant-service', 'customer-identity-service',
     'admin-identity-service', 'account-entitlement-service', 'dashboard-bff',
-    'product-service', 'usage-service', 'billing-service', 'payment-service',
-    'notification-service', 'content-service', 'journey-service',
+    'product-service', 'usage-service', 'support-service', 'billing-service',
+    'payment-service', 'notification-service', 'content-service', 'journey-service',
     'reporting-service', 'ai-gateway', 'audit-service', 'insurance-service',
     'approval-service'
 ]

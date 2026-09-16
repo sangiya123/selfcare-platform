@@ -14,14 +14,14 @@ export SELFCARE_ENV
 
 # ---------- High-level: deploy to EKS via new scripts ----------
 # Usage:
-#   make dev                           # docker-compose local (fast inner loop)
+#   make dev                           # start stateful infra ONLY (docker compose; apps go to K8s)
 #   make k8s-dev TAG=dev-42            # EKS deploy (Jenkins or manual)
 #   make k8s-stg TAG=rc-42
 #   make k8s-prod TAG=v1.2.0
 #   make smoke ENV=dev
 .PHONY: dev stg reg prod k8s-dev k8s-stg k8s-reg k8s-prod smoke dev-test
 dev:
-	@echo "Starting DEV environment (docker-compose local)..."
+	@echo "Starting DEV stateful infrastructure (docker-compose) — apps run on Kubernetes..."
 	@SELFCARE_ENV=dev docker-compose up -d
 
 stg:
@@ -55,8 +55,8 @@ smoke:
 dev-test:
 	@echo "Building + deploying to docker-desktop for local testing..."
 	@cd backend && mvn -B -T 1C package -Dmaven.test.skip=true -Djacoco.skip=true
-	@VERSION=local ./scripts/build-images.sh
-	@VERSION=local ./scripts/deploy-k8s.sh --env dev --local --skip-infra
+	@VERSION=local ./scripts/build-images.sh --registry selfcare
+	@VERSION=local ./scripts/deploy-k8s.sh --env dev --local
 
 # ---------- Backend (Java Spring Boot) ----------
 .PHONY: backend-build backend-run backend-test backend-stop
@@ -71,7 +71,8 @@ backend-test:
 	cd backend && mvn test
 
 backend-stop:
-	cd backend && docker-compose down
+	@echo "Microservices run on Kubernetes; infra stops via 'docker compose down'"
+	cd backend && docker compose down 2>/dev/null || true
 
 # ---------- Admin (Vite/React) ----------
 .PHONY: admin-install admin-run admin-build admin-preview

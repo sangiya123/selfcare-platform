@@ -1,413 +1,240 @@
-# Selfcare Platform - APPLICATION STACK (microservices + observability)
+# Selfcare Platform - STATEFUL INFRASTRUCTURE ONLY
 #
-# LOCAL DEVELOPMENT ONLY. The application deploys to Kubernetes in dev/stg/reg/prod.
-# Infrastructure (MongoDB, MySQL, Redis, Kafka, admin UIs) lives in
-# docker-compose.infra.yml - start it first:
+# This compose file holds ONLY stateful infrastructure and database admin
+# UIs that must never be exposed to the public cloud:
+#   MongoDB, Mongo Express, Redis, MySQL, PHPMyAdmin, Zookeeper, Kafka
 #
-#   docker compose -f docker-compose.infra.yml up -d
-#   docker compose up -d                 # this file - application services
-#   docker compose logs -f api-gateway   # tail a service
-#   docker compose down                  # stop application (infra survives)
+# NO application microservice lives here. The 19 microservices, the admin
+# portal (selfcare-admin), Jenkins, and SonarQube run on Kubernetes and are
+# deployed by the Jenkins pipeline (ci/jenkins/Jenkinsfile) using the Helm
+# chart backend/deploy/helm.
 #
-# Tenant: dialog-lk (Sri Lanka telco). Schema is seeded by the infra compose.
+# Usage:
+#   docker compose up -d                      # start infra only
+#   docker compose down -v                    # tear down (+ volumes)
+#   docker compose logs -f kafka              # tail logs
+#
+# Admin UIs (local convenience only - do NOT publish ports to the internet):
+#   Mongo Express : http://localhost:8081  (admin / Selfcare_M0ng0Expr3ss_Pa55w0rd!2026)
+#   PHPMyAdmin    : http://localhost:8080  (server: mysql, user: selfcare)
+#
+# IMPORTANT: infra names/hosts (mongodb, mysql, redis, kafka) are used by
+# the microservices running on Kubernetes too - expose this host via an
+# in-cluster service or a private network ONLY, never the public internet.
 
-x-selfcare-common: &selfcare-common
-  restart: unless-stopped
-  environment: &selfcare-env
-    # Tenant header that all services require
-    X_DEFAULT_TENANT_ID: "dialog-lk"
-    SELFCARE_TENANT_DEFAULT_ID: "dialog-lk"
-    # SSRF allow list: extend with dev/mock/private hosts that must keep working
-    # (operator BSS/SMSC hosts are baked-in defaults; these are the mock + in-cluster)
-    SELFCARE_SECURITY_URL_ALLOWLIST_HOSTS: "localhost,host.docker.internal,mock,bss-dialog.svc,smsc-dialog.svc,bss-hutch.svc,smsc-hutch.svc,bss-airtel.svc,smsc-airtel.svc,aia-api.svc"
-    # JVM settings (capped heap: 19 services x unrestricted MaxRAMPercentage
-    # overcommits the Docker VM and makes every boot thrash for 20+ min)
-    JAVA_TOOL_OPTIONS: "-Xmx768m -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
-    SPRING_PROFILES_ACTIVE: docker
-    # MySQL hostnames (infra compose network)
-    DB_HOST: mysql
-    DB_PORT: "3306"
-    DB_USER: selfcare
-    DB_USERNAME: selfcare
-    DB_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
-    SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    JPA_DDL_AUTO: update
-    SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-    # MongoDB hostnames (infra compose network)
-    MONGO_HOST: mongodb
-    MONGO_PORT: "27017"
-    MONGO_USERNAME: selfcare
-    MONGO_PASSWORD: Selfcare_M0ng0_Db_Pa55w0rd!2026
-    MONGO_DATABASE: selfcare_config
-    MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
-    SPRING_MONGODB_URI: "mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin"
-    # Redis connectivity (infra compose network)
-    REDIS_HOST: redis
-    REDIS_PORT: "6379"
-    REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
-    SPRING_DATA_REDIS_HOST: redis
-    SPRING_DATA_REDIS_PORT: 6379
-    SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
-  networks:
-    - selfcare-app-net
+name: selfcare-infra
+
+networks:
+  selfcare-infra-net:
+    driver: bridge
+    name: selfcare-infra-net
+
+volumes:
+  infra-mongodb-data:
+  infra-redis-data:
+  infra-mysql-data:
+  infra-jenkins-home:
+  infra-jenkins-workspace:
+  infra-maven-cache:
+  infra-sonarqube-data:
+  infra-sonarqube-extensions:
+  infra-sonarqube-logs:
 
 services:
   # ─────────────────────────────────────────────────────────────
-  # SELF-CARE MICROSERVICES (deploy to Kubernetes in prod)
+  # MongoDB  - config source of truth (tenants, layouts, themes,
+  #             assets, experiences, journeys)
   # ─────────────────────────────────────────────────────────────
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: api-gateway
-    container_name: selfcare-api-gateway
-    <<: *selfcare-common
+  mongodb:
+    image: mongo:7.0
+    container_name: selfcare-infra-mongodb
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "27017:27017"
     environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8080
-      SPRING_CLOUD_CONFIG_ENABLED: "false"
-      SPRING_CONFIG_IMPORT: "optional:configserver:"
-    depends_on:
-      config-tenant-service:
-        condition: service_started
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-selfcare}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-Selfcare_M0ng0_Db_Pa55w0rd!2026}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-selfcare_config}
+    volumes:
+      - infra-mongodb-data:/data/db
+      - ./deploy/local/mongo-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - selfcare-infra-net
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+  # MongoDB admin UI (local only)
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: selfcare-infra-mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USERNAME:-selfcare}:${MONGO_PASSWORD:-Selfcare_M0ng0_Db_Pa55w0rd!2026}@mongodb:27017/${MONGO_DATABASE:-selfcare_config}?authSource=admin
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-Selfcare_M0ng0Expr3ss_Pa55w0rd!2026}
+    networks:
+      - selfcare-infra-net
+
+  # ─────────────────────────────────────────────────────────────
+  # Redis - cache / sessions / hot entitlement
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: selfcare-infra-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-Selfcare_R3d1s_Pa55w0rd!2026}"]
+    volumes:
+      - infra-redis-data:/data
+    networks:
+      - selfcare-infra-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-Selfcare_R3d1s_Pa55w0rd!2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # MySQL - transactional data + per-service schemas
+  # ─────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: selfcare-infra-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Selfcare_My5ql_R00t_Pa55w0rd!2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-selfcare_identity}
+      MYSQL_USER: ${MYSQL_USERNAME:-selfcare}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Selfcare_My5ql_Db_Pa55w0rd!2026}
+    volumes:
+      - infra-mysql-data:/var/lib/mysql
+      - ./deploy/local/mysql-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - selfcare-infra-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-Selfcare_My5ql_R00t_Pa55w0rd!2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # MySQL admin UI (local only)
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: selfcare-infra-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${PHPMYADMIN_PORT:-8080}:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USERNAME:-selfcare}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-Selfcare_My5ql_Db_Pa55w0rd!2026}
+      UPLOAD_LIMIT: 64M
+    networks:
+      - selfcare-infra-net
+
+  # ─────────────────────────────────────────────────────────────
+  # Kafka + Zookeeper - event streaming / audit fan-out / CDC
+  # ─────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: selfcare-infra-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - selfcare-infra-net
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc -w 5 localhost 2181 | grep -q 'Zookeeper version'"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 30s
 
-  config-tenant-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: config-tenant-service
-    container_name: selfcare-config-tenant
-    <<: *selfcare-common
-    ports:
-      - "8081:8081"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8081
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  customer-identity-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: customer-identity-service
-    container_name: selfcare-customer-identity
-    <<: *selfcare-common
-    ports:
-      - "8082:8082"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8082
-      DB_NAME: selfcare_identity
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_identity?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: selfcare
-      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
-
-  admin-identity-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: admin-identity-service
-    container_name: selfcare-admin-identity
-    <<: *selfcare-common
-    ports:
-      - "8083:8083"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8083
-      DB_NAME: selfcare_admin
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_admin?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: selfcare
-      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
-
-  account-entitlement-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: account-entitlement-service
-    container_name: selfcare-account-entitlement
-    <<: *selfcare-common
-    ports:
-      - "8084:8084"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8084
-      DB_NAME: selfcare_core
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_core?useSSL=false&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: selfcare
-      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: Selfcare_R3d1s_Pa55w0rd!2026
-
-  dashboard-bff:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: dashboard-bff
-    container_name: selfcare-dashboard-bff
-    <<: *selfcare-common
-    ports:
-      - "8085:8085"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8085
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: selfcare-infra-kafka
+    restart: unless-stopped
     depends_on:
-      - config-tenant-service
-      - account-entitlement-service
-
-  product-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: product-service
-    container_name: selfcare-product
-    <<: *selfcare-common
+      zookeeper:
+        condition: service_healthy
     ports:
-      - "8086:8086"
+      - "9092:9092"
     environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8086
-
-  usage-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: usage-service
-    container_name: selfcare-usage
-    <<: *selfcare-common
-    ports:
-      - "8087:8087"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8087
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-
-  support-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: support-service
-    container_name: selfcare-support
-    <<: *selfcare-common
-    ports:
-      - "8098:8098"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8098
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  billing-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: billing-service
-    container_name: selfcare-billing
-    <<: *selfcare-common
-    ports:
-      - "8088:8088"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8088
-
-  payment-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: payment-service
-    container_name: selfcare-payment
-    <<: *selfcare-common
-    ports:
-      - "8089:8089"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8089
-      DB_NAME: selfcare_payment
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/selfcare_payment?useSSL=false&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: selfcare
-      SPRING_DATASOURCE_PASSWORD: Selfcare_My5ql_Db_Pa55w0rd!2026
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-
-  notification-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: notification-service
-    container_name: selfcare-notification
-    <<: *selfcare-common
-    ports:
-      - "8090:8090"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8090
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-
-  content-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: content-service
-    container_name: selfcare-content
-    <<: *selfcare-common
-    ports:
-      - "8091:8091"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8091
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  journey-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: journey-service
-    container_name: selfcare-journey
-    <<: *selfcare-common
-    ports:
-      - "8092:8092"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8092
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  reporting-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: reporting-service
-    container_name: selfcare-reporting
-    <<: *selfcare-common
-    ports:
-      - "8093:8093"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8093
-
-  ai-gateway:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: ai-gateway
-    container_name: selfcare-ai-gateway
-    <<: *selfcare-common
-    ports:
-      - "8094:8094"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8094
-      # Local AI stub - replace with real API key in production
-      SELFCARE_AI_PROVIDER: stub
-      SELFCARE_AI_STUB_ENABLED: "true"
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  audit-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: audit-service
-    container_name: selfcare-audit
-    <<: *selfcare-common
-    ports:
-      - "8095:8095"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8095
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-
-  insurance-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: insurance-service
-    container_name: selfcare-insurance
-    <<: *selfcare-common
-    ports:
-      - "8096:8096"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8096
-      SPRING_MONGODB_URI: mongodb://selfcare:Selfcare_M0ng0_Db_Pa55w0rd!2026@mongodb:27017/selfcare_config?authSource=admin
-
-  approval-service:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.jarbuild
-      args:
-        MODULE: approval-service
-    container_name: selfcare-approval
-    <<: *selfcare-common
-    ports:
-      - "8097:8097"
-    environment:
-      <<: *selfcare-env
-      SERVER_PORT: 8097
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - selfcare-infra-net
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ─────────────────────────────────────────────────────────────
-  # OBSERVABILITY (local; in prod these are deployed in-cluster)
+  # CI/CD - Jenkins (full SDLC pipeline) + SonarQube (quality gate)
+  # Built from ci/jenkins (JDK 25, Maven, Node, Helm, kubectl, docker CLI).
+  # Spins in the SAME selfcare-infra network so the pipeline can reach
+  # MongoDB/MySQL/Kafka while running builds + security scans.
   # ─────────────────────────────────────────────────────────────
-
-  prometheus:
-    image: prom/prometheus:v2.55.0
-    container_name: selfcare-prometheus
+  jenkins:
+    build:
+      context: ./ci/jenkins
+    image: selfcare/jenkins:local
+    container_name: selfcare-infra-jenkins
     restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./deploy/local/prometheus-alerts.yaml:/etc/prometheus/alerts/prometheus-alerts.yaml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=7d"
-    networks:
-      - selfcare-app-net
-
-  grafana:
-    image: grafana/grafana:11.2.0
-    container_name: selfcare-grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-    volumes:
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - selfcare-app-net
     depends_on:
-      - prometheus
+      sonarqube:
+        condition: service_started
+    ports:
+      - "${JENKINS_PORT:-8090}:8080"
+      - "50000:50000"
+    env_file:
+      - ci/.env.ci
+    environment:
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Dcasc.jenkins.config=/var/jenkins_home/casc_configs/jenkins.yaml
+    volumes:
+      - infra-jenkins-home:/var/jenkins_home
+      - infra-jenkins-workspace:/workspace
+      - infra-maven-cache:/var/maven-cache
+      - //var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - selfcare-infra-net
 
-networks:
-  selfcare-app-net:
-    driver: bridge
-    name: selfcare-app-net
-    external: false
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: selfcare-infra-sonarqube
+    restart: unless-stopped
+    ports:
+      - "${SONAR_PORT:-9000}:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - infra-sonarqube-data:/opt/sonarqube/data
+      - infra-sonarqube-extensions:/opt/sonarqube/extensions
+      - infra-sonarqube-logs:/opt/sonarqube/logs
+    networks:
+      - selfcare-infra-net

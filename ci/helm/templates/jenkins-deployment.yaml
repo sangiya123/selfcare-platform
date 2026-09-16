@@ -1,0 +1,140 @@
+# =============================================================================
+# Jenkins — Deployment + Service + PVCs
+# =============================================================================
+{{- if .Values.jenkins.enabled }}
+# --- Persistent volumes ---
+{{- range $name, $vol := dict "home" .Values.jenkins.volumes.jenkinsHome "workspace" .Values.jenkins.volumes.workspace "maven" .Values.jenkins.volumes.mavenCache }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-jenkins-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/part-of: selfcare-ci
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ $vol.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ $vol.size }}
+---
+{{- end }}
+# --- Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/part-of: selfcare-ci
+spec:
+  type: {{ .Values.jenkins.service.type }}
+  selector:
+    app.kubernetes.io/name: jenkins
+  ports:
+    - name: http
+      port: {{ .Values.jenkins.service.httpPort }}
+      targetPort: http
+      protocol: TCP
+    - name: jnlp
+      port: {{ .Values.jenkins.service.jnlpPort }}
+      targetPort: jnlp
+      protocol: TCP
+---
+# --- Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/part-of: selfcare-ci
+spec:
+  replicas: {{ .Values.jenkins.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jenkins
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jenkins
+        app.kubernetes.io/part-of: selfcare-ci
+    spec:
+      serviceAccountName: {{ .Values.jenkins.serviceAccount.name }}
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: jenkins
+          image: "{{ .Values.jenkins.image.repository }}:{{ .Values.jenkins.image.tag }}"
+          imagePullPolicy: {{ .Values.jenkins.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: jnlp
+              containerPort: 50000
+          envFrom:
+            - secretRef:
+                name: {{ .Values.jenkins.adminExistingSecret | default (printf "%s-jenkins-credentials" .Release.Name) }}
+          env:
+            - name: JENKINS_ADMIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.jenkins.adminExistingSecret | default (printf "%s-jenkins-credentials" .Release.Name) }}
+                  key: JENKINS_ADMIN_USER
+            - name: JENKINS_OPTS
+              value: "--prefix=/jenkins"
+            - name: JAVA_OPTS
+              value: >-
+                -Djenkins.install.runSetupWizard=false
+                -Dcasc.jenkins.config=/var/jenkins_home/casc_configs/jenkins.yaml
+          volumeMounts:
+            - name: jenkins-home
+              mountPath: /var/jenkins_home
+            - name: workspace
+              mountPath: /workspace
+            - name: maven-cache
+              mountPath: /var/maven-cache
+            - name: casc-config
+              mountPath: /var/jenkins_home/casc_configs
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          resources:
+            {{- toYaml .Values.jenkins.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /jenkins/login
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /jenkins/login
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: jenkins-home
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-jenkins-home
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-jenkins-workspace
+        - name: maven-cache
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-jenkins-maven
+        - name: casc-config
+          configMap:
+            name: {{ .Release.Name }}-jenkins-casc
+        - name: docker-sock
+          {{- if .Values.jenkins.dockerSock.enabled }}
+          hostPath:
+            path: {{ .Values.jenkins.dockerSock.hostPath }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

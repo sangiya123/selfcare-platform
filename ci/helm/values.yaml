@@ -1,0 +1,166 @@
+# =============================================================================
+# Selfcare Platform — CI stack Helm values (Jenkins + SonarQube)
+#
+# Deploy:
+#   helm upgrade --install selfcare-ci ci/helm -n selfcare-ci --create-namespace
+#   -f ci/helm/values.yaml -f ci/helm/values/dev.yaml
+#
+# Jenkins image is built from ci/jenkins/Dockerfile (lts-jdk21 + docker + kubectl).
+# SonarQube is the community edition (community image).
+#
+# Admin passwords are referenced by Secret, NOT hardcoded here.
+# For local docker-desktop development the Secrets are pre-created by
+# ci/start-local-ci.ps1. For real clusters, create via
+# ci/helm/templates/jenkins-secret.yaml (see values.yaml adminExistingSecret).
+# =============================================================================
+
+# --- Global namespace for labels ------------------------------------------------
+namespace: selfcare-ci
+
+# =============================================================================
+# CI tool credentials (injected into Jenkins CasC via Secret)
+# For local docker-desktop, cp ci/.env.ci.example -> ci/.env.ci and run
+# ci/start-local-ci.ps1 which renders these automatically.
+# =============================================================================
+registry:
+  username: ""
+  password: ""
+
+sonar:
+  token: ""
+
+nvd:
+  apiKey: ""
+
+# =============================================================================
+# Jenkins
+# =============================================================================
+jenkins:
+  enabled: true
+  image:
+    repository: jenkins/jenkins
+    tag: lts-jdk21
+    pullPolicy: IfNotPresent
+  # Local dev: build your own image with docker/kubectl/plugin-cli:
+  #   docker build -t selfcare-jenkins:local ci/jenkins/
+  # then set: image.repository=selfcare-jenkins, image.tag=local
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+  replicas: 1
+  service:
+    type: LoadBalancer  # NodePort for docker-desktop; LoadBalancer for cloud LB
+    httpPort: 8080
+    jnlpPort: 50000
+  # Admin credentials (stored in a Kubernetes Secret).
+  # Default: creates a Secret named `jenkins-admin-creds` from values below.
+  # For production, set adminExistingSecret to an external secret name.
+  adminExistingSecret: ""
+  admin:
+    username: admin
+    # Plain-text password only used when adminExistingSecret is empty.
+    # Replace in production! Reference in .env.ci: Selfcare_J3nk1ns_Adm1n_Pa55w0rd!2026
+    password: Selfcare_J3nk1ns_Adm1n_Pa55w0rd!2026
+  # Jenkins CasC configuration (mounted as volume)
+  cascadeConfig: true
+  cascadeYaml: |
+    jenkins:
+      systemMessage: "Selfcare Platform — Jenkins CI"
+      securityRealm:
+        local:
+          allowsSignup: false
+          users:
+            - id: admin
+              password: "${JENKINS_ADMIN_PASSWORD}"
+      authorizationStrategy:
+        roleBased:
+          roles:
+            global:
+              - name: "admin"
+                permissions: ["Overall/Administer"]
+                entries:
+                  - group: authenticated
+      nodes:
+        - permanent:
+            name: "default"
+            numExecutors: 4
+            remoteFS: /workspace
+            labels: "docker linux"
+    credentials:
+      system:
+        domainCredentials:
+          - credentials:
+              - usernamePassword:
+                  scope: GLOBAL
+                  id: docker-registry-url
+                  username: "${DOCKER_REGISTRY_USER}"
+                  password: "${DOCKER_REGISTRY_PASSWORD}"
+              - string:
+                  scope: GLOBAL
+                  id: sonar-token
+                  secret: "${SONAR_TOKEN}"
+              - string:
+                  scope: GLOBAL
+                  id: owasp-nvd-api-key
+                  secret: "${NVD_API_KEY}"
+      unreclass:
+        - org.jenkins_ci.plugins.workflow.cps.CpsScmFlowDefinition:
+            scriptPath: Jenkinsfile
+  # Kubeconfig for dev/stg/reg/prod (base64-encoded, from workflow credentials).
+  # The root Jenkinsfile references DEV_KUBECONFIG / STG_KUBECONFIG / etc.
+  kubeconfigs: {}
+  # kubeconfigs:
+  #   DEV_KUBECONFIG: <base64>
+  #   STG_KUBECONFIG: <base64>
+  volumes:
+    jenkinsHome:
+      storageClassName: standard
+      size: 20Gi
+    workspace:
+      storageClassName: standard
+      size: 20Gi
+    mavenCache:
+      storageClassName: standard
+      size: 10Gi
+  # For docker-in-docker agent builds (mount docker.sock from node)
+  dockerSock:
+    enabled: true
+    hostPath: /var/run/docker.sock
+  serviceAccount:
+    create: true
+    name: jenkins
+  rbac:
+    create: true
+
+# =============================================================================
+# SonarQube
+# =============================================================================
+sonarqube:
+  enabled: true
+  image:
+    repository: sonarqube
+    tag: community
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+  replicas: 1
+  service:
+    type: LoadBalancer
+    port: 9000
+  # Admin password (stored in a Secret).
+  adminExistingSecret: ""
+  admin:
+    password: Selfcare_S0n4r_Adm1n_Pa55w0rd!2026
+  volumes:
+    data:
+      storageClassName: standard
+      size: 10Gi
+    extensions:
+      storageClassName: standard
+      size: 2Gi
+    logs:
+      storageClassName: standard
+      size: 2Gi
+  # SonarQube bootstrap checks can be slow on first boot with low resources
+  esBootstrapChecksDisabled: true

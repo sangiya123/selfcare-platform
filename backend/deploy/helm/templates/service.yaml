@@ -22,7 +22,7 @@ spec:
     {{- include "selfcare.selectorLabels" (dict "name" $name) | nindent 4 }}
 {{- end }}
 {{- end }}
-{{- if and .Values.ingress.enabled (index .Values.services "api-gateway") }}
+{{- if and .Values.ingress.enabled (not $.Values.deploy.isolated) (index .Values.services "api-gateway") }}
 ---
 # API Gateway Ingress - the single public entry point
 apiVersion: networking.k8s.io/v1
@@ -60,7 +60,7 @@ spec:
                 port:
                   number: 8080
 {{- end }}
-{{- if and .Values.ingress.enabled (index .Values.services "admin-identity-service") }}
+{{- if and .Values.ingress.enabled (not $.Values.deploy.isolated) (index .Values.services "admin-identity-service") }}
 ---
 # Admin Portal Ingress
 apiVersion: networking.k8s.io/v1

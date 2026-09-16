@@ -49,8 +49,10 @@ echo "=============================================="
 # --- 1. Deployment readiness ---
 echo ""
 echo "--- Deployment readiness ---"
-for SVC in api-gateway config-tenant-service admin-identity-service notification-service \
-           content-service audit-service approval-service; do
+for SVC in api-gateway config-tenant-service customer-identity-service admin-identity-service \
+           account-entitlement-service dashboard-bff product-service usage-service support-service \
+           billing-service payment-service notification-service content-service journey-service \
+           reporting-service ai-gateway audit-service insurance-service approval-service; do
   READY=$($KUBECTL get deployment "$SVC" -n "$NAMESPACE" \
     -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
   READY=${READY:-0}

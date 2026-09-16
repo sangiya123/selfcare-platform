@@ -67,62 +67,56 @@ docker tag selfcare/api-gateway:1.0.0       selfcare/api-gateway:local-v4
 
 ---
 
-## 3. Deploy — Docker Compose (local)
+## 3. Deploy — Docker Compose (infrastructure ONLY)
+
+The compose file holds ONLY stateful infrastructure + database admin UIs:
+MongoDB, Mongo-Express, Redis, MySQL, PHPMyAdmin, Zookeeper, Kafka.
+Microservices NEVER run in compose.
 
 ```bash
 scripts/start-local.sh                 # or: scripts\start-local.bat
-docker compose up -d                   # full stack incl. observability
-docker compose up -d mongodb redis kafka zookeeper mysql   # infra only
 docker compose ps
-docker compose logs -f api-gateway
-docker compose restart api-gateway
+docker compose logs -f kafka
+docker compose up -d mongodb redis kafka zookeeper mysql   # infra only
 docker compose down                    # stop (keep volumes)
 docker compose down -v                 # stop + delete volumes
 ```
 
-Access:
-- API Gateway  http://localhost:8080  (Swagger: /swagger-ui.html)
-- Grafana      http://localhost:3000  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)
-- Prometheus   http://localhost:9090
+Access (local only — never publish these ports to the internet):
+- Mongo Express http://localhost:8081 (admin/Selfcare_M0ng0Expr3ss_Pa55w0rd!2026)
+- PHPMyAdmin    http://localhost:8080 (server: mysql / user: selfcare)
 
-Smoke test:
-
-```bash
-scripts/verify.sh
-```
+No application service exposes a port in compose — the 19 microservices and
+the admin portal run on Kubernetes (section 4).
 
 ---
 
 ## 4. Deploy — Kubernetes (Docker Desktop)
 
-Apply the manifests in order:
+Infrastructure lives in compose (section 3) and must be running. Deploy the
+19 microservices + admin portal ONE BY ONE via Helm (`deploy.isolated=true`):
 
 ```bash
-kubectl apply -f deploy/kubernetes/namespace.yaml            # ns: selfcare
-kubectl apply -f deploy/kubernetes/secrets.yaml
-kubectl apply -f deploy/kubernetes/configmap.yaml
-kubectl apply -f deploy/kubernetes/infra.yaml                # mongo/redis/mysql/kafka/zk
-kubectl apply -f deploy/kubernetes/tenant-seeding-job.yaml   # seed dialog-lk
-kubectl apply -f deploy/kubernetes/services.yaml             # 18 microservices
-kubectl apply -f deploy/kubernetes/admin-portal.yaml         # selfcare-admin
+# All microservices sequentially + admin portal
+scripts/deploy-k8s.sh --env dev --local
+
+# Promote ONE service (Jenkins does exactly this per service)
+scripts/deploy-k8s.sh --env dev --local --service config-tenant-service
 ```
 
-Or use the all-in-one script (bash):
-
-```bash
-scripts/deploy-k8s.sh            # apply manifests only
-scripts/deploy-k8s.sh --build    # build images first, then apply
-```
+The baseline K8s objects (namespace `selfcare-dev`, `selfcare-infra-creds`
+Secret, ConfigMaps) are applied automatically by the script from
+`deploy/kubernetes/`.
 
 Monitor / debug:
 
 ```bash
-kubectl get pods -n selfcare
-kubectl get svc -n selfcare
-kubectl logs -n selfcare deployment/api-gateway --tail=100
-kubectl rollout status deployment/api-gateway -n selfcare --timeout=180s
-kubectl describe pod -n selfcare -l app=api-gateway
-kubectl port-forward -n selfcare svc/api-gateway 8080:8080
+kubectl get pods -n selfcare-dev
+kubectl get svc -n selfcare-dev
+kubectl logs -n selfcare-dev deployment/api-gateway --tail=100
+kubectl rollout status deployment/api-gateway -n selfcare-dev --timeout=180s
+kubectl describe pod -n selfcare-dev -l app.kubernetes.io/name=api-gateway
+kubectl port-forward -n selfcare-dev svc/api-gateway 8080:8080
 ```
 
 ### Build & deploy a single service (Docker Desktop K8s — recommended)
@@ -136,8 +130,8 @@ per rebuild:
 docker build -t selfcare/<service>:k8s-N -f C:\Users\sangiya\AppData\Local\Temp\opencode\generic.Dockerfile backend\<service>\target
 
 # Roll the deployment onto the new image
-kubectl set image deployment/<service> <service>=selfcare/<service>:k8s-N -n selfcare
-kubectl rollout status deployment/<service> -n selfcare --timeout=180s
+kubectl set image deployment/<service> <service>=selfcare/<service>:k8s-N -n selfcare-dev
+kubectl rollout status deployment/<service> -n selfcare-dev --timeout=180s
 ```
 
 Build one service from Maven (no tests / jacoco):
@@ -158,37 +152,40 @@ ENTRYPOINT ["java","-jar","/app/app.jar"]
 Access (NodePort):
 - API Gateway  http://localhost:30080
 - Studio       http://localhost:30081
-- Prometheus   http://localhost:30090
-- Grafana      http://localhost:30300  (admin/Selfcare_Gr4f4n4_Adm1n_Pa55w0rd!2026)
+- Support svc  http://localhost:30098
+
+Smoke test:
+
+```bash
+scripts/verify.sh
+```
 
 Tear down:
 
 ```bash
-kubectl delete ns selfcare
+kubectl delete ns selfcare-dev
 ```
 
 ---
 
-## 5. CI stack — Jenkins + SonarQube (Docker Compose)
+## 5. CI stack — Jenkins + SonarQube (Kubernetes via Helm)
+
+Jenkins and SonarQube run on Kubernetes via the `ci/helm` chart (not
+docker-compose). Jenkins performs the one-by-one microservice promotion with
+the full pipeline in `ci/jenkins/Jenkinsfile`.
 
 ```bash
-# 1. Configure (Windows PowerShell)
+# 1. Configure credentials (ci/.env.ci)
 Copy-Item ci\.env.ci.example ci\.env.ci
-#    set JENKINS_ADMIN_PASSWORD and SONAR_TOKEN in ci/.env.ci
+#    set JENKINS_ADMIN_PASSWORD, SONAR_ADMIN_PASSWORD, SONAR_TOKEN
 
-# 2. Start (pulls SonarQube, builds Jenkins image, waits for health)
-.\ci\start-local-ci.ps1
-```
-
-Manual equivalent:
-
-```bash
-docker compose --env-file ci/.env.ci -f ci/docker-compose.ci.yml up -d
+# 2. Deploy CI stack to K8s
+helm upgrade --install selfcare-ci ci/helm -n selfcare-ci --create-namespace
 ```
 
 Access:
 - SonarQube  http://localhost:9000  (first login admin/Selfcare_S0n4r_Adm1n_Pa55w0rd!2026 → create token)
-- Jenkins    http://localhost:8080  (admin / your JENKINS_ADMIN_PASSWORD)
+- Jenkins    http://localhost:8080  (admin / Selfcare_J3nk1ns_Adm1n_Pa55w0rd!2026)
 
 Jenkins job: create a Pipeline job from the GitHub repo with script path
 `Jenkinsfile`. Jenkins has kubectl + docker.sock mounted so it can deploy to

@@ -84,8 +84,10 @@ if [ "$DO_SYNC" = false ]; then
   echo "KUBECTL fallback: set image on $LEAD_TENANT-prod deployments"
   NAMESPACE="selfcare-${LEAD_TENANT}-prod"
   IMAGE_NS="${IMAGE_NAMESPACE:-ghcr.io/sangiya123}"
-  for SVC in api-gateway config-tenant-service admin-identity-service notification-service \
-             content-service audit-service approval-service; do
+  for SVC in api-gateway config-tenant-service customer-identity-service admin-identity-service support-service \
+             product-service usage-service billing-service payment-service notification-service content-service \
+             journey-service reporting-service ai-gateway audit-service insurance-service approval-service \
+             account-entitlement-service dashboard-bff; do
     kubectl set image deployment/$SVC "$SVC=$IMAGE_NS/$SVC:$TAG" \
       -n "$NAMESPACE" 2>/dev/null && echo "SET   $SVC" || true
   done
@@ -118,8 +120,10 @@ deploy_tenant() {
       return 1
     }
   else
-    for SVC in api-gateway config-tenant-service admin-identity-service notification-service \
-               content-service audit-service approval-service; do
+    for SVC in api-gateway config-tenant-service customer-identity-service admin-identity-service support-service \
+             product-service usage-service billing-service payment-service notification-service content-service \
+             journey-service reporting-service ai-gateway audit-service insurance-service approval-service \
+             account-entitlement-service dashboard-bff; do
       kubectl set image deployment/$SVC "$SVC=$IMAGE_NS/$SVC:$TAG" \
         -n "$NS" 2>/dev/null && echo "SET   $SVC ($TENANT)" || true
     done

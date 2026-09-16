@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
-# deploy-k8s.sh — Deploy selfcare to Kubernetes (EKS or docker-desktop).
+# deploy-k8s.sh — Deploy selfcare microservices to Kubernetes ONE BY ONE.
+#
+# Deployment model (v3):
+#   - Stateful infrastructure (MongoDB/Redis/MySQL/Kafka/Mongo-Express/PMA)
+#     lives OUTSIDE Kubernetes (docker-compose on the host / managed PaaS).
+#   - Kubernetes runs ONLY the stateless workloads: the 19 backend
+#     microservices + the admin portal, deployed sequentially one-by-one
+#     via the umbrella Helm chart using deploy.isolated=true.
 #
 # Usage:
 #   ./scripts/deploy-k8s.sh --env dev [--tag VERSION] [--registry REG] [--namespace NS]
-#                            [--context CTX] [--skip-seed] [--local]
+#                            [--context CTX] [--local] [--service NAME] [--skip-seed]
 #
 # Examples:
-#   # EKS dev deploy (from Jenkins)
+#   # Deploy ALL microservices one-by-one to dev (EKS)
 #   ./scripts/deploy-k8s.sh --env dev --tag dev-42 --registry ghcr.io/sangiya123
 #
-#   # Local docker-desktop deploy (default namespace = selfcare, no registry)
+#   # Deploy ONLY one service (true one-by-one, used by Jenkins loops)
+#   ./scripts/deploy-k8s.sh --env dev --tag dev-42 --registry ghcr.io/sangiya123 --service config-tenant-service
+#
+#   # Local docker-desktop (no registry, table-driven service list)
 #   ./scripts/deploy-k8s.sh --env dev --local
 #
 # Environment overrides:
@@ -23,7 +33,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 K8S_DIR="$PLATFORM_DIR/deploy/kubernetes"
+HELM_CHART="$PLATFORM_DIR/backend/deploy/helm"
+ADMIN_CHART="$PLATFORM_DIR/admin/selfcare-admin/deploy/helm"
 KUBECTL="kubectl"
+
+# --- All 19 microservices (source of truth: backend/deploy/helm/values.yaml) ---
+SERVICES=(
+  api-gateway config-tenant-service customer-identity-service admin-identity-service
+  account-entitlement-service dashboard-bff product-service usage-service support-service
+  billing-service payment-service notification-service content-service journey-service
+  reporting-service ai-gateway audit-service insurance-service approval-service
+)
 
 # --- Defaults ---
 ENV=""
@@ -33,8 +53,7 @@ SELFCARE_CONTEXT="${SELFCARE_CONTEXT:-}"
 SELFCARE_NAMESPACE="${SELFCARE_NAMESPACE:-}"
 LOCAL_MODE=false
 SKIP_SEED=false
-SKIP_INFRA=false
-CHECK_ONLY=false
+ONLY_SERVICE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -45,24 +64,19 @@ while [[ $# -gt 0 ]]; do
     --context)        SELFCARE_CONTEXT="$2";     shift 2 ;;
     --local)          LOCAL_MODE=true;          shift ;;
     --skip-seed)      SKIP_SEED=true;           shift ;;
-    --skip-infra)     SKIP_INFRA=true;          shift ;;
-    --check-only)     CHECK_ONLY=true;          shift ;;
+    --service)        ONLY_SERVICE="$2";         shift 2 ;;
     *)                echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
 if [ -z "$ENV" ]; then
-  echo "ERROR: --env is required (dev | stg | prod)"
+  echo "ERROR: --env is required (dev | stg | reg | prod)"
   exit 1
 fi
 
-# Derive namespace: selfcare-dev / selfcare-stg / selfcare-prod (or selfcare in local mode)
+# Derive namespace: selfcare-dev / selfcare-stg / selfcare-reg / selfcare-prod
 if [ -z "$SELFCARE_NAMESPACE" ]; then
-  if [ "$LOCAL_MODE" = true ]; then
-    SELFCARE_NAMESPACE="selfcare"
-  else
-    SELFCARE_NAMESPACE="selfcare-${ENV}"
-  fi
+  SELFCARE_NAMESPACE="selfcare-${ENV}"
 fi
 
 # Resolve kubectl context
@@ -73,31 +87,17 @@ elif [ "$LOCAL_MODE" = true ]; then
 fi
 
 echo "=============================================="
-echo " selfcare — Kubernetes Deploy"
+echo " selfcare — Kubernetes Deploy (one-by-one)"
 echo " Env       : $ENV"
 echo " Namespace : $SELFCARE_NAMESPACE"
 echo " Tag       : $VERSION"
 echo " Registry  : $IMAGE_NAMESPACE"
 echo " Context   : $(kubectl config current-context 2>/dev/null || echo auto)"
 echo " Local     : $LOCAL_MODE"
+echo " Service   : ${ONLY_SERVICE:-ALL (${#SERVICES[@]})}"
 echo "=============================================="
 
-# Check-only mode: verify rollout health
-if [ "$CHECK_ONLY" = true ]; then
-  echo ""
-  echo "--- Checking rollout status for namespace $SELFCARE_NAMESPACE ---"
-  for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
-                 account-entitlement-service dashboard-bff product-service usage-service billing-service \
-                 payment-service notification-service content-service journey-service reporting-service \
-                 ai-gateway audit-service insurance-service approval-service; do
-    $KUBECTL rollout status deployment/$SERVICE -n $SELFCARE_NAMESPACE --timeout=5s 2>/dev/null \
-      && echo "OK    $SERVICE" \
-      || echo "FAIL  $SERVICE"
-  done
-  exit 0
-fi
-
-# Step 1: Create / patch namespace
+# Step 1: Namespace
 echo ""
 echo "--- Namespace $SELFCARE_NAMESPACE ---"
 $KUBECTL create namespace "$SELFCARE_NAMESPACE" --dry-run=client -o yaml | $KUBECTL apply -f -
@@ -108,8 +108,6 @@ echo "--- Secrets ---"
 if [ -f "$K8S_DIR/secrets.yaml" ]; then
   $KUBECTL apply -f "$K8S_DIR/secrets.yaml" -n "$SELFCARE_NAMESPACE" || true
 fi
-
-# If EKS and IMAGE_NAMESPACE contains registry host, create pull secret
 REGISTRY_HOST=$(echo "$IMAGE_NAMESPACE" | cut -d/ -f1)
 if [ "$LOCAL_MODE" = false ] && [ -n "$REGISTRY_HOST" ]; then
   $KUBECTL create secret docker-registry selfcare-registry-secret \
@@ -121,32 +119,14 @@ if [ "$LOCAL_MODE" = false ] && [ -n "$REGISTRY_HOST" ]; then
 fi
 echo "OK    secrets"
 
-# Step 3: ConfigMaps
+# Step 3: Shared ConfigMaps (behavior + per-service config comes from Helm)
 echo "--- ConfigMaps ---"
 if [ -f "$K8S_DIR/configmap.yaml" ]; then
   $KUBECTL apply -f "$K8S_DIR/configmap.yaml" -n "$SELFCARE_NAMESPACE"
 fi
 echo "OK    configmaps"
 
-# Step 4: Infrastructure (MongoDB/MySQL/Redis/Kafka)
-if [ "$SKIP_INFRA" = false ]; then
-  echo "--- Infrastructure (Mongo/MySQL/Redis/Kafka) ---"
-  if [ -f "$K8S_DIR/infra.yaml" ]; then
-    $KUBECTL apply -f "$K8S_DIR/infra.yaml" -n "$SELFCARE_NAMESPACE"
-    # Wait for Mongo
-    echo "Waiting for MongoDB..."
-    $KUBECTL rollout status deployment/mongodb -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
-    echo "Waiting for MySQL..."
-    $KUBECTL rollout status deployment/mysql -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
-    echo "Waiting for Redis..."
-    $KUBECTL rollout status deployment/redis -n "$SELFCARE_NAMESPACE" --timeout=120s 2>/dev/null || true
-    echo "OK    infrastructure ready"
-  fi
-else
-  echo "--- Infrastructure: skipped (--skip-infra) ---"
-fi
-
-# Step 5: Seed tenant data (once per namespace)
+# Step 4: Tenant seed (once per namespace, before services come up)
 if [ "$SKIP_SEED" = false ]; then
   echo "--- Tenant seed ---"
   if [ -f "$K8S_DIR/tenant-seeding-job.yaml" ]; then
@@ -154,41 +134,47 @@ if [ "$SKIP_SEED" = false ]; then
     $KUBECTL wait --for=condition=complete --timeout=60s \
       job/selfcare-tenant-seed-dialog -n "$SELFCARE_NAMESPACE" 2>/dev/null || true
     echo "OK    tenant seed"
+  else
+    echo "SKIP  no tenant-seeding-job.yaml (seed via docker-compose mongo-init instead)"
   fi
 else
   echo "--- Tenant seed: skipped ---"
 fi
 
-# Step 6: Deploy microservices
-echo ""
-echo "--- Deploy microservices ---"
-if [ -f "$K8S_DIR/services.yaml" ]; then
-  $KUBECTL apply -f "$K8S_DIR/services.yaml" -n "$SELFCARE_NAMESPACE"
+# Step 5: Deploy microservices ONE BY ONE via umbrella Helm chart (isolated mode)
+deploy_one() {
+  local service="$1"
+  echo ""
+  echo "--- Deploy $service ---"
+  helm upgrade --install "selfcare-${service}" "$HELM_CHART" \
+    --namespace "$SELFCARE_NAMESPACE" --create-namespace \
+    --set deploy.isolated=true \
+    --set deploy.service="$service" \
+    --set deploy.image.repository="$IMAGE_NAMESPACE/$service" \
+    --set deploy.image.tag="$VERSION" \
+    --set environment.name="$ENV" \
+    --set image.tag="$VERSION" \
+    --wait --timeout 5m
+  echo "OK    $service ready"
+}
+
+if [ -n "$ONLY_SERVICE" ]; then
+  deploy_one "$ONLY_SERVICE"
+else
+  for service in "${SERVICES[@]}"; do
+    deploy_one "$service"
+  done
 fi
 
-# Step 7: Set image tag on each deployment
-echo "--- Set images to $IMAGE_NAMESPACE/*:$VERSION ---"
-for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
-               account-entitlement-service dashboard-bff product-service usage-service billing-service \
-               payment-service notification-service content-service journey-service reporting-service \
-               ai-gateway audit-service insurance-service approval-service; do
-  IMAGE_REF="$IMAGE_NAMESPACE/$SERVICE:$VERSION"
-  $KUBECTL set image deployment/$SERVICE "$SERVICE=$IMAGE_REF" -n "$SELFCARE_NAMESPACE" 2>/dev/null \
-    && echo "SET   $SERVICE → $IMAGE_REF" \
-    || echo "SKIP  $SERVICE (no existing deployment)"
-done
-
-# Step 8: Rollout status
+# Step 6: Admin portal (nginx/React bundle) — stateless, deploy last
 echo ""
-echo "--- Rollout status ---"
-for SERVICE in api-gateway config-tenant-service customer-identity-service admin-identity-service \
-               account-entitlement-service dashboard-bff product-service usage-service billing-service \
-               payment-service notification-service content-service journey-service reporting-service \
-               ai-gateway audit-service insurance-service approval-service; do
-  $KUBECTL rollout status deployment/$SERVICE -n "$SELFCARE_NAMESPACE" --timeout=300s 2>/dev/null \
-    && echo "OK    $SERVICE ready" \
-    || echo "WARN  $SERVICE timeout"
-done
+echo "--- Deploy admin portal ---"
+helm upgrade --install selfcare-admin-portal "$ADMIN_CHART" \
+  --namespace "$SELFCARE_NAMESPACE" --create-namespace \
+  --set image.repository="$IMAGE_NAMESPACE/selfcare-admin" \
+  --set image.tag="$VERSION" \
+  --wait --timeout 3m
+echo "OK    admin portal ready"
 
 echo ""
 echo "=============================================="
