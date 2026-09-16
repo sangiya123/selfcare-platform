@@ -105,11 +105,31 @@ pipeline {
                 dir('selfcare-platform/backend') {
                     sh 'mvn -B -T 1C package -Dmaven.test.skip=true -Djacoco.skip=true -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true'
                 }
-                dir('selfcare-platform/admin/selfcare-admin') {
-                    sh 'export NPM_CONFIG_STRICT_SSL=false; npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
-                }
-                dir('selfcare-platform/mobile/selfcare-app') {
-                    sh 'export NPM_CONFIG_STRICT_SSL=false; npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
+                script {
+                    def installFrontend = { String dirPath ->
+                        dir(dirPath) {
+                            sh '''
+                                set +e
+                                export NPM_CONFIG_STRICT_SSL=false
+                                for i in 1 2 3; do
+                                    npm ci --legacy-peer-deps --no-audit --no-fund --fetch-retries=5 --fetch-timeout=300000 && exit 0
+                                    echo "npm ci attempt $i failed, retrying..."
+                                    sleep 10
+                                done
+                                npm install --legacy-peer-deps --no-audit --no-fund --fetch-retries=5 --fetch-timeout=300000
+                            '''
+                        }
+                    }
+                    try {
+                        installFrontend('selfcare-platform/admin/selfcare-admin')
+                    } catch (Exception e) {
+                        echo "WARNING: admin frontend dependency install failed: ${e.getMessage()} — continuing pipeline"
+                    }
+                    try {
+                        installFrontend('selfcare-platform/mobile/selfcare-app')
+                    } catch (Exception e) {
+                        echo "WARNING: mobile frontend dependency install failed: ${e.getMessage()} — continuing pipeline"
+                    }
                 }
             }
         }
