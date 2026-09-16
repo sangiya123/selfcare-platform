@@ -106,10 +106,10 @@ pipeline {
                     sh 'mvn -B -T 1C package -Dmaven.test.skip=true -Djacoco.skip=true -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true'
                 }
                 dir('selfcare-platform/admin/selfcare-admin') {
-                    sh 'npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
+                    sh 'export NPM_CONFIG_STRICT_SSL=false; npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
                 }
                 dir('selfcare-platform/mobile/selfcare-app') {
-                    sh 'npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
+                    sh 'export NPM_CONFIG_STRICT_SSL=false; npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund'
                 }
             }
         }
