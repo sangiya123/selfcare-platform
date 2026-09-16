@@ -1,4 +1,4 @@
-﻿// Selfcare Platform — Jenkins pipeline (full CI/CD, one-by-one deploy)
+// Selfcare Platform — Jenkins pipeline (full CI/CD, one-by-one deploy)
 //
 // Flow (exactly as specified):
 //   Compile -> Unit Test -> JaCoCo -> SonarQube -> Semgrep -> Gitleaks
